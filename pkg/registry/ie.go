@@ -1,4 +1,4 @@
-package infoelements
+package registry
 
 type IEDataType uint8
 
