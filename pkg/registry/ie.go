@@ -31,24 +31,24 @@ const (
 // InfoElement (IE) follows the specification in Section 2.1 of RFC7012
 type InfoElement struct {
 	// Name of the IE
-	name string
+	Name string
 	// Identifier for IE; follows Section 4.3 of RFC7013
-	elementId uint16
+	ElementId uint16
 	// dataType follows the specification in RFC7012(section 3.1)/RFC5610(section 3.1)
-	dataType IEDataType
+	DataType IEDataType
 	// Enterprise number or 0 (0 for IANA registry)
-	enterpriseId uint32
+	EnterpriseId uint32
 	// Length of IE
-	len uint16
+	Len uint16
 	// Add description and dataType semantics if required
 }
 
 func NewInfoElement(name string, ieID uint16, ieType IEDataType, entID uint32, len uint16) *InfoElement {
 	return &InfoElement{
-		name:         name,
-		elementId:    ieID,
-		dataType:     ieType,
-		enterpriseId: entID,
-		len:          len,
+		Name:         name,
+		ElementId:    ieID,
+		DataType:     ieType,
+		EnterpriseId: entID,
+		Len:          len,
 	}
 }
