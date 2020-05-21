@@ -8,7 +8,7 @@ import (
 
 var IANARegistry map[string]entities.InfoElement
 
-func Init() {
+func init() {
 	IANARegistry = make(map[string]entities.InfoElement)
 	LoadIANARegistry()
 }

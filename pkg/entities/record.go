@@ -10,6 +10,7 @@ import (
 )
 
 const (
+	// TODO: Need to think of adding support for multiple templates from a single exporter
 	UniqueTemplateID uint16 = 256
 )
 
@@ -22,9 +23,10 @@ const (
 type Record interface {
 	PrepareRecord() error
 	AddInfoElement(element InfoElement, val interface{}) error
-	// We can have functions for multiple elements as well.
+	// TODO: Functions for multiple elements as well.
+	GetBuffer() *bytes.Buffer
 }
-
+// TODO: Create base record struct. Some functions like GetBuffer will be applicable to base record.
 type dataRecord struct {
 	buff bytes.Buffer
 	len  uint16
@@ -49,6 +51,10 @@ func NewTemplateRecord(count uint16) *templateRecord {
 		len:        0,
 		fieldCount: count,
 	}
+}
+
+func (r *dataRecord) GetBuffer() *bytes.Buffer{
+	return &r.buff
 }
 
 func (r *dataRecord) PrepareRecord() {
@@ -154,7 +160,11 @@ func (r *dataRecord) AddInfoElement(element InfoElement, val interface{}) error 
 		if !ok {
 			return fmt.Errorf("val argument is not of type net.IP for this element")
 		}
-		bytesToAppend = append(bytesToAppend, []byte(v)...)
+		if ipv4Add := v.To4();  ipv4Add != nil {
+			bytesToAppend = append(bytesToAppend, []byte(ipv4Add)...)
+		} else {
+			bytesToAppend = append(bytesToAppend, []byte(v)...)
+		}
 	case String:
 		// TODO: We need to support variable length here
 		return fmt.Errorf("This API does not support string and octetArray types yet")
@@ -171,13 +181,17 @@ func (r *dataRecord) AddInfoElement(element InfoElement, val interface{}) error 
 	return nil
 }
 
-func (r *templateRecord) PrepareRecord() error {
+func (t *templateRecord) GetBuffer() *bytes.Buffer{
+	return &t.buff
+}
+
+func (t *templateRecord) PrepareRecord() error {
 	// Add Template Record Header
 	header := make([]byte, 4)
 	binary.BigEndian.PutUint16(header[0:2], UniqueTemplateID)
-	binary.BigEndian.PutUint16(header[2:4], r.fieldCount)
+	binary.BigEndian.PutUint16(header[2:4], t.fieldCount)
 
-	_, err := r.buff.Write(header)
+	_, err := t.buff.Write(header)
 	if err != nil {
 		log.Fatalf("Error in writing header to template record: %v", err)
 		return err
