@@ -14,7 +14,8 @@ import (
 // Here testing with mocks doesn't seem to be useful. Want to remove it.
 // TODO: Leaving to get comments to get ideas on making testing with mocks useful.
 func TestExportingProcess_AddRecordToMsg(t *testing.T) {
-	registry.LoadIANARegistry()
+	reg := registry.NewIanaRegistry()
+	reg.LoadRegistry()
 
 	ctrl := gomock.NewController(t)
 
@@ -25,12 +26,12 @@ func TestExportingProcess_AddRecordToMsg(t *testing.T) {
 	// Create template record with two fields
 	tempRec := entities.NewTemplateRecord(2)
 	tempRec.PrepareRecord()
-	element, err := registry.GetInfoElement("sourceIPv4Address")
+	element, err := reg.GetInfoElement("sourceIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the elements with name sourceIPv4Address")
 	}
 	tempRec.AddInfoElement(element, nil)
-	element, err = registry.GetInfoElement("destinationIPv4Address")
+	element, err = reg.GetInfoElement("destinationIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the elements with name sourceIPv4Address")
 	}
@@ -44,17 +45,18 @@ func TestExportingProcess_AddRecordToMsg(t *testing.T) {
 }
 
 func TestExportingProcess_SendingTemplateRecordToLocalServer(t *testing.T) {
-	registry.LoadIANARegistry()
+	reg := registry.NewIanaRegistry()
+	reg.LoadRegistry()
 
 	// Create template record with two fields
 	tempRec := entities.NewTemplateRecord(2)
 	tempRec.PrepareRecord()
-	element, err := registry.GetInfoElement("sourceIPv4Address")
+	element, err := reg.GetInfoElement("sourceIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
 	tempRec.AddInfoElement(element, nil)
-	element, err = registry.GetInfoElement("destinationIPv4Address")
+	element, err = reg.GetInfoElement("destinationIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
@@ -106,18 +108,19 @@ func TestExportingProcess_SendingTemplateRecordToLocalServer(t *testing.T) {
 }
 
 func TestExportingProcess_SendingDataRecordToLocalServer(t *testing.T) {
-	registry.LoadIANARegistry()
+	reg := registry.NewIanaRegistry()
+	reg.LoadRegistry()
 
 	// Create template record with two fields
 	dataRec := entities.NewDataRecord()
 	dataRec.PrepareRecord()
-	element, err := registry.GetInfoElement("sourceIPv4Address")
+	element, err := reg.GetInfoElement("sourceIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
 	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
 
-	element, err = registry.GetInfoElement("destinationIPv4Address")
+	element, err = reg.GetInfoElement("destinationIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
