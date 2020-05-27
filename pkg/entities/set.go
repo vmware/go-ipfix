@@ -16,7 +16,7 @@ const (
 )
 
 // Do not expose set to IPFIX library user
-// Not creating any interface plan to use same struct for Template and Data sets
+// Not creating any interface. Plan to use same struct for Template and Data sets
 
 type Set struct {
 	// Pointer to message buffer

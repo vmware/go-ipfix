@@ -51,9 +51,9 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*exportingProce
 }
 
 func (ep *exportingProcess) AddRecordAndSendMsg(recType entities.SetOrRecordType, recBuffer *[]byte) (int, error) {
-	// Check if message is exceeding the limit with new record
 	msgBuffer := ep.msg.GetMsgBuffer()
 	var bytesSent int
+	// Check if message is exceeding the limit with new record
 	if uint16(msgBuffer.Len() + len(*recBuffer)) > entities.MaxTcpSocketMsgSize {
 		ep.set.FinishSet()
 		b, err := ep.sendMsg()

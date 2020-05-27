@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/big"
 	"net"
 )
+
+//go:generate mockgen -destination=testing/mock_record.go -package=testing github.com/srikartati/go-ipfixlib/pkg/entities Record
 
 const (
 	// TODO: Need to think of adding support for multiple templates from a single exporter
@@ -16,16 +19,17 @@ const (
 
 // This package contains encoding of fields in the record.
 // Build the record here with local buffer and write to message buffer afterwards
-// Instead should we write the field directly on to message instead of have local buffer?
+// Instead should we write the field directly on to message instead of having a local buffer?
 // To begin with, we will have local buffer in record.
 // Have an interface and expose functions to user.
 
 type Record interface {
-	PrepareRecord() error
-	AddInfoElement(element InfoElement, val interface{}) error
+	PrepareRecord() (uint16, error)
+	AddInfoElement(element *InfoElement, val interface{}) (uint16, error)
 	// TODO: Functions for multiple elements as well.
 	GetBuffer() *bytes.Buffer
 }
+
 // TODO: Create base record struct. Some functions like GetBuffer will be applicable to base record.
 type dataRecord struct {
 	buff bytes.Buffer
@@ -53,139 +57,151 @@ func NewTemplateRecord(count uint16) *templateRecord {
 	}
 }
 
-func (r *dataRecord) GetBuffer() *bytes.Buffer{
-	return &r.buff
+func (d *dataRecord) GetBuffer() *bytes.Buffer{
+	return &d.buff
 }
 
-func (r *dataRecord) PrepareRecord() {
+func (d *dataRecord) PrepareRecord() (uint16, error) {
 	// We do not have to do anything if it is data record
-	return
+	return 0, nil
 }
 
-func (r *dataRecord) AddInfoElement(element InfoElement, val interface{}) error {
-	bytesToAppend := make([]byte, 0)
+func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
+	var bytesToAppend []byte
+	if element.Len != VariableLength {
+		bytesToAppend = make([]byte, element.Len)
+	} else {
+		bytesToAppend = make([]byte, 0)
+	}
 	switch dataType := element.DataType; dataType {
 	case Unsigned8:
 		v, ok := val.(uint8)
 		if !ok {
-			return fmt.Errorf("val argument is not of type uint8")
+			return 0, fmt.Errorf("val argument is not of type uint8")
 		}
-		bytesToAppend = append(bytesToAppend, v)
+		bytesToAppend[0] = v
 	case Unsigned16:
 		v, ok := val.(uint16)
 		if !ok {
-			return fmt.Errorf("val argument is not of type uint16")
+			return 0, fmt.Errorf("val argument is not of type uint16")
 		}
 		binary.BigEndian.PutUint16(bytesToAppend, v)
 	case Unsigned32:
 		v, ok := val.(uint32)
 		if !ok {
-			return fmt.Errorf("val argument is not of type uint32")
+			return 0, fmt.Errorf("val argument is not of type uint32")
 		}
 		binary.BigEndian.PutUint32(bytesToAppend, v)
 	case Unsigned64:
 		v, ok := val.(uint64)
 		if !ok {
-			return fmt.Errorf("val argument is not of type uint64")
+			return 0, fmt.Errorf("val argument is not of type uint64")
 		}
 		binary.BigEndian.PutUint64(bytesToAppend, v)
 	case Signed8:
 		v, ok := val.(int8)
 		if !ok {
-			return fmt.Errorf("val argument is not of type int8")
+			return 0, fmt.Errorf("val argument is not of type int8")
 		}
-		bytesToAppend = append(bytesToAppend, byte(v))
+		bytesToAppend[0] = byte(v)
 	case Signed16:
 		v, ok := val.(int16)
 		if !ok {
-			return fmt.Errorf("val argument is not of type int16")
+			return 0, fmt.Errorf("val argument is not of type int16")
 		}
 		binary.BigEndian.PutUint16(bytesToAppend, uint16(v))
 	case Signed32:
 		v, ok := val.(int32)
 		if !ok {
-			return fmt.Errorf("val argument is not of type int32")
+			return 0, fmt.Errorf("val argument is not of type int32")
 		}
 		binary.BigEndian.PutUint32(bytesToAppend, uint32(v))
 	case Signed64:
 		v, ok := val.(int64)
 		if !ok {
-			return fmt.Errorf("val argument is not of type int64")
+			return 0, fmt.Errorf("val argument is not of type int64")
 		}
 		binary.BigEndian.PutUint64(bytesToAppend, uint64(v))
 	case Float32:
 		v, ok := val.(float32)
 		if !ok {
-			return fmt.Errorf("val argument is not of type float32")
+			return 0, fmt.Errorf("val argument is not of type float32")
 		}
 		binary.BigEndian.PutUint32(bytesToAppend, math.Float32bits(v))
 	case Float64:
 		v, ok := val.(float64)
 		if !ok {
-			return fmt.Errorf("val argument is not of type float64")
+			return 0, fmt.Errorf("val argument is not of type float64")
 		}
 		binary.BigEndian.PutUint64(bytesToAppend, math.Float64bits(v))
 	case Boolean:
 		v, ok := val.(bool)
 		if !ok {
-			return fmt.Errorf("val argument is not of type bool")
+			return 0, fmt.Errorf("val argument is not of type bool")
 		}
 		// Following boolean spec from RFC7011
 		if v {
-			bytesToAppend = append(bytesToAppend, 1)
+			bytesToAppend[0] = 1
 		} else {
-			bytesToAppend = append(bytesToAppend, 2)
+			bytesToAppend[0] = 2
 		}
 	case DateTimeSeconds, DateTimeMilliseconds:
 		// We expect time to be given in int64 as unix time type in go
 		v, ok := val.(int64)
 		if !ok {
-			return fmt.Errorf("val argument is not of type int64")
+			return 0, fmt.Errorf("val argument is not of type int64")
 		}
 		binary.BigEndian.PutUint64(bytesToAppend, uint64(v))
 		// Currently only supporting seconds and milliseconds
 	case DateTimeMicroseconds, DateTimeNanoseconds:
 		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
-		return fmt.Errorf("This API does not support micro and nano seconds types yet")
+		return 0, fmt.Errorf("This API does not support micro and nano seconds types yet")
 	case MacAddress:
 		// Expects net.Hardware type
 		v, ok := val.(net.HardwareAddr)
 		if !ok {
-			return fmt.Errorf("val argument is not of type net.HardwareAddr for this element")
+			return 0, fmt.Errorf("val argument is not of type net.HardwareAddr for this element")
 		}
-		bytesToAppend = append(bytesToAppend, []byte(v)...)
+		for i, b := range v {
+			bytesToAppend[i] = b
+		}
+		//bytesToAppend = append(bytesToAppend, []byte(v)...)
 	case Ipv4Address, Ipv6Address:
 		// Expects net.IP type
 		v, ok := val.(net.IP)
 		if !ok {
-			return fmt.Errorf("val argument is not of type net.IP for this element")
+			return 0, fmt.Errorf("val argument is not of type net.IP for this element")
 		}
 		if ipv4Add := v.To4();  ipv4Add != nil {
-			bytesToAppend = append(bytesToAppend, []byte(ipv4Add)...)
+			ipv4Int := big.NewInt(0)
+			ipv4Int.SetBytes(ipv4Add)
+			binary.BigEndian.PutUint32(bytesToAppend, uint32(ipv4Int.Uint64()))
 		} else {
-			bytesToAppend = append(bytesToAppend, []byte(v)...)
+			for i, b := range v {
+				bytesToAppend[i] = b
+			}
 		}
 	case String:
 		// TODO: We need to support variable length here
-		return fmt.Errorf("This API does not support string and octetArray types yet")
+		return 0, fmt.Errorf("This API does not support string and octetArray types yet")
 	default:
-		return fmt.Errorf("This API supports only valid information elements with datatypes given in RFC7011")
+		return 0, fmt.Errorf("This API supports only valid information elements with datatypes given in RFC7011")
 	}
 
-	_, err := r.buff.Write(bytesToAppend)
+	bytesWritten, err := d.buff.Write(bytesToAppend)
 	if err != nil {
 		log.Fatalf("Error in writing field to data record: %v", err)
-		return err
+		return 0, err
 	}
 
-	return nil
+	return uint16(bytesWritten), nil
 }
 
 func (t *templateRecord) GetBuffer() *bytes.Buffer{
 	return &t.buff
 }
 
-func (t *templateRecord) PrepareRecord() error {
+func (t *templateRecord) PrepareRecord() (uint16, error) {
 	// Add Template Record Header
 	header := make([]byte, 4)
 	binary.BigEndian.PutUint16(header[0:2], UniqueTemplateID)
@@ -194,16 +210,16 @@ func (t *templateRecord) PrepareRecord() error {
 	_, err := t.buff.Write(header)
 	if err != nil {
 		log.Fatalf("Error in writing header to template record: %v", err)
-		return err
+		return 0, err
 	}
 
-	return nil
+	return uint16(len(header)), nil
 }
 
-func (r *templateRecord) AddInfoElement(element InfoElement, val interface{}) error {
+func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
 	// val could be used to specify smaller length than default? For now assert it to be nil
 	if val != nil {
-		return fmt.Errorf("AddInfoElement of template record cannot take value: %v. nil is expected", val)
+		return 0, fmt.Errorf("AddInfoElement of template record cannot take value: %v. nil is expected", val)
 	}
 	// Add field specifier
 	fieldSpecifier := make([]byte, 4, 8)
@@ -217,11 +233,11 @@ func (r *templateRecord) AddInfoElement(element InfoElement, val interface{}) er
 		fieldSpecifier = append(fieldSpecifier, bytesToAppend...)
 	}
 
-	_, err := r.buff.Write(fieldSpecifier)
+	bytesWritten, err := t.buff.Write(fieldSpecifier)
 	if err != nil {
 		log.Fatalf("Error in writing field to template record: %v", err)
-		return err
+		return 0, err
 	}
 
-	return nil
+	return uint16(bytesWritten), nil
 }
