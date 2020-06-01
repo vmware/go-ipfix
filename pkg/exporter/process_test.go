@@ -70,12 +70,12 @@ func TestExportingProcess_SendingTemplateRecordToLocalServer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	tempRec.AddInfoElement(&element, nil)
+	tempRec.AddInfoElement(element, nil)
 	element, err = reg.GetInfoElement("destinationIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	tempRec.AddInfoElement(&element, nil)
+	tempRec.AddInfoElement(element, nil)
 	tempRecBuff := tempRec.GetBuffer()
 	tempRecBytes := tempRecBuff.Bytes()
 
@@ -134,13 +134,13 @@ func TestExportingProcess_SendingDataRecordToLocalServer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	dataRec.AddInfoElement(&element, net.ParseIP("1.2.3.4"))
+	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
 
 	element, err = reg.GetInfoElement("destinationIPv4Address")
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	dataRec.AddInfoElement(&element, net.ParseIP("5.6.7.8"))
+	dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
 	dataRecBuff := dataRec.GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 

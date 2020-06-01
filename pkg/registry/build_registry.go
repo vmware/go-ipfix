@@ -82,7 +82,7 @@ func (registry *antreaRegistry) LoadRegistry() {
 
 	for idx, row := range data {
 		// skip header
-		if idx == 0  {
+		if idx == 0 {
 			continue
 		}
 
@@ -96,7 +96,7 @@ func (registry *antreaRegistry) LoadRegistry() {
 	output.Close()
 }
 
-func readCSVFromURL(url string) ([][] string, error) {
+func readCSVFromURL(url string) ([][]string, error) {
 	response, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -110,7 +110,7 @@ func readCSVFromURL(url string) ([][] string, error) {
 	return data, nil
 }
 
-func readCSVFromFile(name string) ([][] string, error) {
+func readCSVFromFile(name string) ([][]string, error) {
 	file, err := os.Open(name)
 	if err != nil {
 		return nil, err
