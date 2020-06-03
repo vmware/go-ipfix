@@ -6,10 +6,10 @@ import (
 	"log"
 )
 
-type SetOrRecordType uint8
+type ContentType uint8
 
 const (
-	Template SetOrRecordType = iota
+	Template ContentType = iota
 	Data
 	// Add OptionsTemplate too when it is supported
 	Undefined = 255
@@ -22,7 +22,7 @@ type Set struct {
 	// Pointer to message buffer
 	buffer  *bytes.Buffer
 	currLen uint16
-	setType SetOrRecordType
+	setType ContentType
 }
 
 func NewSet(buffer *bytes.Buffer) *Set {
@@ -33,7 +33,7 @@ func NewSet(buffer *bytes.Buffer) *Set {
 	}
 }
 
-func (s *Set) CreateNewSet(setType SetOrRecordType) error {
+func (s *Set) CreateNewSet(setType ContentType) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
@@ -60,7 +60,7 @@ func (s *Set) GetBuffLen() uint16 {
 	return s.currLen
 }
 
-func (s *Set) GetSetType() SetOrRecordType {
+func (s *Set) GetSetType() ContentType {
 	return s.setType
 }
 

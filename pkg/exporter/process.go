@@ -15,7 +15,7 @@ import (
 var _ ExportingProcess = new(exportingProcess)
 
 type ExportingProcess interface {
-	AddRecordAndSendMsg(setType entities.SetOrRecordType, recBuffer *[]byte) (int, error)
+	AddRecordAndSendMsg(setType entities.ContentType, recBuffer *[]byte) (int, error)
 	// TODO: Add function to send multiple records simultaneously
 	CloseConnToCollector()
 }
@@ -50,7 +50,7 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*exportingProce
 	}, nil
 }
 
-func (ep *exportingProcess) AddRecordAndSendMsg(recType entities.SetOrRecordType, recBuffer *[]byte) (int, error) {
+func (ep *exportingProcess) AddRecordAndSendMsg(recType entities.ContentType, recBuffer *[]byte) (int, error) {
 	msgBuffer := ep.msg.GetMsgBuffer()
 	var bytesSent int
 	// Check if message is exceeding the limit with new record
@@ -148,6 +148,6 @@ func (ep *exportingProcess) CloseConnToCollector() {
 }
 
 // Leaving this for now to get better ideas on how to use mocks for testing in this scenario.
-func funcToTestAddRecordMsg(ep ExportingProcess, recType entities.SetOrRecordType, recBytes *[]byte) (int, error) {
+func funcToTestAddRecordMsg(ep ExportingProcess, recType entities.ContentType, recBytes *[]byte) (int, error) {
 	return ep.AddRecordAndSendMsg(recType, recBytes)
 }
