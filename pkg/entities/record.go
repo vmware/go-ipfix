@@ -57,7 +57,7 @@ func NewTemplateRecord(count uint16) *templateRecord {
 	}
 }
 
-func (d *dataRecord) GetBuffer() *bytes.Buffer{
+func (d *dataRecord) GetBuffer() *bytes.Buffer {
 	return &d.buff
 }
 
@@ -172,7 +172,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type net.IP for this element")
 		}
-		if ipv4Add := v.To4();  ipv4Add != nil {
+		if ipv4Add := v.To4(); ipv4Add != nil {
 			ipv4Int := big.NewInt(0)
 			ipv4Int.SetBytes(ipv4Add)
 			binary.BigEndian.PutUint32(bytesToAppend, uint32(ipv4Int.Uint64()))
@@ -182,8 +182,22 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 			}
 		}
 	case String:
-		// TODO: We need to support variable length here
-		return 0, fmt.Errorf("This API does not support string and octetArray types yet")
+		v, ok := val.(string)
+		if !ok {
+			return 0, fmt.Errorf("val argument is not of type string for this element")
+		}
+		if len(v) < 255 {
+			bytesToAppend = append(bytesToAppend, byte(len(v)))
+			bytesToAppend = append(bytesToAppend, []byte(v)...)
+		} else if len(v) < 65535 {
+			bytesToAppend = append(bytesToAppend, byte(255))
+
+			byteSlice := make([]byte, 2)
+			binary.BigEndian.PutUint16(byteSlice, uint16(len(v)))
+			bytesToAppend = append(bytesToAppend, byteSlice...)
+
+			bytesToAppend = append(bytesToAppend, []byte(v)...)
+		}
 	default:
 		return 0, fmt.Errorf("This API supports only valid information elements with datatypes given in RFC7011")
 	}
@@ -197,7 +211,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 	return uint16(bytesWritten), nil
 }
 
-func (t *templateRecord) GetBuffer() *bytes.Buffer{
+func (t *templateRecord) GetBuffer() *bytes.Buffer {
 	return &t.buff
 }
 

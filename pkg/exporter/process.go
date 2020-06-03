@@ -54,7 +54,7 @@ func (ep *exportingProcess) AddRecordAndSendMsg(recType entities.SetOrRecordType
 	msgBuffer := ep.msg.GetMsgBuffer()
 	var bytesSent int
 	// Check if message is exceeding the limit with new record
-	if uint16(msgBuffer.Len() + len(*recBuffer)) > entities.MaxTcpSocketMsgSize {
+	if uint16(msgBuffer.Len()+len(*recBuffer)) > entities.MaxTcpSocketMsgSize {
 		ep.set.FinishSet()
 		b, err := ep.sendMsg()
 		if err != nil {
@@ -117,7 +117,7 @@ func (ep *exportingProcess) createNewMsg() error {
 	return nil
 }
 
-func (ep *exportingProcess) sendMsg() (int, error){
+func (ep *exportingProcess) sendMsg() (int, error) {
 	// Update length, time and sequence number
 	msgBuffer := ep.msg.GetMsgBuffer()
 	byteSlice := msgBuffer.Bytes()
@@ -139,7 +139,7 @@ func (ep *exportingProcess) sendMsg() (int, error){
 	msgBuffer.Reset()
 	ep.msg.SetDataRecFlag(false)
 
-    return bytesSent, nil
+	return bytesSent, nil
 }
 
 func (ep *exportingProcess) CloseConnToCollector() {

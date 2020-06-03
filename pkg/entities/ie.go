@@ -31,7 +31,7 @@ const (
 
 const VariableLength uint16 = 65535
 
-var InfoElementLength = [...]uint16 {
+var InfoElementLength = [...]uint16{
 	VariableLength,
 	1,
 	2,
