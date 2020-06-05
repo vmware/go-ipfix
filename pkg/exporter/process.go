@@ -12,21 +12,14 @@ import (
 
 //go:generate mockgen -destination=testing/mock_process.go -package=testing github.com/srikartati/go-ipfixlib/pkg/exporter ExportingProcess
 
-var _ ExportingProcess = new(exportingProcess)
-
-type ExportingProcess interface {
-	AddRecordAndSendMsg(setType entities.ContentType, recBuffer *[]byte) (int, error)
-	// TODO: Add function to send multiple records simultaneously
-	CloseConnToCollector()
-}
-
-// 1. Tested one exportingProcess process per exporter. Can support multiple collector scenario by
+// 1. Tested one ExportingProcess process per exporter. Can support multiple collector scenario by
 //    creating different instances of exporting process. Need to be tested
 // 2. Only one observation point per observation domain is supported,
 //    so observation point ID not defined.
 // 3. Supports only TCP session; SCTP and UDP is not supported.
 // TODO:UDP needs to send MTU size packets as per RFC7011
-type exportingProcess struct {
+// TODO: Add function to send multiple records simultaneously
+type ExportingProcess struct {
 	connToCollector net.Conn
 	obsDomainID     uint32
 	seqNumber       uint32
@@ -34,14 +27,14 @@ type exportingProcess struct {
 	msg             *entities.MsgBuffer
 }
 
-func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*exportingProcess, error) {
+func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*ExportingProcess, error) {
 	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 	if err != nil {
-		log.Fatalf("Cannot the create the connection to configured exportingProcess %s. Error is %v", collectorAddr.String(), err)
+		log.Fatalf("Cannot the create the connection to configured ExportingProcess %s. Error is %v", collectorAddr.String(), err)
 		return nil, err
 	}
 	msgBuffer := entities.NewMsgBuffer()
-	return &exportingProcess{
+	return &ExportingProcess{
 		connToCollector: conn,
 		obsDomainID:     obsID,
 		seqNumber:       0,
@@ -50,7 +43,7 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*exportingProce
 	}, nil
 }
 
-func (ep *exportingProcess) AddRecordAndSendMsg(recType entities.ContentType, recBuffer *[]byte) (int, error) {
+func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, recBuffer *[]byte) (int, error) {
 	msgBuffer := ep.msg.GetMsgBuffer()
 	var bytesSent int
 	// Check if message is exceeding the limit with new record
@@ -100,7 +93,7 @@ func (ep *exportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 	return bytesSent, nil
 }
 
-func (ep *exportingProcess) createNewMsg() error {
+func (ep *ExportingProcess) createNewMsg() error {
 	// Create the header and write to message
 	header := make([]byte, 16)
 	// IPFIX version number is 10.
@@ -117,7 +110,7 @@ func (ep *exportingProcess) createNewMsg() error {
 	return nil
 }
 
-func (ep *exportingProcess) sendMsg() (int, error) {
+func (ep *ExportingProcess) sendMsg() (int, error) {
 	// Update length, time and sequence number
 	msgBuffer := ep.msg.GetMsgBuffer()
 	byteSlice := msgBuffer.Bytes()
@@ -142,12 +135,7 @@ func (ep *exportingProcess) sendMsg() (int, error) {
 	return bytesSent, nil
 }
 
-func (ep *exportingProcess) CloseConnToCollector() {
+func (ep *ExportingProcess) CloseConnToCollector() {
 	ep.connToCollector.Close()
 	return
-}
-
-// Leaving this for now to get better ideas on how to use mocks for testing in this scenario.
-func funcToTestAddRecordMsg(ep ExportingProcess, recType entities.ContentType, recBytes *[]byte) (int, error) {
-	return ep.AddRecordAndSendMsg(recType, recBytes)
 }
