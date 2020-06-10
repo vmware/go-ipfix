@@ -63,6 +63,34 @@ func (mr *MockRecordMockRecorder) GetBuffer() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBuffer", reflect.TypeOf((*MockRecord)(nil).GetBuffer))
 }
 
+// GetFieldCount mocks base method
+func (m *MockRecord) GetFieldCount() uint16 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetFieldCount")
+	ret0, _ := ret[0].(uint16)
+	return ret0
+}
+
+// GetFieldCount indicates an expected call of GetFieldCount
+func (mr *MockRecordMockRecorder) GetFieldCount() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFieldCount", reflect.TypeOf((*MockRecord)(nil).GetFieldCount))
+}
+
+// GetTemplateID mocks base method
+func (m *MockRecord) GetTemplateID() uint16 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetTemplateID")
+	ret0, _ := ret[0].(uint16)
+	return ret0
+}
+
+// GetTemplateID indicates an expected call of GetTemplateID
+func (mr *MockRecordMockRecorder) GetTemplateID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetTemplateID", reflect.TypeOf((*MockRecord)(nil).GetTemplateID))
+}
+
 // PrepareRecord mocks base method
 func (m *MockRecord) PrepareRecord() (uint16, error) {
 	m.ctrl.T.Helper()

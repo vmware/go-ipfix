@@ -33,7 +33,7 @@ func NewSet(buffer *bytes.Buffer) *Set {
 	}
 }
 
-func (s *Set) CreateNewSet(setType ContentType) error {
+func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
@@ -41,7 +41,7 @@ func (s *Set) CreateNewSet(setType ContentType) error {
 	} else if setType == Data {
 		// Supporting only one templateID per exporting process
 		// TODO: Add support to multiple template IDs
-		binary.BigEndian.PutUint16(header[0:2], UniqueTemplateID)
+		binary.BigEndian.PutUint16(header[0:2], templateID)
 	}
 	// Write the set header to msg buffer
 	_, err := s.buffer.Write(header)

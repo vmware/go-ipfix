@@ -34,7 +34,7 @@ func (m *MockExportingProcess) EXPECT() *MockExportingProcessMockRecorder {
 }
 
 // AddRecordAndSendMsg mocks base method
-func (m *MockExportingProcess) AddRecordAndSendMsg(arg0 entities.ContentType, arg1 *[]byte) (int, error) {
+func (m *MockExportingProcess) AddRecordAndSendMsg(arg0 entities.ContentType, arg1 entities.Record) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddRecordAndSendMsg", arg0, arg1)
 	ret0, _ := ret[0].(int)

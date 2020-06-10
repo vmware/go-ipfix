@@ -12,11 +12,6 @@ import (
 
 //go:generate mockgen -destination=testing/mock_record.go -package=testing github.com/srikartati/go-ipfixlib/pkg/entities Record
 
-const (
-	// TODO: Need to think of adding support for multiple templates from a single exporter
-	UniqueTemplateID uint16 = 256
-)
-
 // This package contains encoding of fields in the record.
 // Build the record here with local buffer and write to message buffer afterwards
 // Instead should we write the field directly on to message instead of having a local buffer?
@@ -28,37 +23,57 @@ type Record interface {
 	AddInfoElement(element *InfoElement, val interface{}) (uint16, error)
 	// TODO: Functions for multiple elements as well.
 	GetBuffer() *bytes.Buffer
+	GetTemplateID() uint16
+	GetFieldCount() uint16
+	GetTemplateFields() *[]string
 }
 
 // TODO: Create base record struct. Some functions like GetBuffer will be applicable to base record.
-type dataRecord struct {
-	buff bytes.Buffer
-	len  uint16
+type baseRecord struct {
+	buff       bytes.Buffer
+	len        uint16
+	fieldCount uint16
+	template   uint16
+	Record
 }
 
-func NewDataRecord() *dataRecord {
+type dataRecord struct {
+	*baseRecord
+}
+
+func NewDataRecord(id uint16) *dataRecord {
 	return &dataRecord{
-		buff: bytes.Buffer{},
-		len:  0,
+		&baseRecord{buff: bytes.Buffer{}, len: 0, fieldCount: 0, template: id},
 	}
 }
 
 type templateRecord struct {
-	buff       bytes.Buffer
-	len        uint16
-	fieldCount uint16
+	*baseRecord
+	templateList []string
 }
 
-func NewTemplateRecord(count uint16) *templateRecord {
+func NewTemplateRecord(count uint16, id uint16) *templateRecord {
 	return &templateRecord{
-		buff:       bytes.Buffer{},
-		len:        0,
-		fieldCount: count,
+		&baseRecord{
+			buff:       bytes.Buffer{},
+			len:        0,
+			fieldCount: count,
+			template:   id,
+		},
+		make([]string, 0),
 	}
 }
 
-func (d *dataRecord) GetBuffer() *bytes.Buffer {
-	return &d.buff
+func (b *baseRecord) GetBuffer() *bytes.Buffer {
+	return &b.buff
+}
+
+func (b *baseRecord) GetTemplateID() uint16 {
+	return b.template
+}
+
+func (b *baseRecord) GetFieldCount() uint16 {
+	return b.fieldCount
 }
 
 func (d *dataRecord) PrepareRecord() (uint16, error) {
@@ -67,6 +82,7 @@ func (d *dataRecord) PrepareRecord() (uint16, error) {
 }
 
 func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
+	d.fieldCount++
 	var bytesToAppend []byte
 	if element.Len != VariableLength {
 		bytesToAppend = make([]byte, element.Len)
@@ -211,14 +227,10 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 	return uint16(bytesWritten), nil
 }
 
-func (t *templateRecord) GetBuffer() *bytes.Buffer {
-	return &t.buff
-}
-
 func (t *templateRecord) PrepareRecord() (uint16, error) {
 	// Add Template Record Header
 	header := make([]byte, 4)
-	binary.BigEndian.PutUint16(header[0:2], UniqueTemplateID)
+	binary.BigEndian.PutUint16(header[0:2], t.template)
 	binary.BigEndian.PutUint16(header[2:4], t.fieldCount)
 
 	_, err := t.buff.Write(header)
@@ -252,6 +264,10 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 		log.Fatalf("Error in writing field to template record: %v", err)
 		return 0, err
 	}
-
+	t.templateList = append(t.templateList, element.Name)
 	return uint16(bytesWritten), nil
+}
+
+func (t *templateRecord) GetTemplateFields() *[]string {
+	return &t.templateList
 }

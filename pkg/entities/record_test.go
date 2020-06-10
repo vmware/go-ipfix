@@ -5,6 +5,7 @@ import (
 	"net"
 	"testing"
 )
+var uniqueTemplateID uint16 = 256
 
 func TestPrepareRecord(t *testing.T) {
 	prepareRecordTests := []struct {
@@ -12,8 +13,8 @@ func TestPrepareRecord(t *testing.T) {
 		expectLen uint16
 		expectErr error
 	}{
-		{NewDataRecord(), 0, nil},
-		{NewTemplateRecord(1), 4, nil},
+		{NewDataRecord(uniqueTemplateID), 0, nil},
+		{NewTemplateRecord(1, uniqueTemplateID), 4, nil},
 	}
 
 	for _, test := range prepareRecordTests {
@@ -61,8 +62,8 @@ func TestAddInfoElements(t *testing.T) {
 		ieList  []*InfoElement
 		valList []interface{}
 	}{
-		{NewTemplateRecord(1), testIEs, nil},
-		{NewDataRecord(), testIEs, valData},
+		{NewTemplateRecord(1, uniqueTemplateID), testIEs, nil},
+		{NewDataRecord(uniqueTemplateID), testIEs, valData},
 	}
 
 	for i, test := range addIETests {
