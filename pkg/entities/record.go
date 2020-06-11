@@ -1,3 +1,17 @@
+// Copyright 2020 go-ipfix Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package entities
 
 import (
@@ -10,7 +24,7 @@ import (
 	"net"
 )
 
-//go:generate mockgen -destination=testing/mock_record.go -package=testing github.com/srikartati/go-ipfixlib/pkg/entities Record
+//go:generate mockgen -copyright_file ../../license_templates/license_header.raw.txt -destination=testing/mock_record.go -package=testing github.com/srikartati/go-ipfixlib/pkg/entities Record
 
 // This package contains encoding of fields in the record.
 // Build the record here with local buffer and write to message buffer afterwards
@@ -215,7 +229,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 			bytesToAppend = append(bytesToAppend, []byte(v)...)
 		}
 	default:
-		return 0, fmt.Errorf("This API supports only valid information elements with datatypes given in RFC7011")
+		return 0, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 	}
 
 	bytesWritten, err := d.buff.Write(bytesToAppend)

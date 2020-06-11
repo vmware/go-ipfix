@@ -1,3 +1,17 @@
+// Copyright 2020 go-ipfix Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package exporter
 
 import (
@@ -9,8 +23,6 @@ import (
 
 	"github.com/srikartati/go-ipfixlib/pkg/entities"
 )
-
-//go:generate mockgen -destination=testing/mock_process.go -package=testing github.com/srikartati/go-ipfixlib/pkg/exporter ExportingProcess
 
 var uniqueTemplateID uint16 = 255
 
@@ -149,11 +161,6 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 func (ep *ExportingProcess) CloseConnToCollector() {
 	ep.connToCollector.Close()
 	return
-}
-
-// Leaving this for now to get better ideas on how to use mocks for testing in this scenario.
-func funcToTestAddRecordMsg(ep ExportingProcess, recType entities.ContentType, rec entities.Record) (int, error) {
-	return ep.AddRecordAndSendMsg(recType, rec)
 }
 
 func (ep *ExportingProcess) addTemplate(names *[]string) {
