@@ -26,6 +26,11 @@ import (
 
 var uniqueTemplateID uint16 = 255
 
+type templateValue struct{
+	elementNames []string
+	minDataRecLen uint16
+}
+
 // 1. Tested one exportingProcess process per exporter. Can support multiple collector scenario by
 //    creating different instances of exporting process. Need to be tested
 // 2. Only one observation point per observation domain is supported,
@@ -39,13 +44,13 @@ type ExportingProcess struct {
 	seqNumber       uint32
 	set             *entities.Set
 	msg             *entities.MsgBuffer
-	templates       map[uint16][]string
+	templatesMap    map[uint16]templateValue
 }
 
 func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*ExportingProcess, error) {
 	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 	if err != nil {
-		log.Fatalf("Cannot the create the connection to configured ExportingProcess %s. Error is %v", collectorAddr.String(), err)
+		log.Printf("Cannot the create the connection to configured ExportingProcess %s. Error is %v", collectorAddr.String(), err)
 		return nil, err
 	}
 	msgBuffer := entities.NewMsgBuffer()
@@ -55,15 +60,18 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*ExportingProce
 		seqNumber:       0,
 		set:             entities.NewSet(msgBuffer.GetMsgBuffer()),
 		msg:             msgBuffer,
-		templates:       make(map[uint16][]string),
+		templatesMap:    make(map[uint16]templateValue),
 	}, nil
 }
 
 func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, rec entities.Record) (int, error) {
 	if recType == entities.Template {
-		ep.addTemplate(rec.GetTemplateFields())
+		ep.updateTemplate(rec.GetTemplateID(), rec.GetTemplateFields(), rec.GetMinDataRecordLen())
 	} else if recType == entities.Data {
-		ep.sanityCheck(rec)
+		err := ep.sanityCheck(rec)
+		if err != nil {
+			return 0, fmt.Errorf("error when doing sanity check:%v", err)
+		}
 	}
 	recBytes := rec.GetBuffer().Bytes()
 
@@ -74,15 +82,14 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 		ep.set.FinishSet()
 		b, err := ep.sendMsg()
 		if err != nil {
-			log.Fatalf("Sending msg as it exceeded max msg size. Returned error: %v", err)
+			return b, err
 		}
 		bytesSent = bytesSent + b
 	}
 	if msgBuffer.Len() == 0 {
 		err := ep.createNewMsg()
 		if err != nil {
-			log.Fatalf("Cannot create new msg. Returned error: %v", err)
-			return bytesSent, err
+			return bytesSent, fmt.Errorf("error when creating message: %v", err)
 		}
 	}
 	// Check set buffer length and type change to create new set in the message
@@ -95,8 +102,7 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 	// Write the record to the set
 	err := ep.set.WriteRecordToSet(&recBytes)
 	if err != nil {
-		log.Fatalf("Error in writing record to the current set: %v", err)
-		return bytesSent, err
+		return bytesSent, fmt.Errorf("error when writing record to the set: %v", err)
 	}
 	if recType == entities.Data && !ep.msg.GetDataRecFlag() {
 		ep.msg.SetDataRecFlag(true)
@@ -108,7 +114,6 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 
 	b, err := ep.sendMsg()
 	if err != nil {
-		log.Fatalf("Sending msg as it exceeded max msg size. Returned error: %v", err)
 		return bytesSent, err
 	}
 	bytesSent = bytesSent + b
@@ -127,7 +132,7 @@ func (ep *ExportingProcess) createNewMsg() error {
 	msgBuffer := ep.msg.GetMsgBuffer()
 	_, err := msgBuffer.Write(header)
 	if err != nil {
-		log.Fatalf("Error in writing header to message buffer: %v", err)
+		log.Printf("Error in writing header to message buffer: %v", err)
 		return err
 	}
 	return nil
@@ -146,8 +151,10 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 	// Send msg on the connection
 	bytesSent, err := ep.connToCollector.Write(byteSlice)
 	if err != nil {
-		log.Fatalf("Error when sending message on collector connection: %v", err)
-		return bytesSent, err
+		// Reset the message buffer and return error
+		msgBuffer.Reset()
+		ep.msg.SetDataRecFlag(false)
+		return bytesSent, fmt.Errorf("error when sending message on controller connection: %v", err)
 	} else if bytesSent == 0 && len(byteSlice) != 0 {
 		return 0, fmt.Errorf("sent 0 bytes; message is of length: %d", len(byteSlice))
 	}
@@ -158,32 +165,55 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 	return bytesSent, nil
 }
 
-func (ep *ExportingProcess) CloseConnToCollector() {
-	ep.connToCollector.Close()
+func (ep *ExportingProcess) CloseConnToCollector() error{
+	err := ep.connToCollector.Close()
+	return fmt.Errorf("error when closing connection to collector: %v", err)
+}
+
+func (ep *ExportingProcess) AddTemplate() uint16{
+	uniqueTemplateID++
+	ep.templatesMap[uniqueTemplateID] = templateValue{
+		nil,
+		0,
+	}
+
+	log.Printf("Template ID: %d", uniqueTemplateID)
+
+	return uniqueTemplateID
+}
+
+func (ep *ExportingProcess) updateTemplate(id uint16, elementNames *[]string, minDataRecLen uint16) {
+	ep.templatesMap[id] = templateValue{
+		make([]string, len(*elementNames)),
+		minDataRecLen,
+	}
+	for i, name := range *elementNames {
+		ep.templatesMap[uniqueTemplateID].elementNames[i] = name
+	}
+
 	return
 }
 
-func (ep *ExportingProcess) addTemplate(names *[]string) {
-	uniqueTemplateID++
-	templates := ep.templates
-	templates[uniqueTemplateID] = *names
-	log.Printf("Template ID: %d", uniqueTemplateID)
+
+func (ep *ExportingProcess) deleteTemplate(id uint16) error{
+	if _, exist := ep.templatesMap[id]; !exist {
+		return fmt.Errorf("process: template %d does not exist in exporting process", id)
+	}
+	delete(ep.templatesMap, id)
+
+	return nil
 }
 
-func (ep *ExportingProcess) deleteTemplate(id uint16) {
-	if _, exist := ep.templates[id]; !exist {
-		log.Fatalf("process: template %d does not exist in exporting process", id)
+func (ep *ExportingProcess) sanityCheck(rec entities.Record) error{
+	templateID := rec.GetTemplateID()
+	if _, exist := ep.templatesMap[templateID]; !exist {
+		return fmt.Errorf("process: templateID %d does not exist in exporting process", templateID)
 	}
-	delete(ep.templates, id)
-}
-
-func (ep *ExportingProcess) sanityCheck(rec entities.Record) {
-	template := rec.GetTemplateID()
-	if _, exist := ep.templates[template]; !exist {
-		log.Fatalf("process: template %d does not exist in exporting process", template)
+	if rec.GetFieldCount() != uint16(len(ep.templatesMap[templateID].elementNames)) {
+		return fmt.Errorf("process: field count of data does not match templateID %d", templateID)
 	}
-	templateFieldCount := len(ep.templates[template])
-	if rec.GetFieldCount() != uint16(templateFieldCount) {
-		log.Fatalf("process: field count of data does not match template %d", template)
+	if rec.GetBuffer().Len() < int(ep.templatesMap[templateID].minDataRecLen) {
+		return fmt.Errorf("process: Data Record does not pass the min required length (%d) check for template ID %d", ep.templatesMap[templateID].minDataRecLen, templateID)
 	}
+	return nil
 }

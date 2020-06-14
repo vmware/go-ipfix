@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -41,7 +42,12 @@ func initIANARegistry() {
 	if output, error = os.Create(registryFileName); error != nil {
 		log.Fatalf("main: Cannot open output file %s", registryFileName)
 	}
+	licenseHeader, err := ioutil.ReadFile("./../../license_templates/license_header.go.txt")
+	if err != nil {
+		log.Fatalf("error in reading license header file")
+	}
 	writer := bufio.NewWriter(output)
+	fmt.Fprintf(writer, string(licenseHeader) + "\n")
 	fmt.Fprintf(writer,
 		`package registry
 
@@ -81,7 +87,12 @@ func initAntreaRegistry() {
 	if output, error = os.Create(registryFileName); error != nil {
 		log.Fatalf("main: Cannot open output file %s", registryFileName)
 	}
+	licenseHeader, err := ioutil.ReadFile("./../../license_templates/license_header.go.txt")
+	if err != nil {
+		log.Fatalf("error in reading license header file")
+	}
 	writer := bufio.NewWriter(output)
+	fmt.Fprintf(writer, string(licenseHeader) + "\n")
 	fmt.Fprintf(writer,
 		`package registry
 

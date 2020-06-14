@@ -64,7 +64,7 @@ func TestIanaRegistryGetReverseInfoElement(t *testing.T) {
 	assert.NotEqual(t, nil, error, "IANA registry GetReverseInfoElement should return error when ie is not reversible.")
 	// reverse InfoElement exists
 	reverseIE, error = reg.GetReverseInfoElement("deltaFlowCount")
-	assert.Equal(t, "reverseDeltaFlowCount", reverseIE.Name, "IANA registry GetReverseInfoElement does not return correct reverse ie.")
+	assert.Equal(t, "reverse_DeltaFlowCount", reverseIE.Name, "IANA registry GetReverseInfoElement does not return correct reverse ie.")
 	assert.Equal(t, reversePen, reverseIE.EnterpriseId, "IANA registry GetReverseInfoElement does not return correct reverse ie.")
 }
 
@@ -99,6 +99,6 @@ func TestAntreaRegistryGetReverseInfoElement(t *testing.T) {
 	assert.NotEqual(t, nil, error, "Antrea registry GetReverseInfoElement should return error when ie does not exist.")
 	// reverse InfoElement exists
 	reverseIE, error = reg.GetReverseInfoElement("destinationClusterIP")
-	assert.Equal(t, "reverseDestinationClusterIP", reverseIE.Name, "Antrea registry GetReverseInfoElement does not return correct reverse ie.")
+	assert.Equal(t, "reverse_DestinationClusterIP", reverseIE.Name, "Antrea registry GetReverseInfoElement does not return correct reverse ie.")
 	assert.Equal(t, reversePen, reverseIE.EnterpriseId, "Antrea registry GetReverseInfoElement does not return correct reverse ie.")
 }

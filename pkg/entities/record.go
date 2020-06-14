@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math"
 	"math/big"
 	"net"
@@ -40,6 +39,8 @@ type Record interface {
 	GetTemplateID() uint16
 	GetFieldCount() uint16
 	GetTemplateFields() *[]string
+	GetMinDataRecordLen() uint16
+
 }
 
 // TODO: Create base record struct. Some functions like GetBuffer will be applicable to base record.
@@ -47,7 +48,7 @@ type baseRecord struct {
 	buff       bytes.Buffer
 	len        uint16
 	fieldCount uint16
-	template   uint16
+	templateID uint16
 	Record
 }
 
@@ -57,13 +58,17 @@ type dataRecord struct {
 
 func NewDataRecord(id uint16) *dataRecord {
 	return &dataRecord{
-		&baseRecord{buff: bytes.Buffer{}, len: 0, fieldCount: 0, template: id},
+		&baseRecord{buff: bytes.Buffer{}, len: 0, fieldCount: 0, templateID: id},
 	}
 }
 
 type templateRecord struct {
 	*baseRecord
 	templateList []string
+	// Minimum data record length required to be sent for this template.
+	// Elements with variable length are considered to be one byte.
+	minDataRecLength uint16
+
 }
 
 func NewTemplateRecord(count uint16, id uint16) *templateRecord {
@@ -72,9 +77,10 @@ func NewTemplateRecord(count uint16, id uint16) *templateRecord {
 			buff:       bytes.Buffer{},
 			len:        0,
 			fieldCount: count,
-			template:   id,
+			templateID: id,
 		},
 		make([]string, 0),
+		0,
 	}
 }
 
@@ -83,7 +89,7 @@ func (b *baseRecord) GetBuffer() *bytes.Buffer {
 }
 
 func (b *baseRecord) GetTemplateID() uint16 {
-	return b.template
+	return b.templateID
 }
 
 func (b *baseRecord) GetFieldCount() uint16 {
@@ -234,7 +240,6 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 
 	bytesWritten, err := d.buff.Write(bytesToAppend)
 	if err != nil {
-		log.Fatalf("Error in writing field to data record: %v", err)
 		return 0, err
 	}
 
@@ -244,12 +249,11 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 func (t *templateRecord) PrepareRecord() (uint16, error) {
 	// Add Template Record Header
 	header := make([]byte, 4)
-	binary.BigEndian.PutUint16(header[0:2], t.template)
+	binary.BigEndian.PutUint16(header[0:2], t.templateID)
 	binary.BigEndian.PutUint16(header[2:4], t.fieldCount)
 
 	_, err := t.buff.Write(header)
 	if err != nil {
-		log.Fatalf("Error in writing header to template record: %v", err)
 		return 0, err
 	}
 
@@ -275,13 +279,22 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 
 	bytesWritten, err := t.buff.Write(fieldSpecifier)
 	if err != nil {
-		log.Fatalf("Error in writing field to template record: %v", err)
 		return 0, err
 	}
 	t.templateList = append(t.templateList, element.Name)
+	// Keep track of minimum data record length required for sanity check
+	if element.Len == VariableLength {
+		t.minDataRecLength = t.minDataRecLength + 1
+	} else {
+		t.minDataRecLength = t.minDataRecLength + element.Len
+	}
 	return uint16(bytesWritten), nil
 }
 
 func (t *templateRecord) GetTemplateFields() *[]string {
 	return &t.templateList
+}
+
+func (t *templateRecord) GetMinDataRecordLen() uint16 {
+	return t.minDataRecLength
 }

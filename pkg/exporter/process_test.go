@@ -195,13 +195,15 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 
 
 	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
-	exporter.addTemplate(&[]string{"sourceIPv4Address", "destinationIPv4Address"})
+	templateID := exporter.AddTemplate()
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, &[]string{"sourceIPv4Address", "destinationIPv4Address"}, 8)
 	// Add data to exporting process
 	reg := registry.NewIanaRegistry()
 	reg.LoadRegistry()
 
 	// Create data record with two fields
-	dataRec := entities.NewDataRecord(uniqueTemplateID)
+	dataRec := entities.NewDataRecord(templateID)
 	dataRec.PrepareRecord()
 	element, err := reg.GetInfoElement("sourceIPv4Address")
 	if err != nil {
@@ -261,13 +263,15 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
 
 	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
-	exporter.addTemplate(&[]string{"sourceIPv4Address", "destinationIPv4Address"})
+	templateID := exporter.AddTemplate()
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, &[]string{"sourceIPv4Address", "destinationIPv4Address"}, 8)
 	// Add data to exporting process
 	reg := registry.NewIanaRegistry()
 	reg.LoadRegistry()
 
 	// Create data record with two fields
-	dataRec := entities.NewDataRecord(uniqueTemplateID)
+	dataRec := entities.NewDataRecord(templateID)
 	dataRec.PrepareRecord()
 	element, err := reg.GetInfoElement("sourceIPv4Address")
 	if err != nil {

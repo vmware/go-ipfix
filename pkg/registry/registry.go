@@ -80,7 +80,7 @@ func (reg *ianaRegistry) GetReverseInfoElement(name string) (*entities.InfoEleme
 		err := fmt.Errorf("IANA Registry: The information element %s is not reverse element", name)
 		return &ie, err
 	}
-	reverseName := "reverse" + strings.Title(ie.Name)
+	reverseName := "reverse_" + strings.Title(ie.Name)
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
 }
 
@@ -109,7 +109,7 @@ func (reg *antreaRegistry) GetReverseInfoElement(name string) (*entities.InfoEle
 		err := fmt.Errorf("Antrea Registry: There is no information element with name %s", name)
 		return &ie, err
 	}
-	reverseName := "reverse" + strings.Title(ie.Name)
+	reverseName := "reverse_" + strings.Title(ie.Name)
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
 }
 

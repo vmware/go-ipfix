@@ -11,7 +11,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
 package registry
 
 import (
@@ -144,8 +143,8 @@ func (registry *ianaRegistry) LoadRegistry() {
 	registry.registerInfoElement(*entities.NewInfoElement("wlanSSID", 147, 13, 0, 65535))
 	registry.registerInfoElement(*entities.NewInfoElement("flowId", 148, 4, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("observationDomainId", 149, 3, 0, 4))
-	registry.registerInfoElement(*entities.NewInfoElement("flowStartSeconds", 150, 14, 0, 4))
-	registry.registerInfoElement(*entities.NewInfoElement("flowEndSeconds", 151, 14, 0, 4))
+	registry.registerInfoElement(*entities.NewInfoElement("flowStartSeconds", 150, 14, 0, 8))
+	registry.registerInfoElement(*entities.NewInfoElement("flowEndSeconds", 151, 14, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("flowStartMilliseconds", 152, 15, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("flowEndMilliseconds", 153, 15, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("flowStartMicroseconds", 154, 16, 0, 8))
@@ -254,12 +253,12 @@ func (registry *ianaRegistry) LoadRegistry() {
 	registry.registerInfoElement(*entities.NewInfoElement("postIpPrecedence", 257, 1, 0, 1))
 	registry.registerInfoElement(*entities.NewInfoElement("collectionTimeMilliseconds", 258, 15, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("exportSctpStreamId", 259, 2, 0, 2))
-	registry.registerInfoElement(*entities.NewInfoElement("maxExportSeconds", 260, 14, 0, 4))
-	registry.registerInfoElement(*entities.NewInfoElement("maxFlowEndSeconds", 261, 14, 0, 4))
+	registry.registerInfoElement(*entities.NewInfoElement("maxExportSeconds", 260, 14, 0, 8))
+	registry.registerInfoElement(*entities.NewInfoElement("maxFlowEndSeconds", 261, 14, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("messageMD5Checksum", 262, 0, 0, 65535))
 	registry.registerInfoElement(*entities.NewInfoElement("messageScope", 263, 1, 0, 1))
-	registry.registerInfoElement(*entities.NewInfoElement("minExportSeconds", 264, 14, 0, 4))
-	registry.registerInfoElement(*entities.NewInfoElement("minFlowStartSeconds", 265, 14, 0, 4))
+	registry.registerInfoElement(*entities.NewInfoElement("minExportSeconds", 264, 14, 0, 8))
+	registry.registerInfoElement(*entities.NewInfoElement("minFlowStartSeconds", 265, 14, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("opaqueOctets", 266, 0, 0, 65535))
 	registry.registerInfoElement(*entities.NewInfoElement("sessionScope", 267, 1, 0, 1))
 	registry.registerInfoElement(*entities.NewInfoElement("maxFlowEndMicroseconds", 268, 16, 0, 8))
@@ -316,7 +315,7 @@ func (registry *ianaRegistry) LoadRegistry() {
 	registry.registerInfoElement(*entities.NewInfoElement("selectorIdTotalPktsSelected", 319, 4, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("absoluteError", 320, 10, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("relativeError", 321, 10, 0, 8))
-	registry.registerInfoElement(*entities.NewInfoElement("observationTimeSeconds", 322, 14, 0, 4))
+	registry.registerInfoElement(*entities.NewInfoElement("observationTimeSeconds", 322, 14, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("observationTimeMilliseconds", 323, 15, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("observationTimeMicroseconds", 324, 16, 0, 8))
 	registry.registerInfoElement(*entities.NewInfoElement("observationTimeNanoseconds", 325, 17, 0, 8))

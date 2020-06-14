@@ -17,6 +17,7 @@ package entities
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"log"
 )
 
@@ -60,8 +61,7 @@ func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Write the set header to msg buffer
 	_, err := s.buffer.Write(header)
 	if err != nil {
-		log.Fatalf("Error in writing header to message buffer: %v", err)
-		return err
+		return fmt.Errorf("error when writing header to message buffer: %v", err)
 	}
 	// set the setType and update set length
 	s.setType = setType
@@ -89,11 +89,12 @@ func (s *Set) WriteRecordToSet(recBuffer *[]byte) error {
 }
 
 func (s *Set) FinishSet() {
+	// TODO:Add padding when multiple sets are sent in single IPFIX message
 	// Add length to the message
 	byteSlice := s.buffer.Bytes()
 	setOffset := s.buffer.Len() - int(s.currLen)
 	binary.BigEndian.PutUint16(byteSlice[setOffset+2:setOffset+4], s.currLen)
-	// TODO:Add padding if required
+	log.Printf("length of set written: %d", s.currLen)
 	// Reset the length
 	s.currLen = 0
 }
