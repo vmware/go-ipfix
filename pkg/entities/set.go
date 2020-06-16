@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"log"
 )
 
 type ContentType uint8
@@ -94,7 +93,6 @@ func (s *Set) FinishSet() {
 	byteSlice := s.buffer.Bytes()
 	setOffset := s.buffer.Len() - int(s.currLen)
 	binary.BigEndian.PutUint16(byteSlice[setOffset+2:setOffset+4], s.currLen)
-	log.Printf("length of set written: %d", s.currLen)
 	// Reset the length
 	s.currLen = 0
 }
