@@ -17,6 +17,7 @@ package exporter
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/vmware/go-ipfix/pkg/entities"
@@ -53,7 +54,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(listener.Addr(), 1)
+	exporter, err := InitExportingProcess(listener.Addr(), 1, 0)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", listener.Addr().String(), err)
 	}
@@ -64,7 +65,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	reg.LoadRegistry()
 
 	// Create template record with two fields
-	tempRec := entities.NewTemplateRecord(2, uniqueTemplateID)
+	templateID := exporter.NewTemplateID()
+	tempRec := entities.NewTemplateRecord(2, templateID)
 	tempRec.PrepareRecord()
 	element, err := reg.GetInfoElement("sourceIPv4Address")
 	if err != nil {
@@ -108,18 +110,25 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	// TODO: Move this in to different function with byte size as arg
 	go func() {
 		defer conn.Close()
-		buff := make([]byte, 32)
-		_, err = conn.Read(buff)
-		if err != nil {
-			t.Fatal(err)
+
+		bytes := make([]byte, 0)
+		numBytes := 0
+		for start := time.Now(); time.Since(start) < 2* time.Second; {
+			b := make([]byte, 32)
+			nb, err := conn.Read(b)
+			if err != nil {
+				t.Fatal(err)
+			}
+			numBytes = numBytes + nb
+			bytes = append(bytes, b...)
 		}
 		// Compare only template record part. Remove message header and set header.
-		buffCh <- buff[20:]
+		buffCh <- bytes
 		return
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(conn.LocalAddr(), 1)
+	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 2)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
 	}
@@ -130,7 +139,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	reg.LoadRegistry()
 
 	// Create template record with two fields
-	tempRec := entities.NewTemplateRecord(2, uniqueTemplateID)
+	templateID := exporter.NewTemplateID()
+	tempRec := entities.NewTemplateRecord(2, templateID)
 	tempRec.PrepareRecord()
 	element, err := reg.GetInfoElement("sourceIPv4Address")
 	if err != nil {
@@ -149,11 +159,21 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
+	// Sleep for 2s for template refresh routine to get executed
+	time.Sleep(2 * time.Second)
+
+	// Expect to receive two template headers one from AddRecordAndSendMsg and other from tempRefresh go routine
+	bytesAtServer := <-buffCh
+	assert.Equal(t, len(bytesAtServer), 64)
+	assert.Equal(t, bytesAtServer[20:32], bytesAtServer[52:], "both template messages should be same")
+	firstTemplateBytes := bytesAtServer[:32]
 	// 32 is the size of the IPFIX message including all headers
 	assert.Equal(t, 32, bytesSent)
-	assert.Equal(t, tempRecBytes, <-buffCh)
+	assert.Equal(t, tempRecBytes, firstTemplateBytes[20:])
 	assert.Equal(t, uint32(0), exporter.seqNumber)
+
 	exporter.CloseConnToCollector()
+
 }
 
 func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
@@ -187,20 +207,29 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(listener.Addr(), 1)
+	exporter, err := InitExportingProcess(listener.Addr(), 1, 0)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", listener.Addr().String(), err)
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", listener.Addr().String())
 
-
-	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
-	templateID := exporter.AddTemplate()
-	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
-	exporter.updateTemplate(templateID, &[]string{"sourceIPv4Address", "destinationIPv4Address"}, 8)
 	// Add data to exporting process
 	reg := registry.NewIanaRegistry()
 	reg.LoadRegistry()
+
+	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
+	templateID := exporter.NewTemplateID()
+	// Get the element to update template in exporting process
+	element1, err := reg.GetInfoElement("sourceIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	element2, err := reg.GetInfoElement("destinationIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2}, 8)
 
 	// Create data record with two fields
 	dataRec := entities.NewDataRecord(templateID)
@@ -256,19 +285,29 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(conn.LocalAddr(), 1)
+	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 0)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
 
-	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
-	templateID := exporter.AddTemplate()
-	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
-	exporter.updateTemplate(templateID, &[]string{"sourceIPv4Address", "destinationIPv4Address"}, 8)
 	// Add data to exporting process
 	reg := registry.NewIanaRegistry()
 	reg.LoadRegistry()
+	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
+	templateID := exporter.NewTemplateID()
+	// Get the element to update template in exporting process
+	element1, err := reg.GetInfoElement("sourceIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	element2, err := reg.GetInfoElement("destinationIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2}, 8)
+
 
 	// Create data record with two fields
 	dataRec := entities.NewDataRecord(templateID)

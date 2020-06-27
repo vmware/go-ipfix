@@ -38,9 +38,8 @@ type Record interface {
 	GetBuffer() *bytes.Buffer
 	GetTemplateID() uint16
 	GetFieldCount() uint16
-	GetTemplateFields() *[]string
+	GetTemplateElements() []*InfoElement
 	GetMinDataRecordLen() uint16
-
 }
 
 // TODO: Create base record struct. Some functions like GetBuffer will be applicable to base record.
@@ -64,11 +63,10 @@ func NewDataRecord(id uint16) *dataRecord {
 
 type templateRecord struct {
 	*baseRecord
-	templateList []string
+	templateElements []*InfoElement
 	// Minimum data record length required to be sent for this template.
 	// Elements with variable length are considered to be one byte.
 	minDataRecLength uint16
-
 }
 
 func NewTemplateRecord(count uint16, id uint16) *templateRecord {
@@ -79,7 +77,7 @@ func NewTemplateRecord(count uint16, id uint16) *templateRecord {
 			fieldCount: count,
 			templateID: id,
 		},
-		make([]string, 0),
+		make([]*InfoElement, 0),
 		0,
 	}
 }
@@ -254,7 +252,7 @@ func (t *templateRecord) PrepareRecord() (uint16, error) {
 
 	_, err := t.buff.Write(header)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("error in writing template header")
 	}
 
 	return uint16(len(header)), nil
@@ -263,7 +261,7 @@ func (t *templateRecord) PrepareRecord() (uint16, error) {
 func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
 	// val could be used to specify smaller length than default? For now assert it to be nil
 	if val != nil {
-		return 0, fmt.Errorf("AddInfoElement of template record cannot take value: %v. nil is expected", val)
+		return 0, fmt.Errorf("AddInfoElement(templateRecord): cannot take value: %v. nil is expected", val)
 	}
 	// Add field specifier
 	fieldSpecifier := make([]byte, 4, 8)
@@ -279,9 +277,9 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 
 	bytesWritten, err := t.buff.Write(fieldSpecifier)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("AddInfoElement(templateRecord): error in writing to buffer")
 	}
-	t.templateList = append(t.templateList, element.Name)
+	t.templateElements = append(t.templateElements, element)
 	// Keep track of minimum data record length required for sanity check
 	if element.Len == VariableLength {
 		t.minDataRecLength = t.minDataRecLength + 1
@@ -291,8 +289,8 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 	return uint16(bytesWritten), nil
 }
 
-func (t *templateRecord) GetTemplateFields() *[]string {
-	return &t.templateList
+func (t *templateRecord) GetTemplateElements() []*InfoElement {
+	return t.templateElements
 }
 
 func (t *templateRecord) GetMinDataRecordLen() uint16 {
