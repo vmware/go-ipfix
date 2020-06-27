@@ -80,7 +80,7 @@ func (s *Set) GetSetType() ContentType {
 func (s *Set) WriteRecordToSet(recBuffer *[]byte) error {
 	_, err := s.buffer.Write(*recBuffer)
 	if err != nil {
-		return err
+		return fmt.Errorf("error in writing the buffer to set: %v", err)
 	}
 	// Update the length of set
 	s.currLen = s.currLen + uint16(len(*recBuffer))

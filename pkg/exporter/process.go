@@ -25,10 +25,10 @@ import (
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
-var uniqueTemplateID uint16 = 255
+const startTemplateID uint16 = 255
 
-type templateValue struct{
-	elementNames []string
+type templateValue struct {
+	elements      []*entities.InfoElement
 	minDataRecLen uint16
 }
 
@@ -43,35 +43,71 @@ type ExportingProcess struct {
 	connToCollector net.Conn
 	obsDomainID     uint32
 	seqNumber       uint32
+	templateID      uint16
 	set             *entities.Set
 	msg             *entities.MsgBuffer
 	templatesMap    map[uint16]templateValue
+	templateRefCh   chan struct{}
 }
 
-func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*ExportingProcess, error) {
+// InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID) and tempRefTimeout
+// (template refresh timeout). tempRefTimeout is applicable only for collectors listening over UDP; unit is seconds. For TCP, you can
+// pass any value. For UDP, if 0 is passed, consider 1800s as default.
+// TODO: Get obsID, tempRefTimeout as args which can be of dynamic size supporting both TCP and UDP.
+func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout uint32) (*ExportingProcess, error) {
 	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 	if err != nil {
 		klog.Infof("Cannot the create the connection to configured ExportingProcess %s. Error is %v", collectorAddr.String(), err)
 		return nil, err
 	}
 	msgBuffer := entities.NewMsgBuffer()
-	return &ExportingProcess{
+
+	expProc := &ExportingProcess{
 		connToCollector: conn,
 		obsDomainID:     obsID,
 		seqNumber:       0,
+		templateID:      startTemplateID,
 		set:             entities.NewSet(msgBuffer.GetMsgBuffer()),
 		msg:             msgBuffer,
 		templatesMap:    make(map[uint16]templateValue),
-	}, nil
+		templateRefCh:   make(chan struct{}),
+	}
+
+	// Template refresh logic is only for UDP transport.
+	if collectorAddr.Network() == "udp" {
+		if tempRefTimeout == 0 {
+			// Default value is 1800s
+			tempRefTimeout = 1800
+		}
+		go func() {
+			ticker := time.NewTicker(time.Duration(tempRefTimeout) * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-expProc.templateRefCh:
+					break
+				case <-ticker.C:
+					err := expProc.sendRefreshedTemplates()
+					if err != nil {
+						// Other option is sending messages through channel to library consumers
+						klog.Infof("Error when sending refreshed templates. Closing the connection to IPFIX controller")
+						expProc.CloseConnToCollector()
+					}
+				}
+			}
+		}()
+	}
+
+	return expProc, nil
 }
 
 func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, rec entities.Record) (int, error) {
 	if recType == entities.Template {
-		ep.updateTemplate(rec.GetTemplateID(), rec.GetTemplateFields(), rec.GetMinDataRecordLen())
+		ep.updateTemplate(rec.GetTemplateID(), rec.GetTemplateElements(), rec.GetMinDataRecordLen())
 	} else if recType == entities.Data {
-		err := ep.sanityCheck(rec)
+		err := ep.dataRecSanityCheck(rec)
 		if err != nil {
-			return 0, fmt.Errorf("error when doing sanity check:%v", err)
+			return 0, fmt.Errorf("AddRecordAndSendMsg: error when doing sanity check:%v", err)
 		}
 	}
 	recBytes := rec.GetBuffer().Bytes()
@@ -90,20 +126,20 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 	if msgBuffer.Len() == 0 {
 		err := ep.createNewMsg()
 		if err != nil {
-			return bytesSent, fmt.Errorf("error when creating message: %v", err)
+			return bytesSent, fmt.Errorf("AddRecordAndSendMsg: error when creating message: %v", err)
 		}
 	}
 	// Check set buffer length and type change to create new set in the message
 	if ep.set.GetBuffLen() == 0 {
-		ep.set.CreateNewSet(recType, uniqueTemplateID)
+		ep.set.CreateNewSet(recType, rec.GetTemplateID())
 	} else if ep.set.GetSetType() != recType {
 		ep.set.FinishSet()
-		ep.set.CreateNewSet(recType, uniqueTemplateID)
+		ep.set.CreateNewSet(recType, rec.GetTemplateID())
 	}
 	// Write the record to the set
 	err := ep.set.WriteRecordToSet(&recBytes)
 	if err != nil {
-		return bytesSent, fmt.Errorf("error when writing record to the set: %v", err)
+		return bytesSent, fmt.Errorf("AddRecordAndSendMsg: %v", err)
 	}
 	if recType == entities.Data && !ep.msg.GetDataRecFlag() {
 		ep.msg.SetDataRecFlag(true)
@@ -133,8 +169,7 @@ func (ep *ExportingProcess) createNewMsg() error {
 	msgBuffer := ep.msg.GetMsgBuffer()
 	_, err := msgBuffer.Write(header)
 	if err != nil {
-		klog.Infof("Error in writing header to message buffer: %v", err)
-		return err
+		return fmt.Errorf("createNewMsg: %v", err)
 	}
 	return nil
 }
@@ -166,55 +201,86 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 	return bytesSent, nil
 }
 
-func (ep *ExportingProcess) CloseConnToCollector() error{
-	err := ep.connToCollector.Close()
-	return fmt.Errorf("error when closing connection to collector: %v", err)
-}
-
-func (ep *ExportingProcess) AddTemplate() uint16{
-	uniqueTemplateID++
-	ep.templatesMap[uniqueTemplateID] = templateValue{
-		nil,
-		0,
+func (ep *ExportingProcess) CloseConnToCollector() {
+	if !isChanClosed(ep.templateRefCh) {
+		close(ep.templateRefCh) // Close template refresh channel
 	}
 
-	klog.Infof("Template ID: %d", uniqueTemplateID)
-
-	return uniqueTemplateID
+	err := ep.connToCollector.Close()
+	// Just log the error that happened when closing the connection. Not returning error as we do not expect library
+	// consumers to exit their programs with this error.
+	if err != nil {
+		klog.Infof("error when closing connection to collector: %v", err)
+	}
 }
 
-func (ep *ExportingProcess) updateTemplate(id uint16, elementNames *[]string, minDataRecLen uint16) {
+// NewTemplateID is called to get ID when creating new template record.
+func (ep *ExportingProcess) NewTemplateID() uint16 {
+	ep.templateID++
+	return ep.templateID
+}
+
+func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElement, minDataRecLen uint16) {
+	if _, exist := ep.templatesMap[id]; exist {
+		return
+	}
 	ep.templatesMap[id] = templateValue{
-		make([]string, len(*elementNames)),
+		make([]*entities.InfoElement, len(elements)),
 		minDataRecLen,
 	}
-	for i, name := range *elementNames {
-		ep.templatesMap[uniqueTemplateID].elementNames[i] = name
+	for i, elem := range elements {
+		ep.templatesMap[id].elements[i] = elem
 	}
-
 	return
 }
 
-
-func (ep *ExportingProcess) deleteTemplate(id uint16) error{
+func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 	if _, exist := ep.templatesMap[id]; !exist {
 		return fmt.Errorf("process: template %d does not exist in exporting process", id)
 	}
 	delete(ep.templatesMap, id)
-
 	return nil
 }
 
-func (ep *ExportingProcess) sanityCheck(rec entities.Record) error{
+func (ep *ExportingProcess) sendRefreshedTemplates() error {
+	// Send refreshed template for every template in template map
+	for k, v := range ep.templatesMap {
+		tempRec := entities.NewTemplateRecord(uint16(len(v.elements)), k)
+		// Add template header
+		if _, err := tempRec.PrepareRecord(); err != nil {
+			return err
+		}
+		for _, elem := range v.elements {
+			if _, err := tempRec.AddInfoElement(elem, nil); err != nil {
+				return err
+			}
+		}
+		if _, err := ep.AddRecordAndSendMsg(entities.Template, tempRec); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (ep *ExportingProcess) dataRecSanityCheck(rec entities.Record) error {
 	templateID := rec.GetTemplateID()
 	if _, exist := ep.templatesMap[templateID]; !exist {
 		return fmt.Errorf("process: templateID %d does not exist in exporting process", templateID)
 	}
-	if rec.GetFieldCount() != uint16(len(ep.templatesMap[templateID].elementNames)) {
+	if rec.GetFieldCount() != uint16(len(ep.templatesMap[templateID].elements)) {
 		return fmt.Errorf("process: field count of data does not match templateID %d", templateID)
 	}
 	if rec.GetBuffer().Len() < int(ep.templatesMap[templateID].minDataRecLen) {
 		return fmt.Errorf("process: Data Record does not pass the min required length (%d) check for template ID %d", ep.templatesMap[templateID].minDataRecLen, templateID)
 	}
 	return nil
+}
+
+func isChanClosed(ch <-chan struct{}) bool {
+	select {
+	case <-ch:
+		return true
+	default:
+	}
+	return false
 }
