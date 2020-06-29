@@ -1,0 +1,298 @@
+// Copyright 2020 go-ipfix Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+package exporter
+
+import (
+	"net"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
+)
+
+func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
+	// Create local server for testing
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("Got error when creating a local server: %v", err)
+	}
+	t.Log("Created local server on random available port for testing")
+
+	buffCh := make(chan []byte)
+	// Create go routine for local server
+	// TODO: Move this in to different function with byte size as arg
+	go func() {
+		defer listener.Close()
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		t.Log("Accept the connection from exporter")
+		buff := make([]byte, 32)
+		_, err = conn.Read(buff)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Compare only template record part. Remove message header and set header.
+		buffCh <- buff[20:]
+		return
+	}()
+
+	// Create exporter using local server info
+	exporter, err := InitExportingProcess(listener.Addr(), 1)
+	if err != nil {
+		t.Fatalf("Got error when connecting to local server %s: %v", listener.Addr().String(), err)
+	}
+	t.Logf("Created exporter connecting to local server with address: %s", listener.Addr().String())
+
+	// Add template to exporting process
+	reg := registry.NewIanaRegistry()
+	reg.LoadRegistry()
+
+	// Create template record with two fields
+	tempRec := entities.NewTemplateRecord(2, uniqueTemplateID)
+	tempRec.PrepareRecord()
+	element, err := reg.GetInfoElement("sourceIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	tempRec.AddInfoElement(element, nil)
+	element, err = reg.GetInfoElement("destinationIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	tempRec.AddInfoElement(element, nil)
+	tempRecBuff := tempRec.GetBuffer()
+	tempRecBytes := tempRecBuff.Bytes()
+
+
+	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Template, tempRec)
+	if err != nil {
+		t.Fatalf("Got error when sending record: %v", err)
+	}
+	// 32 is the size of the IPFIX message including all headers
+	assert.Equal(t, 32, bytesSent)
+	assert.Equal(t, tempRecBytes, <-buffCh)
+	assert.Equal(t, uint32(0), exporter.seqNumber)
+	exporter.CloseConnToCollector()
+}
+
+func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
+	// Create local server for testing
+	udpAddr, err := net.ResolveUDPAddr("udp", ":0")
+	if err != nil {
+		t.Fatalf("Got error when resolving UDP address: %v", err)
+	}
+	conn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		t.Fatalf("Got error when creating a local server: %v", err)
+	}
+	t.Log("Created local server on random available port for testing")
+
+	buffCh := make(chan []byte)
+	// Create go routine for local server
+	// TODO: Move this in to different function with byte size as arg
+	go func() {
+		defer conn.Close()
+		buff := make([]byte, 32)
+		_, err = conn.Read(buff)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Compare only template record part. Remove message header and set header.
+		buffCh <- buff[20:]
+		return
+	}()
+
+	// Create exporter using local server info
+	exporter, err := InitExportingProcess(conn.LocalAddr(), 1)
+	if err != nil {
+		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
+	}
+	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
+
+	// Add template to exporting process
+	reg := registry.NewIanaRegistry()
+	reg.LoadRegistry()
+
+	// Create template record with two fields
+	tempRec := entities.NewTemplateRecord(2, uniqueTemplateID)
+	tempRec.PrepareRecord()
+	element, err := reg.GetInfoElement("sourceIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	tempRec.AddInfoElement(element, nil)
+	element, err = reg.GetInfoElement("destinationIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	tempRec.AddInfoElement(element, nil)
+	tempRecBuff := tempRec.GetBuffer()
+	tempRecBytes := tempRecBuff.Bytes()
+
+	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Template, tempRec)
+	if err != nil {
+		t.Fatalf("Got error when sending record: %v", err)
+	}
+	// 32 is the size of the IPFIX message including all headers
+	assert.Equal(t, 32, bytesSent)
+	assert.Equal(t, tempRecBytes, <-buffCh)
+	assert.Equal(t, uint32(0), exporter.seqNumber)
+	exporter.CloseConnToCollector()
+}
+
+func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
+	// Create local server for testing
+	listener, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("Got error when creating a local server: %v", err)
+	}
+	t.Log("Created local server on random available port for testing")
+
+	buffCh := make(chan []byte)
+	// Create go routine for local server
+	// TODO: Move this in to different function with byte size as arg
+	go func() {
+		defer listener.Close()
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		t.Log("Accept the connection from exporter")
+		buff := make([]byte, 28)
+		_, err = conn.Read(buff)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Compare only data record part. Remove message header and set header.
+		// TODO: Verify message header and set header through hardcoded byte values
+		buffCh <- buff[20:]
+		return
+	}()
+
+	// Create exporter using local server info
+	exporter, err := InitExportingProcess(listener.Addr(), 1)
+	if err != nil {
+		t.Fatalf("Got error when connecting to local server %s: %v", listener.Addr().String(), err)
+	}
+	t.Logf("Created exporter connecting to local server with address: %s", listener.Addr().String())
+
+
+	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
+	templateID := exporter.AddTemplate()
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, &[]string{"sourceIPv4Address", "destinationIPv4Address"}, 8)
+	// Add data to exporting process
+	reg := registry.NewIanaRegistry()
+	reg.LoadRegistry()
+
+	// Create data record with two fields
+	dataRec := entities.NewDataRecord(templateID)
+	dataRec.PrepareRecord()
+	element, err := reg.GetInfoElement("sourceIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
+
+	element, err = reg.GetInfoElement("destinationIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
+	dataRecBuff := dataRec.GetBuffer()
+	dataRecBytes := dataRecBuff.Bytes()
+
+	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Data, dataRec)
+	if err != nil {
+		t.Fatalf("Got error when sending record: %v", err)
+	}
+	// 28 is the size of the IPFIX message including all headers (20 bytes)
+	assert.Equal(t, 28, bytesSent)
+	assert.Equal(t, dataRecBytes, <-buffCh)
+	assert.Equal(t, uint32(1), exporter.seqNumber)
+	exporter.CloseConnToCollector()
+}
+
+func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
+	// Create local server for testing
+	udpAddr, err := net.ResolveUDPAddr("udp", ":0")
+	if err != nil {
+		t.Fatalf("Got error when resolving UDP address: %v", err)
+	}
+	conn, err := net.ListenUDP("udp", udpAddr)
+	t.Log("Created local server on random available port for testing")
+
+	buffCh := make(chan []byte)
+	// Create go routine for local server
+	// TODO: Move this in to different function with byte size as arg
+	go func() {
+		defer conn.Close()
+		buff := make([]byte, 28)
+		_, err = conn.Read(buff)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Compare only data record part. Remove message header and set header.
+		// TODO: Verify message header and set header through hardcoded byte values
+		buffCh <- buff[20:]
+		return
+	}()
+
+	// Create exporter using local server info
+	exporter, err := InitExportingProcess(conn.LocalAddr(), 1)
+	if err != nil {
+		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
+	}
+	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
+
+	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
+	templateID := exporter.AddTemplate()
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, &[]string{"sourceIPv4Address", "destinationIPv4Address"}, 8)
+	// Add data to exporting process
+	reg := registry.NewIanaRegistry()
+	reg.LoadRegistry()
+
+	// Create data record with two fields
+	dataRec := entities.NewDataRecord(templateID)
+	dataRec.PrepareRecord()
+	element, err := reg.GetInfoElement("sourceIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
+
+	element, err = reg.GetInfoElement("destinationIPv4Address")
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
+	dataRecBuff := dataRec.GetBuffer()
+	dataRecBytes := dataRecBuff.Bytes()
+	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Data, dataRec)
+	if err != nil {
+		t.Fatalf("Got error when sending record: %v", err)
+	}
+	// 28 is the size of the IPFIX message including all headers (20 bytes)
+	assert.Equal(t, 28, bytesSent)
+	assert.Equal(t, dataRecBytes, <-buffCh)
+	assert.Equal(t, uint32(1), exporter.seqNumber)
+	exporter.CloseConnToCollector()
+}

@@ -1,0 +1,9 @@
+ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,Range,References,Requester,Revision,Date,Enterprise ID,
+100,sourcePodNamespace,string,,current,,,,,,,,55829,https://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
+101,sourcePodName,string,,current,,,,,,,,55829,Picked the enterprise ID that was not reserved yet.
+102,destinationPodNamespace,string,,current,,,,,,,,55829,
+103,destinationPodName,string,,current,,,,,,,,55829,
+104,sourceNodeName,string,,current,,,,,,,,55829,
+105,destinationNodeName,string,,current,,,,,,,,55829,
+106,destinationClusterIP,ipv4Address,,current,,,,,,,,55829,
+107,destinationServicePort,unsigned16,,current,,,,,,,,55829,
