@@ -17,9 +17,10 @@ package exporter
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"net"
 	"time"
+
+	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
@@ -50,7 +51,7 @@ type ExportingProcess struct {
 func InitExportingProcess(collectorAddr net.Addr, obsID uint32) (*ExportingProcess, error) {
 	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 	if err != nil {
-		log.Printf("Cannot the create the connection to configured ExportingProcess %s. Error is %v", collectorAddr.String(), err)
+		klog.Infof("Cannot the create the connection to configured ExportingProcess %s. Error is %v", collectorAddr.String(), err)
 		return nil, err
 	}
 	msgBuffer := entities.NewMsgBuffer()
@@ -132,7 +133,7 @@ func (ep *ExportingProcess) createNewMsg() error {
 	msgBuffer := ep.msg.GetMsgBuffer()
 	_, err := msgBuffer.Write(header)
 	if err != nil {
-		log.Printf("Error in writing header to message buffer: %v", err)
+		klog.Infof("Error in writing header to message buffer: %v", err)
 		return err
 	}
 	return nil
@@ -177,7 +178,7 @@ func (ep *ExportingProcess) AddTemplate() uint16{
 		0,
 	}
 
-	log.Printf("Template ID: %d", uniqueTemplateID)
+	klog.Infof("Template ID: %d", uniqueTemplateID)
 
 	return uniqueTemplateID
 }
