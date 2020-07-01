@@ -21,11 +21,12 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
+
+	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
@@ -34,17 +35,17 @@ func initIANARegistry() {
 	registryURL := "https://www.iana.org/assignments/ipfix/ipfix-information-elements.csv"
 	data, error := readCSVFromURL(registryURL)
 	if error != nil {
-		log.Fatalf("main: %v", error)
+		klog.Errorf("main: %v", error)
 	}
 
 	registryFileName := "registry_IANA.go"
 	var output *os.File
 	if output, error = os.Create(registryFileName); error != nil {
-		log.Fatalf("main: Cannot open output file %s", registryFileName)
+		klog.Errorf("main: Cannot open output file %s", registryFileName)
 	}
 	licenseHeader, err := ioutil.ReadFile("./../../license_templates/license_header.go.txt")
 	if err != nil {
-		log.Fatalf("error in reading license header file")
+		klog.Error("Error in reading license header file")
 	}
 	writer := bufio.NewWriter(output)
 	fmt.Fprintf(writer, string(licenseHeader) + "\n\n")
@@ -80,16 +81,16 @@ func initAntreaRegistry() {
 	fileName := "registry_antrea.csv"
 	data, error := readCSVFromFile(fileName)
 	if error != nil {
-		log.Fatal(error)
+		klog.Error(error)
 	}
 	registryFileName := "registry_antrea.go"
 	var output *os.File
 	if output, error = os.Create(registryFileName); error != nil {
-		log.Fatalf("main: Cannot open output file %s", registryFileName)
+		klog.Errorf("main: Cannot open output file %s", registryFileName)
 	}
 	licenseHeader, err := ioutil.ReadFile("./../../license_templates/license_header.go.txt")
 	if err != nil {
-		log.Fatalf("error in reading license header file")
+		klog.Error("Error in reading license header file")
 	}
 	writer := bufio.NewWriter(output)
 	fmt.Fprintf(writer, string(licenseHeader) + "\n\n")
@@ -171,9 +172,9 @@ func main() {
 		case "iana":
 			initIANARegistry()
 		default:
-			log.Fatalln("main: Invalid registry name. Options: \"Antrea\", \"IANA\"")
+			klog.Error("main: Invalid registry name. Options: \"Antrea\", \"IANA\"")
 		}
 	default:
-		log.Fatalln("main: Invalid number of parameters.")
+		klog.Error("main: Invalid number of parameters.")
 	}
 }
