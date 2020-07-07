@@ -57,7 +57,7 @@ type ExportingProcess struct {
 func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout uint32) (*ExportingProcess, error) {
 	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 	if err != nil {
-		klog.Infof("Cannot the create the connection to configured ExportingProcess %s. Error is %v", collectorAddr.String(), err)
+		klog.Errorf("Cannot the create the connection to configured ExportingProcess %s: %v", collectorAddr.String(), err)
 		return nil, err
 	}
 	msgBuffer := entities.NewMsgBuffer()
@@ -90,7 +90,7 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 					err := expProc.sendRefreshedTemplates()
 					if err != nil {
 						// Other option is sending messages through channel to library consumers
-						klog.Infof("Error when sending refreshed templates. Closing the connection to IPFIX controller")
+						klog.Errorf("Error when sending refreshed templates: %v. Closing the connection to IPFIX controller", err)
 						expProc.CloseConnToCollector()
 					}
 				}
@@ -210,7 +210,7 @@ func (ep *ExportingProcess) CloseConnToCollector() {
 	// Just log the error that happened when closing the connection. Not returning error as we do not expect library
 	// consumers to exit their programs with this error.
 	if err != nil {
-		klog.Infof("error when closing connection to collector: %v", err)
+		klog.Errorf("Error when closing connection to collector: %v", err)
 	}
 }
 

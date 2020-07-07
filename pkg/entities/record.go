@@ -252,7 +252,7 @@ func (t *templateRecord) PrepareRecord() (uint16, error) {
 
 	_, err := t.buff.Write(header)
 	if err != nil {
-		return 0, fmt.Errorf("error in writing template header")
+		return 0, fmt.Errorf("error in writing template header: %v", err)
 	}
 
 	return uint16(len(header)), nil
@@ -277,7 +277,7 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 
 	bytesWritten, err := t.buff.Write(fieldSpecifier)
 	if err != nil {
-		return 0, fmt.Errorf("AddInfoElement(templateRecord): error in writing to buffer")
+		return 0, fmt.Errorf("error in writing to buffer: %v", err)
 	}
 	t.templateElements = append(t.templateElements, element)
 	// Keep track of minimum data record length required for sanity check
