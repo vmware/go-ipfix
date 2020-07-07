@@ -252,7 +252,7 @@ func (t *templateRecord) PrepareRecord() (uint16, error) {
 
 	_, err := t.buff.Write(header)
 	if err != nil {
-		return 0, fmt.Errorf("error in writing template header: %v", err)
+		return 0, fmt.Errorf("AddInfoElement(templateRecord) error in writing template header: %v", err)
 	}
 
 	return uint16(len(header)), nil
@@ -261,7 +261,7 @@ func (t *templateRecord) PrepareRecord() (uint16, error) {
 func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
 	// val could be used to specify smaller length than default? For now assert it to be nil
 	if val != nil {
-		return 0, fmt.Errorf("AddInfoElement(templateRecord): cannot take value: %v. nil is expected", val)
+		return 0, fmt.Errorf("AddInfoElement(templateRecord) cannot take value %v (nil is expected)", val)
 	}
 	// Add field specifier
 	fieldSpecifier := make([]byte, 4, 8)
@@ -277,7 +277,7 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 
 	bytesWritten, err := t.buff.Write(fieldSpecifier)
 	if err != nil {
-		return 0, fmt.Errorf("error in writing to buffer: %v", err)
+		return 0, fmt.Errorf("AddInfoElement(templateRecord) error in writing to buffer: %v", err)
 	}
 	t.templateElements = append(t.templateElements, element)
 	// Keep track of minimum data record length required for sanity check
