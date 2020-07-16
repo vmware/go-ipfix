@@ -6,6 +6,16 @@ go-ipfix is an IPFIX library that can be used to implement an IPFIX exporter, wh
 ## Try it out
 This IPFIX library can be used to build an exporter. Please check out the [exporter tests](https://github.com/vmware/go-ipfix/blob/master/pkg/exporter/process_test.go) to get an idea on how to build exporter on top of TCP and UDP transport protocols given a IPFIX collector.
 
+## Build Registry
+To build the registry from [IANA registry](https://www.iana.org/assignments/ipfix/ipfix.xhtml) or [Antrea registry](pkg/registry/registry_antrea.csv), run
+```
+go run pkg/registry/build_registry/build_registry.go [REGISTRY_NAME]
+# REGISTRY_NAME: "Antrea", "IANA", ""(build both registries)
+```
+it will generate two files: `pkg/registry/registry_antrea.go` and/or `pkg/registry/registry_IANA.go` to enable local registry loading functions.
+
+Please make sure to reload registry if there are changes in IANA/Antrea registry.
+
 ## Contributing
 
 The go-ipfix project team welcomes contributions from the community. If you wish to contribute code and you have not signed our contributor license agreement (CLA), our bot will update the issue when you open a Pull Request. For any questions about the CLA process, please refer to our [FAQ](https://cla.vmware.com/faq). For more detailed information, refer to [CONTRIBUTING.md](CONTRIBUTING.md).

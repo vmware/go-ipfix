@@ -38,12 +38,12 @@ func initIANARegistry() {
 		klog.Errorf("main: %v", error)
 	}
 
-	registryFileName := "registry_IANA.go"
+	registryFileName := "./pkg/registry/registry_IANA.go"
 	var output *os.File
 	if output, error = os.Create(registryFileName); error != nil {
 		klog.Errorf("main: Cannot open output file %s", registryFileName)
 	}
-	licenseHeader, err := ioutil.ReadFile("./../../license_templates/license_header.go.txt")
+	licenseHeader, err := ioutil.ReadFile("./license_templates/license_header.go.txt")
 	if err != nil {
 		klog.Error("Error in reading license header file")
 	}
@@ -78,17 +78,17 @@ func (registry *ianaRegistry) LoadRegistry() {
 }
 
 func initAntreaRegistry() {
-	fileName := "registry_antrea.csv"
+	fileName := "./pkg/registry/registry_antrea.csv"
 	data, error := readCSVFromFile(fileName)
 	if error != nil {
 		klog.Error(error)
 	}
-	registryFileName := "registry_antrea.go"
+	registryFileName := "./pkg/registry/registry_antrea.go"
 	var output *os.File
 	if output, error = os.Create(registryFileName); error != nil {
 		klog.Errorf("main: Cannot open output file %s", registryFileName)
 	}
-	licenseHeader, err := ioutil.ReadFile("./../../license_templates/license_header.go.txt")
+	licenseHeader, err := ioutil.ReadFile("./license_templates/license_header.go.txt")
 	if err != nil {
 		klog.Error("Error in reading license header file")
 	}
