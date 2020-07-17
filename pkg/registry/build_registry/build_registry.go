@@ -23,6 +23,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 
@@ -37,13 +39,16 @@ func initIANARegistry() {
 	if error != nil {
 		klog.Errorf("main: %v", error)
 	}
-
-	registryFileName := "./pkg/registry/registry_IANA.go"
+	// get root of current package
+	_, base, _, _ := runtime.Caller(0)
+	rootPath := filepath.Dir(base)
+	registryFileName := rootPath + "/../registry_IANA.go"
 	var output *os.File
 	if output, error = os.Create(registryFileName); error != nil {
 		klog.Errorf("main: Cannot open output file %s", registryFileName)
 	}
-	licenseHeader, err := ioutil.ReadFile("./license_templates/license_header.go.txt")
+	headerPath := rootPath + "/../../../license_templates/license_header.go.txt"
+	licenseHeader, err := ioutil.ReadFile(headerPath)
 	if err != nil {
 		klog.Error("Error in reading license header file")
 	}
@@ -78,17 +83,21 @@ func (registry *ianaRegistry) LoadRegistry() {
 }
 
 func initAntreaRegistry() {
-	fileName := "./pkg/registry/registry_antrea.csv"
+	// get root of current package
+	_, base, _, _ := runtime.Caller(0)
+	rootPath := filepath.Dir(base)
+	fileName := rootPath + "/../registry_antrea.csv"
 	data, error := readCSVFromFile(fileName)
 	if error != nil {
 		klog.Error(error)
 	}
-	registryFileName := "./pkg/registry/registry_antrea.go"
+	registryFileName := rootPath + "/../registry_antrea.go"
 	var output *os.File
 	if output, error = os.Create(registryFileName); error != nil {
 		klog.Errorf("main: Cannot open output file %s", registryFileName)
 	}
-	licenseHeader, err := ioutil.ReadFile("./license_templates/license_header.go.txt")
+	headerPath := rootPath + "/../../../license_templates/license_header.go.txt"
+	licenseHeader, err := ioutil.ReadFile(headerPath)
 	if err != nil {
 		klog.Error("Error in reading license header file")
 	}
