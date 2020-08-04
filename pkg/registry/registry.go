@@ -27,27 +27,34 @@ type Registry interface {
 	LoadRegistry()
 	GetInfoElement(name string) (*entities.InfoElement, error)
 	GetReverseInfoElement(name string) (*entities.InfoElement, error)
+	GetIENameFromID(id uint16) (string, error)
 }
 
 type ianaRegistry struct {
-	registry map[string]entities.InfoElement
+	registry 	map[string]entities.InfoElement
+	nameIDMap	map[uint16]string
 }
 
 type antreaRegistry struct {
-	registry map[string]entities.InfoElement
+	registry 	map[string]entities.InfoElement
+	nameIDMap	map[uint16]string
 }
 
 func NewIanaRegistry() *ianaRegistry {
 	reg := make(map[string]entities.InfoElement)
+	nameID := make(map[uint16]string)
 	return &ianaRegistry{
 		registry: reg,
+		nameIDMap: nameID,
 	}
 }
 
 func NewAntreaRegistry() *antreaRegistry {
 	reg := make(map[string]entities.InfoElement)
+	nameID := make(map[uint16]string)
 	return &antreaRegistry{
 		registry: reg,
+		nameIDMap: nameID,
 	}
 }
 
@@ -56,6 +63,7 @@ func (reg *ianaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("IANA Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
+	reg.nameIDMap[ie.ElementId] = ie.Name
 	return nil
 }
 
@@ -84,11 +92,20 @@ func (reg *ianaRegistry) GetReverseInfoElement(name string) (*entities.InfoEleme
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
 }
 
+func (reg *ianaRegistry) GetIENameFromID(id uint16) (string, error) {
+	var name string
+	if name, exist := reg.nameIDMap[id] ; !exist {
+		return name, fmt.Errorf("IANA Registry: The information element with id %d does not exist.", id)
+	}
+	return name, nil
+}
+
 func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
 	if _, exist := reg.registry[ie.Name]; exist {
 		return fmt.Errorf("Antrea Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
+	reg.nameIDMap[ie.ElementId] = ie.Name
 	return nil
 }
 
@@ -111,6 +128,15 @@ func (reg *antreaRegistry) GetReverseInfoElement(name string) (*entities.InfoEle
 	}
 	reverseName := "reverse_" + strings.Title(ie.Name)
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
+}
+
+
+func (reg *antreaRegistry) GetIENameFromID(id uint16) (string, error) {
+	var name string
+	if name, exist := reg.nameIDMap[id] ; !exist {
+		return name, fmt.Errorf("Antrea Registry: The information element with id %d does not exist.", id)
+	}
+	return name, nil
 }
 
 // Non-reversible Information Elements follow Section 6.1 of RFC5103
