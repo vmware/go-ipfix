@@ -31,20 +31,20 @@ type Registry interface {
 }
 
 type ianaRegistry struct {
-	registry 	map[string]entities.InfoElement
-	nameIDMap	map[uint16]string
+	registry  map[string]entities.InfoElement
+	nameIDMap map[uint16]string
 }
 
 type antreaRegistry struct {
-	registry 	map[string]entities.InfoElement
-	nameIDMap	map[uint16]string
+	registry  map[string]entities.InfoElement
+	nameIDMap map[uint16]string
 }
 
 func NewIanaRegistry() *ianaRegistry {
 	reg := make(map[string]entities.InfoElement)
 	nameID := make(map[uint16]string)
 	return &ianaRegistry{
-		registry: reg,
+		registry:  reg,
 		nameIDMap: nameID,
 	}
 }
@@ -53,7 +53,7 @@ func NewAntreaRegistry() *antreaRegistry {
 	reg := make(map[string]entities.InfoElement)
 	nameID := make(map[uint16]string)
 	return &antreaRegistry{
-		registry: reg,
+		registry:  reg,
 		nameIDMap: nameID,
 	}
 }
@@ -94,7 +94,7 @@ func (reg *ianaRegistry) GetReverseInfoElement(name string) (*entities.InfoEleme
 
 func (reg *ianaRegistry) GetIENameFromID(id uint16) (string, error) {
 	var name string
-	if name, exist := reg.nameIDMap[id] ; !exist {
+	if name, exist := reg.nameIDMap[id]; !exist {
 		return name, fmt.Errorf("IANA Registry: The information element with id %d does not exist.", id)
 	}
 	return name, nil
@@ -130,10 +130,9 @@ func (reg *antreaRegistry) GetReverseInfoElement(name string) (*entities.InfoEle
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
 }
 
-
 func (reg *antreaRegistry) GetIENameFromID(id uint16) (string, error) {
 	var name string
-	if name, exist := reg.nameIDMap[id] ; !exist {
+	if name, exist := reg.nameIDMap[id]; !exist {
 		return name, fmt.Errorf("Antrea Registry: The information element with id %d does not exist.", id)
 	}
 	return name, nil

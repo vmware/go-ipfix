@@ -4,38 +4,38 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/vmware/go-ipfix/pkg/registry"
 	"io"
 	"k8s.io/klog"
+	"net"
 	"sync"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type CollectingProcess struct {
 	// for each obsDomainID, there is a map of templates
-	templatesMap	map[uint32]map[uint16][]*TemplateField
+	templatesMap map[uint32]map[uint16][]*TemplateField
 	// templatesLock allows multiple readers or one writer at the same time
-	templatesLock	*sync.RWMutex
-	ianaRegistry 	registry.Registry
-	antreaRegistry	registry.Registry
+	templatesLock  *sync.RWMutex
+	ianaRegistry   registry.Registry
+	antreaRegistry registry.Registry
 }
 
-
 type Packet struct {
-	Version 		uint16
-	BufferLength	uint16
-	SeqNumber		uint32
-	ObsDomainID		uint32
-	ExportTime		uint32
-	FlowSets		interface{}
+	Version      uint16
+	BufferLength uint16
+	SeqNumber    uint32
+	ObsDomainID  uint32
+	ExportTime   uint32
+	FlowSets     interface{}
 }
 
 type FlowSetHeader struct {
 	// 2 for templateFlowSet
 	// 256-65535 for dataFlowSet (templateID)
-	ID			uint16
-	Length		uint16
+	ID     uint16
+	Length uint16
 }
 
 type TemplateFlowSet struct {
@@ -49,34 +49,60 @@ type DataFlowSet struct {
 }
 
 type TemplateField struct {
-	ElementID		uint16
-	ElementLength	uint16
-	EnterpriseID	uint32
+	ElementID     uint16
+	ElementLength uint16
+	EnterpriseID  uint32
 }
 
 type DataField struct {
-	DataType	entities.IEDataType
-	Value 		bytes.Buffer
+	DataType entities.IEDataType
+	Value    bytes.Buffer
 }
 
-func InitCollectingProcess() (*CollectingProcess, error) {
+func InitCollectingProcess(address net.Addr, maxBufferSize uint16) (*CollectingProcess, error, ) {
 	ianaReg := registry.NewIanaRegistry()
 	antreaReg := registry.NewAntreaRegistry()
 	ianaReg.LoadRegistry()
 	antreaReg.LoadRegistry()
 	collectProc := &CollectingProcess{
-		templatesMap: make(map[uint32]map[uint16][]*TemplateField),
-		templatesLock: &sync.RWMutex{},
-		ianaRegistry: ianaReg,
+		templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
+		templatesLock:  &sync.RWMutex{},
+		ianaRegistry:   ianaReg,
 		antreaRegistry: antreaReg,
 	}
+	if address.Network() == "udp" {
+		collectProc.startUDPServer(address, maxBufferSize)
+	}
 	return collectProc, nil
+}
+
+func (cp *CollectingProcess) startUDPServer(address net.Addr, maxBufferSize uint16) {
+	listener, err := net.ResolveUDPAddr(address.Network(), address.String())
+	conn, err := net.ListenUDP("udp", listener)
+	if err != nil {
+		klog.Errorf("Cannot start collecting process on %s: %v", address.String(), err)
+	}
+	errChan := make(chan error, 1)
+
+	defer conn.Close()
+	klog.Info("Start collecting process")
+	for {
+		buff := make([]byte, maxBufferSize)
+		size, err := conn.Read(buff)
+		if err != nil {
+			errChan <- err
+		}
+		payload := make([]byte, size)
+		copy(payload, buff[0:size])
+		klog.Infof("Receiving %d bytes from %s", size, address.String())
+		cp.DecodeMessage(bytes.NewBuffer(payload))
+	}
 }
 
 func (cp *CollectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) *Packet {
 	packet := Packet{}
 	flowSetHeader := FlowSetHeader{}
-	decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber,&packet.ObsDomainID, &flowSetHeader)
+	decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
 	if flowSetHeader.ID == 2 {
 		templateFlowSet := TemplateFlowSet{}
 		templateFlowSet.Records = cp.decodeTemplateRecord(msgBuffer, packet.ObsDomainID)
