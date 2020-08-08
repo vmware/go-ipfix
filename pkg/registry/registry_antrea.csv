@@ -7,4 +7,4 @@ ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,R
 105,destinationNodeName,string,,current,,,,,,,,55829,
 106,destinationClusterIP,ipv4Address,,current,,,,,,,,55829,
 107,destinationServicePort,unsigned16,,current,,,,,,,,55829,
-108,destinationServiceName,string,,current,,,,,,,,55829,
+108,destinationServicePortName,string,,current,,,,,,,,55829,
