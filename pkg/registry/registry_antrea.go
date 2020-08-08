@@ -29,5 +29,5 @@ func (registry *antreaRegistry) LoadRegistry() {
 	registry.registerInfoElement(*entities.NewInfoElement("destinationNodeName", 105, 13, 55829, 65535))
 	registry.registerInfoElement(*entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4))
 	registry.registerInfoElement(*entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2))
-	registry.registerInfoElement(*entities.NewInfoElement("destinationServiceName", 108, 13, 55829, 65535))
+	registry.registerInfoElement(*entities.NewInfoElement("destinationServicePortName", 108, 13, 55829, 65535))
 }
