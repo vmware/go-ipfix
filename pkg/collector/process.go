@@ -18,10 +18,16 @@ type CollectingProcess struct {
 	templatesMap map[uint32]map[uint16][]*TemplateField
 	// templatesLock allows multiple readers or one writer at the same time
 	templatesLock  *sync.RWMutex
+	// registries for decoding Information Element
 	ianaRegistry   registry.Registry
 	antreaRegistry registry.Registry
+	// list of workers to process message
+	workerList []*Worker
+	// worker pool to receive and process message
+	workerPool chan chan *bytes.Buffer
 }
 
+// data struct of processed message
 type Packet struct {
 	Version      uint16
 	BufferLength uint16
@@ -31,6 +37,7 @@ type Packet struct {
 	FlowSets     interface{}
 }
 
+// Shared header fields for TemplateFlowSet and DataFlowSet
 type FlowSetHeader struct {
 	// 2 for templateFlowSet
 	// 256-65535 for dataFlowSet (templateID)
@@ -59,21 +66,45 @@ type DataField struct {
 	Value    bytes.Buffer
 }
 
-func InitCollectingProcess(address net.Addr, maxBufferSize uint16) (*CollectingProcess, error, ) {
+func InitCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum int) (*CollectingProcess, error, ) {
 	ianaReg := registry.NewIanaRegistry()
 	antreaReg := registry.NewAntreaRegistry()
 	ianaReg.LoadRegistry()
 	antreaReg.LoadRegistry()
+	workerList := make([]*Worker, workerNum)
+	workerPool := make(chan chan *bytes.Buffer)
 	collectProc := &CollectingProcess{
 		templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
 		templatesLock:  &sync.RWMutex{},
 		ianaRegistry:   ianaReg,
 		antreaRegistry: antreaReg,
+		workerList:     workerList,
+		workerPool:     workerPool,
 	}
+	// Create and start workers for collector
+	collectProc.initWorkers(workerNum)
+
 	if address.Network() == "udp" {
 		collectProc.startUDPServer(address, maxBufferSize)
 	}
 	return collectProc, nil
+}
+
+// Initialize and start all workers
+func (cp *CollectingProcess) initWorkers(workerNum int) {
+	for i := 0; i < workerNum; i++ {
+		worker := CreateWorker(i, cp.workerPool, cp.DecodeMessage)
+		cp.workerList[i] = worker
+	}
+	for _, worker := range cp.workerList {
+		worker.start()
+	}
+}
+
+// Send message to worker pool
+func (cp *CollectingProcess) processMessage(message []byte) {
+	messageChan := <-cp.workerPool
+	messageChan <- bytes.NewBuffer(message)
 }
 
 func (cp *CollectingProcess) startUDPServer(address net.Addr, maxBufferSize uint16) {
@@ -82,82 +113,123 @@ func (cp *CollectingProcess) startUDPServer(address net.Addr, maxBufferSize uint
 	if err != nil {
 		klog.Errorf("Cannot start collecting process on %s: %v", address.String(), err)
 	}
-	errChan := make(chan error, 1)
 
 	defer conn.Close()
-	klog.Info("Start collecting process")
+	klog.Infof("Start %s collecting process on %s", address.Network(), address.String())
 	for {
 		buff := make([]byte, maxBufferSize)
 		size, err := conn.Read(buff)
 		if err != nil {
-			errChan <- err
+			klog.Errorf("Error in collecting process: %v", err)
+			return
 		}
-		payload := make([]byte, size)
-		copy(payload, buff[0:size])
+		message := make([]byte, size)
+		copy(message, buff[0:size])
 		klog.Infof("Receiving %d bytes from %s", size, address.String())
-		cp.DecodeMessage(bytes.NewBuffer(payload))
+		cp.processMessage(message)
 	}
 }
 
-func (cp *CollectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) *Packet {
+func (cp *CollectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) (*Packet, error) {
 	packet := Packet{}
 	flowSetHeader := FlowSetHeader{}
-	decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
+	err := decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
+	if err != nil {
+		return nil, fmt.Errorf("Error in decoding message: %v", err)
+	}
+	if packet.Version != uint16(10) {
+		return nil, fmt.Errorf("Collector only supports IPFIX (v10). Invalid version %d received.", packet.Version)
+	}
 	if flowSetHeader.ID == 2 {
 		templateFlowSet := TemplateFlowSet{}
-		templateFlowSet.Records = cp.decodeTemplateRecord(msgBuffer, packet.ObsDomainID)
+		records, err := cp.decodeTemplateRecord(msgBuffer, packet.ObsDomainID)
+		if err != nil {
+			return nil, fmt.Errorf("Error in decoding message: %v", err)
+		}
+		templateFlowSet.Records = records
 		templateFlowSet.FlowSetHeader = flowSetHeader
 		packet.FlowSets = templateFlowSet
 	} else {
 		dataFlowSet := DataFlowSet{}
-		dataFlowSet.Records = cp.decodeDataRecord(msgBuffer, packet.ObsDomainID, flowSetHeader.ID)
+		records, err := cp.decodeDataRecord(msgBuffer, packet.ObsDomainID, flowSetHeader.ID)
+		if err != nil {
+			return nil, fmt.Errorf("Error in decoding message: %v", err)
+		}
+		dataFlowSet.Records = records
 		dataFlowSet.FlowSetHeader = flowSetHeader
 		packet.FlowSets = dataFlowSet
 	}
-	return &packet
+	return &packet, nil
 }
 
-func (cp *CollectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) []*TemplateField {
+func (cp *CollectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) ([]*TemplateField, error) {
 	var templateID uint16
 	var fieldCount uint16
-	decode(templateBuffer, &templateID, &fieldCount)
+	err := decode(templateBuffer, &templateID, &fieldCount)
+	if err != nil {
+		return nil, fmt.Errorf("Error in decoding message: %v", err)
+	}
 	fields := make([]*TemplateField, 0)
 	for i := 0; i < int(fieldCount); i++ {
 		field := TemplateField{}
 		// check whether enterprise ID is 0 or not
 		elementID := make([]byte, 2)
-		decode(templateBuffer, &elementID, &field.ElementLength)
+		err = decode(templateBuffer, &elementID, &field.ElementLength)
+		if err != nil {
+			return nil, fmt.Errorf("Error in decoding message: %v", err)
+		}
 		indicator := elementID[0] >> 7
 		if indicator != 1 {
 			field.EnterpriseID = uint32(0)
 		} else {
-			decode(templateBuffer, &field.EnterpriseID)
+			err = decode(templateBuffer, &field.EnterpriseID)
+			if err != nil {
+				return nil, fmt.Errorf("Error in decoding message: %v", err)
+			}
 			elementID[0] = elementID[0] ^ 0x80
 		}
 		field.ElementID = binary.BigEndian.Uint16(elementID)
 		fields = append(fields, &field)
 	}
-	cp.AddTemplate(obsDomainID, templateID, fields)
-	return fields
+	cp.addTemplate(obsDomainID, templateID, fields)
+	return fields, nil
 }
 
-func (cp *CollectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) []*DataField {
-	template, err := cp.GetTemplate(obsDomainID, templateID)
+func (cp *CollectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) ([]*DataField, error) {
+	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
-		klog.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
-	} else {
-		fields := make([]*DataField, 0)
-		for _, templateField := range template {
-			length := int(templateField.ElementLength)
-			field := DataField{}
-			field.Value = bytes.Buffer{}
-			field.Value.Write(dataBuffer.Next(length))
-			field.DataType = cp.getDataType(templateField)
-			fields = append(fields, &field)
-		}
-		return fields
+		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	return nil
+	fields := make([]*DataField, 0)
+	for _, templateField := range template {
+		length := int(templateField.ElementLength)
+		field := DataField{}
+		field.Value = bytes.Buffer{}
+		field.Value.Write(dataBuffer.Next(length))
+		field.DataType = cp.getDataType(templateField)
+		fields = append(fields, &field)
+	}
+	return fields, nil
+}
+
+func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, fields []*TemplateField) {
+	cp.templatesLock.Lock()
+	if _, exists := cp.templatesMap[obsDomainID]; !exists {
+		cp.templatesMap[obsDomainID] = make(map[uint16][]*TemplateField)
+	}
+	cp.templatesMap[obsDomainID][templateID] = fields
+	cp.templatesLock.Unlock()
+}
+
+func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*TemplateField, error) {
+	cp.templatesLock.RLock()
+	if fields, exists := cp.templatesMap[obsDomainID][templateID]; exists {
+		cp.templatesLock.RUnlock()
+		return fields, nil
+	} else {
+		cp.templatesLock.RUnlock()
+		return fields, fmt.Errorf("Template %d with obsDomainID %d does not exist.", templateID, obsDomainID)
+	}
 }
 
 func (cp *CollectingProcess) getDataType(templateField *TemplateField) entities.IEDataType {
@@ -173,26 +245,6 @@ func (cp *CollectingProcess) getDataType(templateField *TemplateField) entities.
 	}
 	ie, _ := registry.GetInfoElement(fieldName)
 	return ie.DataType
-}
-
-func (cp *CollectingProcess) AddTemplate(obsDomainID uint32, templateID uint16, fields []*TemplateField) {
-	cp.templatesLock.Lock()
-	if _, exists := cp.templatesMap[obsDomainID]; !exists {
-		cp.templatesMap[obsDomainID] = make(map[uint16][]*TemplateField)
-	}
-	cp.templatesMap[obsDomainID][templateID] = fields
-	cp.templatesLock.Unlock()
-}
-
-func (cp *CollectingProcess) GetTemplate(obsDomainID uint32, templateID uint16) ([]*TemplateField, error) {
-	cp.templatesLock.RLock()
-	if fields, exists := cp.templatesMap[obsDomainID][templateID]; exists {
-		cp.templatesLock.RUnlock()
-		return fields, nil
-	} else {
-		cp.templatesLock.RUnlock()
-		return fields, fmt.Errorf("Template %d with obsDomainID %d does not exist.", templateID, obsDomainID)
-	}
 }
 
 func decode(buffer io.Reader, output ...interface{}) error {
