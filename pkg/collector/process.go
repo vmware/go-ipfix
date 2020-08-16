@@ -17,13 +17,15 @@ type CollectingProcess struct {
 	// for each obsDomainID, there is a map of templates
 	templatesMap map[uint32]map[uint16][]*TemplateField
 	// templatesLock allows multiple readers or one writer at the same time
-	templatesLock  *sync.RWMutex
+	templatesLock *sync.RWMutex
 	// registries for decoding Information Element
 	ianaRegistry   registry.Registry
 	antreaRegistry registry.Registry
-	// list of workers to process message
+
+	// workerList and workerPool are applicable to udp only
+	// list of udp workers to process message
 	workerList []*Worker
-	// worker pool to receive and process message
+	// udp worker pool to receive and process message
 	workerPool chan chan *bytes.Buffer
 }
 
@@ -71,8 +73,12 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum int
 	antreaReg := registry.NewAntreaRegistry()
 	ianaReg.LoadRegistry()
 	antreaReg.LoadRegistry()
-	workerList := make([]*Worker, workerNum)
-	workerPool := make(chan chan *bytes.Buffer)
+	var workerList []*Worker
+	var workerPool chan chan *bytes.Buffer
+	if address.Network() == "udp" {
+		workerList = make([]*Worker, workerNum)
+		workerPool = make(chan chan *bytes.Buffer)
+	}
 	collectProc := &CollectingProcess{
 		templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
 		templatesLock:  &sync.RWMutex{},
@@ -81,53 +87,16 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum int
 		workerList:     workerList,
 		workerPool:     workerPool,
 	}
-	// Create and start workers for collector
-	collectProc.initWorkers(workerNum)
-
 	if address.Network() == "udp" {
+		// Create and start workers for collector
+		collectProc.initWorkers(workerNum)
 		collectProc.startUDPServer(address, maxBufferSize)
+	} else if address.Network() == "tcp" {
+		collectProc.startTCPServer(address, maxBufferSize)
+	} else {
+		return nil, fmt.Errorf("Network %s is not supported.", address.Network())
 	}
 	return collectProc, nil
-}
-
-// Initialize and start all workers
-func (cp *CollectingProcess) initWorkers(workerNum int) {
-	for i := 0; i < workerNum; i++ {
-		worker := CreateWorker(i, cp.workerPool, cp.DecodeMessage)
-		cp.workerList[i] = worker
-	}
-	for _, worker := range cp.workerList {
-		worker.start()
-	}
-}
-
-// Send message to worker pool
-func (cp *CollectingProcess) processMessage(message []byte) {
-	messageChan := <-cp.workerPool
-	messageChan <- bytes.NewBuffer(message)
-}
-
-func (cp *CollectingProcess) startUDPServer(address net.Addr, maxBufferSize uint16) {
-	listener, err := net.ResolveUDPAddr(address.Network(), address.String())
-	conn, err := net.ListenUDP("udp", listener)
-	if err != nil {
-		klog.Errorf("Cannot start collecting process on %s: %v", address.String(), err)
-	}
-
-	defer conn.Close()
-	klog.Infof("Start %s collecting process on %s", address.Network(), address.String())
-	for {
-		buff := make([]byte, maxBufferSize)
-		size, err := conn.Read(buff)
-		if err != nil {
-			klog.Errorf("Error in collecting process: %v", err)
-			return
-		}
-		message := make([]byte, size)
-		copy(message, buff[0:size])
-		klog.Infof("Receiving %d bytes from %s", size, address.String())
-		cp.processMessage(message)
-	}
 }
 
 func (cp *CollectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) (*Packet, error) {
