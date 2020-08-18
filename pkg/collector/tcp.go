@@ -8,7 +8,7 @@ import (
 	"net"
 )
 
-func (cp *CollectingProcess) startTCPServer(address net.Addr, maxBufferSize uint16) {
+func (cp *TCPCollectingProcess) start(address net.Addr, maxBufferSize uint16) {
 	listener, err := net.Listen("tcp", address.String())
 	if err != nil {
 		klog.Errorf("Cannot start collecting process on %s: %v", address.String(), err)
@@ -28,7 +28,7 @@ func (cp *CollectingProcess) startTCPServer(address net.Addr, maxBufferSize uint
 	}
 }
 
-func (cp *CollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize uint16, address net.Addr) {
+func (cp *TCPCollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize uint16, address net.Addr) {
 	for {
 		buff := make([]byte, maxBufferSize)
 		size, err := conn.Read(buff)

@@ -6,7 +6,8 @@ import (
 	"net"
 )
 
-func (cp *CollectingProcess) startUDPServer(address net.Addr, maxBufferSize uint16) {
+func (cp *UDPCollectingProcess) start(address net.Addr, maxBufferSize uint16, workerNum int) {
+	cp.initWorkers(workerNum)
 	listener, err := net.ResolveUDPAddr(address.Network(), address.String())
 	conn, err := net.ListenUDP("udp", listener)
 	if err != nil {
@@ -29,7 +30,7 @@ func (cp *CollectingProcess) startUDPServer(address net.Addr, maxBufferSize uint
 }
 
 // Initialize and start all workers
-func (cp *CollectingProcess) initWorkers(workerNum int) {
+func (cp *UDPCollectingProcess) initWorkers(workerNum int) {
 	for i := 0; i < workerNum; i++ {
 		worker := CreateWorker(i, cp.workerPool, cp.DecodeMessage)
 		cp.workerList[i] = worker
@@ -40,11 +41,10 @@ func (cp *CollectingProcess) initWorkers(workerNum int) {
 }
 
 // Send message to worker pool
-func (cp *CollectingProcess) processMessage(message []byte) {
+func (cp *UDPCollectingProcess) processMessage(message []byte) {
 	messageChan := <-cp.workerPool
 	messageChan <- bytes.NewBuffer(message)
 }
-
 
 type Worker struct {
 	id          uint16

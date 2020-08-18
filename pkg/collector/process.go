@@ -4,29 +4,41 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 	"io"
 	"k8s.io/klog"
 	"net"
 	"sync"
-
-	"github.com/vmware/go-ipfix/pkg/entities"
-	"github.com/vmware/go-ipfix/pkg/registry"
+	"time"
 )
 
-type CollectingProcess struct {
+type collectingProcess struct {
 	// for each obsDomainID, there is a map of templates
 	templatesMap map[uint32]map[uint16][]*TemplateField
 	// templatesLock allows multiple readers or one writer at the same time
 	templatesLock *sync.RWMutex
+	// template lifetime
+	templateTTL uint32
 	// registries for decoding Information Element
 	ianaRegistry   registry.Registry
 	antreaRegistry registry.Registry
+	// server information
+	address net.Addr
+}
 
-	// workerList and workerPool are applicable to udp only
+type UDPCollectingProcess struct {
+	collectingProcess
 	// list of udp workers to process message
 	workerList []*Worker
 	// udp worker pool to receive and process message
 	workerPool chan chan *bytes.Buffer
+	// template lifetime channel
+	templateLtCh chan struct{}
+}
+
+type TCPCollectingProcess struct {
+	collectingProcess
 }
 
 // data struct of processed message
@@ -68,38 +80,50 @@ type DataField struct {
 	Value    bytes.Buffer
 }
 
-func InitCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum int) (*CollectingProcess, error, ) {
+func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPCollectingProcess, error) {
 	ianaReg := registry.NewIanaRegistry()
 	antreaReg := registry.NewAntreaRegistry()
 	ianaReg.LoadRegistry()
 	antreaReg.LoadRegistry()
-	var workerList []*Worker
-	var workerPool chan chan *bytes.Buffer
-	if address.Network() == "udp" {
-		workerList = make([]*Worker, workerNum)
-		workerPool = make(chan chan *bytes.Buffer)
+	collectProc := &TCPCollectingProcess{
+		collectingProcess{
+			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
+			templatesLock:  &sync.RWMutex{},
+			templateTTL:    0,
+			ianaRegistry:   ianaReg,
+			antreaRegistry: antreaReg,
+			address:        address,
+		},
 	}
-	collectProc := &CollectingProcess{
-		templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
-		templatesLock:  &sync.RWMutex{},
-		ianaRegistry:   ianaReg,
-		antreaRegistry: antreaReg,
-		workerList:     workerList,
-		workerPool:     workerPool,
-	}
-	if address.Network() == "udp" {
-		// Create and start workers for collector
-		collectProc.initWorkers(workerNum)
-		collectProc.startUDPServer(address, maxBufferSize)
-	} else if address.Network() == "tcp" {
-		collectProc.startTCPServer(address, maxBufferSize)
-	} else {
-		return nil, fmt.Errorf("Network %s is not supported.", address.Network())
-	}
+	collectProc.start(address, maxBufferSize)
 	return collectProc, nil
 }
 
-func (cp *CollectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) (*Packet, error) {
+func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum int, templateTTL uint32) (*UDPCollectingProcess, error) {
+	ianaReg := registry.NewIanaRegistry()
+	antreaReg := registry.NewAntreaRegistry()
+	ianaReg.LoadRegistry()
+	antreaReg.LoadRegistry()
+	workerList := make([]*Worker, workerNum)
+	workerPool := make(chan chan *bytes.Buffer)
+	collectProc := &UDPCollectingProcess{
+		collectingProcess: collectingProcess{
+			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
+			templatesLock:  &sync.RWMutex{},
+			templateTTL:    templateTTL,
+			ianaRegistry:   ianaReg,
+			antreaRegistry: antreaReg,
+			address:        address,
+		},
+		workerList: workerList,
+		workerPool: workerPool,
+	}
+
+	collectProc.start(address, maxBufferSize, workerNum)
+	return collectProc, nil
+}
+
+func (cp *collectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) (*Packet, error) {
 	packet := Packet{}
 	flowSetHeader := FlowSetHeader{}
 	err := decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
@@ -131,7 +155,7 @@ func (cp *CollectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) (*Packet, er
 	return &packet, nil
 }
 
-func (cp *CollectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) ([]*TemplateField, error) {
+func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) ([]*TemplateField, error) {
 	var templateID uint16
 	var fieldCount uint16
 	err := decode(templateBuffer, &templateID, &fieldCount)
@@ -164,7 +188,7 @@ func (cp *CollectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, 
 	return fields, nil
 }
 
-func (cp *CollectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) ([]*DataField, error) {
+func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) ([]*DataField, error) {
 	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
@@ -181,16 +205,33 @@ func (cp *CollectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomai
 	return fields, nil
 }
 
-func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, fields []*TemplateField) {
+func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, fields []*TemplateField) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
 		cp.templatesMap[obsDomainID] = make(map[uint16][]*TemplateField)
 	}
 	cp.templatesMap[obsDomainID][templateID] = fields
 	cp.templatesLock.Unlock()
+	// template lifetime management
+	if cp.address.Network() == "tcp" {
+		return
+	}
+	if cp.templateTTL == 0 {
+		cp.templateTTL = 1800 * 3 // Default value is 5400s
+	}
+	go func() {
+		ticker := time.NewTicker(time.Duration(cp.templateTTL) * time.Second)
+		defer ticker.Stop()
+		select {
+		case <-ticker.C:
+			klog.Infof("Template with id %d, and obsDomainID %d is expired.", templateID, obsDomainID)
+			cp.deleteTemplate(obsDomainID, templateID)
+			break
+		}
+	}()
 }
 
-func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*TemplateField, error) {
+func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*TemplateField, error) {
 	cp.templatesLock.RLock()
 	if fields, exists := cp.templatesMap[obsDomainID][templateID]; exists {
 		cp.templatesLock.RUnlock()
@@ -201,7 +242,13 @@ func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) 
 	}
 }
 
-func (cp *CollectingProcess) getDataType(templateField *TemplateField) entities.IEDataType {
+func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) {
+	cp.templatesLock.Lock()
+	delete(cp.templatesMap[obsDomainID], templateID)
+	cp.templatesLock.Unlock()
+}
+
+func (cp *collectingProcess) getDataType(templateField *TemplateField) entities.IEDataType {
 	var registry registry.Registry
 	if templateField.EnterpriseID == 0 { // IANA Registry
 		registry = cp.ianaRegistry
