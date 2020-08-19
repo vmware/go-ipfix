@@ -8,56 +8,69 @@ import (
 	"net"
 )
 
-func (cp *TCPCollectingProcess) start(address net.Addr, maxBufferSize uint16) {
-	listener, err := net.Listen("tcp", address.String())
+func (cp *TCPCollectingProcess) Start() {
+	listener, err := net.Listen("tcp", cp.address.String())
 	if err != nil {
-		klog.Errorf("Cannot start collecting process on %s: %v", address.String(), err)
+		klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
 		return
 	}
 
-	klog.Infof("Start %s collecting process on %s", address.Network(), address.String())
+	klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
 	defer listener.Close()
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			klog.Errorf("Cannot start collecting process on %s: %v", address.String(), err)
+			klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
 			return
 		}
-		go cp.handleTCPConnection(conn, maxBufferSize, address)
+		errChan := make(chan bool)
+		go func() {
+			cp.handleTCPConnection(conn, cp.maxBufferSize, cp.address, errChan)
+		}()
+		select {
+		case <-errChan:
+			return
+		}
 	}
 }
 
-func (cp *TCPCollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize uint16, address net.Addr) {
+func (cp *TCPCollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize uint16, address net.Addr, errChan chan bool) {
 	for {
-		buff := make([]byte, maxBufferSize)
-		size, err := conn.Read(buff)
-		if err != nil {
-			if err == io.EOF {
-				klog.Infof("TCP Connection %s has been closed.", address.String())
-			} else {
-				klog.Errorf("Error in collecting process: %v", err)
-			}
+		select {
+		case <-cp.stopChan:
+			errChan <- true
 			return
-		}
-		klog.Infof("Receiving %d bytes from %s", size, address.String())
-		message := make([]byte, size)
-		copy(message, buff[0:size])
-		for size > 0 {
-			length, err := getMessageLength(bytes.NewBuffer(message))
+		default:
+			buff := make([]byte, maxBufferSize)
+			size, err := conn.Read(buff)
 			if err != nil {
-				klog.Error(err)
+				if err == io.EOF {
+					klog.Infof("TCP Connection %s has been closed.", address.String())
+				} else {
+					klog.Errorf("Error in collecting process: %v", err)
+				}
 				return
 			}
-			size = size - length
-			// get the packet here
-			packet, err := cp.DecodeMessage(bytes.NewBuffer(message[0:length]))
-			if err != nil {
-				klog.Error(err)
-				return
+			klog.Infof("Receiving %d bytes from %s", size, address.String())
+			message := make([]byte, size)
+			copy(message, buff[0:size])
+			for size > 0 {
+				length, err := getMessageLength(bytes.NewBuffer(message))
+				if err != nil {
+					klog.Error(err)
+					return
+				}
+				size = size - length
+				// get the packet here
+				packet, err := cp.DecodeMessage(bytes.NewBuffer(message[0:length]))
+				if err != nil {
+					klog.Error(err)
+					return
+				}
+				klog.Info(packet)
+				message = message[length:]
 			}
-			klog.Info(packet)
-			message = message[length:]
 		}
 	}
 	conn.Close()

@@ -6,26 +6,32 @@ import (
 	"net"
 )
 
-func (cp *UDPCollectingProcess) start(address net.Addr, maxBufferSize uint16, workerNum int) {
-	cp.initWorkers(workerNum)
-	listener, err := net.ResolveUDPAddr(address.Network(), address.String())
+func (cp *UDPCollectingProcess) Start() {
+	cp.initWorkers(cp.workerNum)
+	listener, err := net.ResolveUDPAddr(cp.address.Network(), cp.address.String())
 	conn, err := net.ListenUDP("udp", listener)
 	if err != nil {
-		klog.Errorf("Cannot start collecting process on %s: %v", address.String(), err)
+		klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
 	}
 
-	klog.Infof("Start %s collecting process on %s", address.Network(), address.String())
+	klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
 	for {
-		buff := make([]byte, maxBufferSize)
-		size, err := conn.Read(buff)
-		if err != nil {
-			klog.Errorf("Error in collecting process: %v", err)
+		select {
+		case <-cp.stopChan:
+			cp.stopWorkers()
 			return
+		default:
+			buff := make([]byte, cp.maxBufferSize)
+			size, err := conn.Read(buff)
+			if err != nil {
+				klog.Errorf("Error in collecting process: %v", err)
+				return
+			}
+			message := make([]byte, size)
+			copy(message, buff[0:size])
+			klog.Infof("Receiving %d bytes from %s", size, cp.address.String())
+			cp.processMessage(message)
 		}
-		message := make([]byte, size)
-		copy(message, buff[0:size])
-		klog.Infof("Receiving %d bytes from %s", size, address.String())
-		cp.processMessage(message)
 	}
 }
 
@@ -37,6 +43,13 @@ func (cp *UDPCollectingProcess) initWorkers(workerNum int) {
 	}
 	for _, worker := range cp.workerList {
 		worker.start()
+	}
+}
+
+// Stop all workers
+func (cp *UDPCollectingProcess) stopWorkers() {
+	for _, worker := range cp.workerList {
+		worker.stop()
 	}
 }
 
@@ -70,7 +83,7 @@ func (worker *Worker) start() {
 		for {
 			select {
 			case <-worker.errorChan:
-				break
+				return
 			case worker.workerPool <- worker.messageChan:
 				message := <-worker.messageChan
 				packet, err := worker.decodeFunc(message)

@@ -25,20 +25,26 @@ type collectingProcess struct {
 	antreaRegistry registry.Registry
 	// server information
 	address net.Addr
+	// maximum buffer size to read the record
+	maxBufferSize uint16
+	// chanel to receive stop information
+	stopChan chan bool
+	// packet list
+	packets []*Packet
 }
 
 type UDPCollectingProcess struct {
-	collectingProcess
+	*collectingProcess
 	// list of udp workers to process message
 	workerList []*Worker
 	// udp worker pool to receive and process message
 	workerPool chan chan *bytes.Buffer
-	// template lifetime channel
-	templateLtCh chan struct{}
+	// number of workers
+	workerNum int
 }
 
 type TCPCollectingProcess struct {
-	collectingProcess
+	*collectingProcess
 }
 
 // data struct of processed message
@@ -86,16 +92,18 @@ func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPColle
 	ianaReg.LoadRegistry()
 	antreaReg.LoadRegistry()
 	collectProc := &TCPCollectingProcess{
-		collectingProcess{
+		&collectingProcess{
 			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    0,
 			ianaRegistry:   ianaReg,
 			antreaRegistry: antreaReg,
 			address:        address,
+			maxBufferSize:  maxBufferSize,
+			stopChan:       make(chan bool),
+			packets:        make([]*Packet, 0),
 		},
 	}
-	collectProc.start(address, maxBufferSize)
 	return collectProc, nil
 }
 
@@ -107,19 +115,21 @@ func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum 
 	workerList := make([]*Worker, workerNum)
 	workerPool := make(chan chan *bytes.Buffer)
 	collectProc := &UDPCollectingProcess{
-		collectingProcess: collectingProcess{
+		collectingProcess: &collectingProcess{
 			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    templateTTL,
 			ianaRegistry:   ianaReg,
 			antreaRegistry: antreaReg,
 			address:        address,
+			maxBufferSize:  maxBufferSize,
+			stopChan:       make(chan bool),
+			packets:        make([]*Packet, 0),
 		},
 		workerList: workerList,
 		workerPool: workerPool,
+		workerNum:  workerNum,
 	}
-
-	collectProc.start(address, maxBufferSize, workerNum)
 	return collectProc, nil
 }
 
@@ -152,6 +162,7 @@ func (cp *collectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) (*Packet, er
 		dataFlowSet.FlowSetHeader = flowSetHeader
 		packet.FlowSets = dataFlowSet
 	}
+	cp.packets = append(cp.packets, &packet)
 	return &packet, nil
 }
 
