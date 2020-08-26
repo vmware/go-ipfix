@@ -31,7 +31,7 @@ import (
 
 type collectingProcess struct {
 	// for each obsDomainID, there is a map of templates
-	templatesMap map[uint32]map[uint16][]*TemplateField
+	templatesMap map[uint32]map[uint16][]*templateField
 	// templatesLock allows multiple readers or one writer at the same time
 	templatesLock *sync.RWMutex
 	// template lifetime
@@ -46,140 +46,101 @@ type collectingProcess struct {
 	// chanel to receive stop information
 	stopChan chan bool
 	// packet list
-	packets []*Packet
+	messages []*entities.Message
 }
 
 const AntreaEnterpriseID uint32 = 55829
 
-// data struct of processed message
-type Packet struct {
-	Version      uint16
-	BufferLength uint16
-	SeqNumber    uint32
-	ObsDomainID  uint32
-	ExportTime   uint32
-	FlowSets     interface{}
+type templateField struct {
+	elementID     uint16
+	elementLength uint16
+	enterpriseID  uint32
 }
 
-// Shared header fields for TemplateFlowSet and DataFlowSet
-type FlowSetHeader struct {
-	// 2 for templateFlowSet
-	// 256-65535 for dataFlowSet (templateID)
-	ID     uint16
-	Length uint16
-}
-
-type TemplateFlowSet struct {
-	FlowSetHeader
-	Records []*TemplateField
-}
-
-type DataFlowSet struct {
-	FlowSetHeader
-	Records []*DataField
-}
-
-type TemplateField struct {
-	ElementID     uint16
-	ElementLength uint16
-	EnterpriseID  uint32
-}
-
-type DataField struct {
-	DataType entities.IEDataType
-	Value    bytes.Buffer
-}
-
-func (cp *collectingProcess) decodePacket(msgBuffer *bytes.Buffer) (*Packet, error) {
-	packet := Packet{}
-	flowSetHeader := FlowSetHeader{}
-	err := decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
+func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
+	message := entities.Message{}
+	setHeader := entities.SetHeader{}
+	err := decode(packetBuffer, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setHeader)
 	if err != nil {
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
-	if packet.Version != uint16(10) {
-		return nil, fmt.Errorf("Collector only supports IPFIX (v10). Invalid version %d received.", packet.Version)
+	if message.Version != uint16(10) {
+		return nil, fmt.Errorf("Collector only supports IPFIX (v10). Invalid version %d received.", message.Version)
 	}
-	if flowSetHeader.ID == 2 {
-		templateFlowSet := TemplateFlowSet{}
-		records, err := cp.decodeTemplateRecord(msgBuffer, packet.ObsDomainID)
+	if setHeader.ID == 2 {
+		record, err := cp.decodeTemplateRecord(packetBuffer, message.ObsDomainID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
-		templateFlowSet.Records = records
-		templateFlowSet.FlowSetHeader = flowSetHeader
-		packet.FlowSets = templateFlowSet
+		message.Set = record
 	} else {
-		dataFlowSet := DataFlowSet{}
-		records, err := cp.decodeDataRecord(msgBuffer, packet.ObsDomainID, flowSetHeader.ID)
+		record, err := cp.decodeDataRecord(packetBuffer, message.ObsDomainID, setHeader.ID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
-		dataFlowSet.Records = records
-		dataFlowSet.FlowSetHeader = flowSetHeader
-		packet.FlowSets = dataFlowSet
+		message.Set = record
 	}
-	cp.packets = append(cp.packets, &packet)
-	return &packet, nil
+	cp.messages = append(cp.messages, &message)
+	return &message, nil
 }
 
-func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) ([]*TemplateField, error) {
+func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) (*entities.Set, error) {
 	var templateID uint16
 	var fieldCount uint16
 	err := decode(templateBuffer, &templateID, &fieldCount)
 	if err != nil {
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
-	fields := make([]*TemplateField, 0)
+	fields := make([]*templateField, 0)
+	buff := templateBuffer
+	set := entities.NewSet(buff)
+	set.CreateNewSet(entities.Template, templateID)
+
+
 	for i := 0; i < int(fieldCount); i++ {
-		field := TemplateField{}
+		field := templateField{}
 		// check whether enterprise ID is 0 or not
 		elementID := make([]byte, 2)
-		err = decode(templateBuffer, &elementID, &field.ElementLength)
+		err = decode(templateBuffer, &elementID, &field.elementLength)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
 		indicator := elementID[0] >> 7
 		if indicator != 1 {
-			field.EnterpriseID = uint32(0)
+			field.enterpriseID = uint32(0)
 		} else {
-			err = decode(templateBuffer, &field.EnterpriseID)
+			err = decode(templateBuffer, &field.enterpriseID)
 			if err != nil {
 				return nil, fmt.Errorf("Error in decoding message: %v", err)
 			}
 			elementID[0] = elementID[0] ^ 0x80
 		}
-		field.ElementID = binary.BigEndian.Uint16(elementID)
+		field.elementID = binary.BigEndian.Uint16(elementID)
 		fields = append(fields, &field)
 	}
 	cp.addTemplate(obsDomainID, templateID, fields)
-	return fields, nil
+	return set, nil
 }
 
-func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) ([]*DataField, error) {
-	template, err := cp.getTemplate(obsDomainID, templateID)
+func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (*entities.Set, error) {
+	// make sure template exists
+	_, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	fields := make([]*DataField, 0)
-	for _, templateField := range template {
-		length := int(templateField.ElementLength)
-		field := DataField{}
-		field.Value = bytes.Buffer{}
-		field.Value.Write(dataBuffer.Next(length))
-		field.DataType = cp.getDataType(templateField)
-		if field.DataType == 255 { // invalid data type
-			return nil, fmt.Errorf("Information element with id %d cannot be found.", templateField.ElementID)
-		}
-		fields = append(fields, &field)
-	}
-	return fields, nil
+	buff := bytes.Buffer{}
+	set := entities.NewSet(&buff)
+	set.CreateNewSet(entities.Data, templateID)
+
+	// decode data record using template?
+
+	return set, nil
 }
 
-func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, fields []*TemplateField) {
+func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, fields []*templateField) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
-		cp.templatesMap[obsDomainID] = make(map[uint16][]*TemplateField)
+		cp.templatesMap[obsDomainID] = make(map[uint16][]*templateField)
 	}
 	cp.templatesMap[obsDomainID][templateID] = fields
 	cp.templatesLock.Unlock()
@@ -204,7 +165,7 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}()
 }
 
-func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*TemplateField, error) {
+func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*templateField, error) {
 	cp.templatesLock.RLock()
 	defer cp.templatesLock.RUnlock()
 	if fields, exists := cp.templatesMap[obsDomainID][templateID]; exists {
@@ -220,16 +181,16 @@ func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 	delete(cp.templatesMap[obsDomainID], templateID)
 }
 
-func (cp *collectingProcess) getDataType(templateField *TemplateField) entities.IEDataType {
+func (cp *collectingProcess) getDataType(templateField *templateField) entities.IEDataType {
 	var registry registry.Registry
-	if templateField.EnterpriseID == 0 { // IANA Registry
+	if templateField.enterpriseID == 0 { // IANA Registry
 		registry = cp.ianaRegistry
-	} else if templateField.EnterpriseID == AntreaEnterpriseID { // Antrea Registry
+	} else if templateField.enterpriseID == AntreaEnterpriseID { // Antrea Registry
 		registry = cp.antreaRegistry
 	}
-	fieldName, err := registry.GetIENameFromID(templateField.ElementID)
+	fieldName, err := registry.GetIENameFromID(templateField.elementID)
 	if err != nil {
-		klog.Errorf("Information Element with id %d cannot be found.", templateField.ElementID)
+		klog.Errorf("Information Element with id %d cannot be found.", templateField.elementID)
 		return 255
 	}
 	ie, _ := registry.GetInfoElement(fieldName)

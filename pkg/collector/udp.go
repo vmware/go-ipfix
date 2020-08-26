@@ -16,6 +16,7 @@ package collector
 
 import (
 	"bytes"
+	"github.com/vmware/go-ipfix/pkg/entities"
 	"net"
 	"sync"
 
@@ -43,7 +44,7 @@ func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum 
 	workerPool := make(chan chan *bytes.Buffer)
 	collectProc := &UDPCollectingProcess{
 		collectingProcess: collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
+			templatesMap:   make(map[uint32]map[uint16][]*templateField),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    templateTTL,
 			ianaRegistry:   ianaReg,
@@ -51,7 +52,7 @@ func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum 
 			address:        address,
 			maxBufferSize:  maxBufferSize,
 			stopChan:       make(chan bool),
-			packets:        make([]*Packet, 0),
+			messages:        make([]*entities.Message, 0),
 		},
 		workerList: workerList,
 		workerPool: workerPool,
@@ -118,10 +119,10 @@ type Worker struct {
 	messageChan chan *bytes.Buffer
 	errorChan   chan bool
 	workerPool  chan chan *bytes.Buffer
-	decodeFunc  func(message *bytes.Buffer) (*Packet, error)
+	decodeFunc  func(message *bytes.Buffer) (*entities.Message, error)
 }
 
-func CreateWorker(id int, workerPool chan chan *bytes.Buffer, decodeFunc func(message *bytes.Buffer) (*Packet, error)) *Worker {
+func CreateWorker(id int, workerPool chan chan *bytes.Buffer, decodeFunc func(message *bytes.Buffer) (*entities.Message, error)) *Worker {
 	return &Worker{
 		id:          uint16(id),
 		messageChan: make(chan *bytes.Buffer),

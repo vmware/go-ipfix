@@ -17,12 +17,14 @@ package collector
 import (
 	"bytes"
 	"fmt"
-	"github.com/vmware/go-ipfix/pkg/registry"
 	"io"
 	"net"
 	"sync"
 
 	"k8s.io/klog"
+
+	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type TCPCollectingProcess struct {
@@ -36,7 +38,7 @@ func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPColle
 	antreaReg.LoadRegistry()
 	collectProc := &TCPCollectingProcess{
 		collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
+			templatesMap:   make(map[uint32]map[uint16][]*templateField),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    0,
 			ianaRegistry:   ianaReg,
@@ -44,7 +46,7 @@ func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPColle
 			address:        address,
 			maxBufferSize:  maxBufferSize,
 			stopChan:       make(chan bool),
-			packets:        make([]*Packet, 0),
+			messages:        make([]*entities.Message, 0),
 		},
 	}
 	return collectProc, nil
@@ -120,8 +122,8 @@ func (cp *TCPCollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize
 
 // get buffer length by decoding the header
 func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
-	packet := Packet{}
-	flowSetHeader := FlowSetHeader{}
+	packet := entities.Message{}
+	flowSetHeader := entities.SetHeader{}
 	err := decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
 	if err != nil {
 		return 0, fmt.Errorf("Cannot decode message: %v", err)

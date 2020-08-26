@@ -34,9 +34,17 @@ const (
 
 type Set struct {
 	// Pointer to message buffer
+	SetHeader
 	buffer  *bytes.Buffer
 	currLen uint16
 	setType ContentType
+}
+
+type SetHeader struct {
+	// 2 for templateFlowSet
+	// 256-65535 for dataFlowSet (templateID)
+	ID     uint16
+	Length uint16
 }
 
 func NewSet(buffer *bytes.Buffer) *Set {
