@@ -1,12 +1,54 @@
+// Copyright 2020 VMware, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package collector
 
 import (
 	"bytes"
 	"fmt"
+	"github.com/vmware/go-ipfix/pkg/registry"
 	"io"
-	"k8s.io/klog"
 	"net"
+	"sync"
+
+	"k8s.io/klog"
 )
+
+type TCPCollectingProcess struct {
+	collectingProcess
+}
+
+func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPCollectingProcess, error) {
+	ianaReg := registry.NewIanaRegistry()
+	antreaReg := registry.NewAntreaRegistry()
+	ianaReg.LoadRegistry()
+	antreaReg.LoadRegistry()
+	collectProc := &TCPCollectingProcess{
+		collectingProcess{
+			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
+			templatesLock:  &sync.RWMutex{},
+			templateTTL:    0,
+			ianaRegistry:   ianaReg,
+			antreaRegistry: antreaReg,
+			address:        address,
+			maxBufferSize:  maxBufferSize,
+			stopChan:       make(chan bool),
+			packets:        make([]*Packet, 0),
+		},
+	}
+	return collectProc, nil
+}
 
 func (cp *TCPCollectingProcess) Start() {
 	listener, err := net.Listen("tcp", cp.address.String())
@@ -63,7 +105,7 @@ func (cp *TCPCollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize
 				}
 				size = size - length
 				// get the packet here
-				packet, err := cp.DecodeMessage(bytes.NewBuffer(message[0:length]))
+				packet, err := cp.decodePacket(bytes.NewBuffer(message[0:length]))
 				if err != nil {
 					klog.Error(err)
 					return

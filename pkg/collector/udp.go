@@ -1,10 +1,64 @@
+// Copyright 2020 VMware, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package collector
 
 import (
 	"bytes"
-	"k8s.io/klog"
 	"net"
+	"sync"
+
+	"k8s.io/klog"
+
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
+
+type UDPCollectingProcess struct {
+	collectingProcess
+	// list of udp workers to process message
+	workerList []*Worker
+	// udp worker pool to receive and process message
+	workerPool chan chan *bytes.Buffer
+	// number of workers
+	workerNum int
+}
+
+func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum int, templateTTL uint32) (*UDPCollectingProcess, error) {
+	ianaReg := registry.NewIanaRegistry()
+	antreaReg := registry.NewAntreaRegistry()
+	ianaReg.LoadRegistry()
+	antreaReg.LoadRegistry()
+	workerList := make([]*Worker, workerNum)
+	workerPool := make(chan chan *bytes.Buffer)
+	collectProc := &UDPCollectingProcess{
+		collectingProcess: collectingProcess{
+			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
+			templatesLock:  &sync.RWMutex{},
+			templateTTL:    templateTTL,
+			ianaRegistry:   ianaReg,
+			antreaRegistry: antreaReg,
+			address:        address,
+			maxBufferSize:  maxBufferSize,
+			stopChan:       make(chan bool),
+			packets:        make([]*Packet, 0),
+		},
+		workerList: workerList,
+		workerPool: workerPool,
+		workerNum:  workerNum,
+	}
+	return collectProc, nil
+}
 
 func (cp *UDPCollectingProcess) Start() {
 	cp.initWorkers(cp.workerNum)
@@ -38,7 +92,7 @@ func (cp *UDPCollectingProcess) Start() {
 // Initialize and start all workers
 func (cp *UDPCollectingProcess) initWorkers(workerNum int) {
 	for i := 0; i < workerNum; i++ {
-		worker := CreateWorker(i, cp.workerPool, cp.DecodeMessage)
+		worker := CreateWorker(i, cp.workerPool, cp.decodePacket)
 		cp.workerList[i] = worker
 	}
 	for _, worker := range cp.workerList {

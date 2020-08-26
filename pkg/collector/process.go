@@ -1,16 +1,32 @@
+// Copyright 2020 VMware, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package collector
 
 import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/vmware/go-ipfix/pkg/entities"
-	"github.com/vmware/go-ipfix/pkg/registry"
 	"io"
-	"k8s.io/klog"
 	"net"
 	"sync"
 	"time"
+
+	"k8s.io/klog"
+
+	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type collectingProcess struct {
@@ -33,19 +49,7 @@ type collectingProcess struct {
 	packets []*Packet
 }
 
-type UDPCollectingProcess struct {
-	*collectingProcess
-	// list of udp workers to process message
-	workerList []*Worker
-	// udp worker pool to receive and process message
-	workerPool chan chan *bytes.Buffer
-	// number of workers
-	workerNum int
-}
-
-type TCPCollectingProcess struct {
-	*collectingProcess
-}
+const AntreaEnterpriseID uint32 = 55829
 
 // data struct of processed message
 type Packet struct {
@@ -86,54 +90,7 @@ type DataField struct {
 	Value    bytes.Buffer
 }
 
-func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPCollectingProcess, error) {
-	ianaReg := registry.NewIanaRegistry()
-	antreaReg := registry.NewAntreaRegistry()
-	ianaReg.LoadRegistry()
-	antreaReg.LoadRegistry()
-	collectProc := &TCPCollectingProcess{
-		&collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
-			templatesLock:  &sync.RWMutex{},
-			templateTTL:    0,
-			ianaRegistry:   ianaReg,
-			antreaRegistry: antreaReg,
-			address:        address,
-			maxBufferSize:  maxBufferSize,
-			stopChan:       make(chan bool),
-			packets:        make([]*Packet, 0),
-		},
-	}
-	return collectProc, nil
-}
-
-func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum int, templateTTL uint32) (*UDPCollectingProcess, error) {
-	ianaReg := registry.NewIanaRegistry()
-	antreaReg := registry.NewAntreaRegistry()
-	ianaReg.LoadRegistry()
-	antreaReg.LoadRegistry()
-	workerList := make([]*Worker, workerNum)
-	workerPool := make(chan chan *bytes.Buffer)
-	collectProc := &UDPCollectingProcess{
-		collectingProcess: &collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*TemplateField),
-			templatesLock:  &sync.RWMutex{},
-			templateTTL:    templateTTL,
-			ianaRegistry:   ianaReg,
-			antreaRegistry: antreaReg,
-			address:        address,
-			maxBufferSize:  maxBufferSize,
-			stopChan:       make(chan bool),
-			packets:        make([]*Packet, 0),
-		},
-		workerList: workerList,
-		workerPool: workerPool,
-		workerNum:  workerNum,
-	}
-	return collectProc, nil
-}
-
-func (cp *collectingProcess) DecodeMessage(msgBuffer *bytes.Buffer) (*Packet, error) {
+func (cp *collectingProcess) decodePacket(msgBuffer *bytes.Buffer) (*Packet, error) {
 	packet := Packet{}
 	flowSetHeader := FlowSetHeader{}
 	err := decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
@@ -211,6 +168,9 @@ func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomai
 		field.Value = bytes.Buffer{}
 		field.Value.Write(dataBuffer.Next(length))
 		field.DataType = cp.getDataType(templateField)
+		if field.DataType == 255 { // invalid data type
+			return nil, fmt.Errorf("Information element with id %d cannot be found.", templateField.ElementID)
+		}
 		fields = append(fields, &field)
 	}
 	return fields, nil
@@ -227,6 +187,8 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	if cp.address.Network() == "tcp" {
 		return
 	}
+
+	// Handle udp template expiration
 	if cp.templateTTL == 0 {
 		cp.templateTTL = 1800 * 3 // Default value is 5400s
 	}
@@ -244,31 +206,31 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 
 func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*TemplateField, error) {
 	cp.templatesLock.RLock()
+	defer cp.templatesLock.RUnlock()
 	if fields, exists := cp.templatesMap[obsDomainID][templateID]; exists {
-		cp.templatesLock.RUnlock()
 		return fields, nil
 	} else {
-		cp.templatesLock.RUnlock()
-		return fields, fmt.Errorf("Template %d with obsDomainID %d does not exist.", templateID, obsDomainID)
+		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist.", templateID, obsDomainID)
 	}
 }
 
 func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) {
 	cp.templatesLock.Lock()
+	defer cp.templatesLock.Unlock()
 	delete(cp.templatesMap[obsDomainID], templateID)
-	cp.templatesLock.Unlock()
 }
 
 func (cp *collectingProcess) getDataType(templateField *TemplateField) entities.IEDataType {
 	var registry registry.Registry
 	if templateField.EnterpriseID == 0 { // IANA Registry
 		registry = cp.ianaRegistry
-	} else if templateField.EnterpriseID == 55829 { // Antrea Registry
+	} else if templateField.EnterpriseID == AntreaEnterpriseID { // Antrea Registry
 		registry = cp.antreaRegistry
 	}
 	fieldName, err := registry.GetIENameFromID(templateField.ElementID)
 	if err != nil {
 		klog.Errorf("Information Element with id %d cannot be found.", templateField.ElementID)
+		return 255
 	}
 	ie, _ := registry.GetInfoElement(fieldName)
 	return ie.DataType
