@@ -25,13 +25,14 @@ import (
 
 	"k8s.io/klog"
 
+	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type collectingProcess struct {
 	// for each obsDomainID, there is a map of templates
-	templatesMap map[uint32]map[uint16][]*templateField
+	templatesMap map[uint32]map[uint16][]*entities.InfoElement
 	// templatesLock allows multiple readers or one writer at the same time
 	templatesLock *sync.RWMutex
 	// template lifetime
@@ -49,100 +50,101 @@ type collectingProcess struct {
 	messages []*entities.Message
 }
 
-const AntreaEnterpriseID uint32 = 55829
-
-type templateField struct {
-	elementID     uint16
-	elementLength uint16
-	enterpriseID  uint32
-}
-
 func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
 	message := entities.Message{}
-	setHeader := entities.SetHeader{}
-	err := decode(packetBuffer, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setHeader)
+	var id, length uint16
+	err := decode(packetBuffer, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &id, &length)
 	if err != nil {
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
 	if message.Version != uint16(10) {
 		return nil, fmt.Errorf("Collector only supports IPFIX (v10). Invalid version %d received.", message.Version)
 	}
-	if setHeader.ID == 2 {
+	if id == 2 {
 		record, err := cp.decodeTemplateRecord(packetBuffer, message.ObsDomainID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
-		message.Set = record
+		message.Record = record
 	} else {
-		record, err := cp.decodeDataRecord(packetBuffer, message.ObsDomainID, setHeader.ID)
+		record, err := cp.decodeDataRecord(packetBuffer, message.ObsDomainID, id)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
-		message.Set = record
+		message.Record = record
 	}
 	cp.messages = append(cp.messages, &message)
 	return &message, nil
 }
 
-func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) (*entities.Set, error) {
+func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) (*entities.TemplateRecord, error) {
 	var templateID uint16
 	var fieldCount uint16
 	err := decode(templateBuffer, &templateID, &fieldCount)
 	if err != nil {
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
-	fields := make([]*templateField, 0)
-	buff := templateBuffer
-	set := entities.NewSet(buff)
-	set.CreateNewSet(entities.Template, templateID)
-
+	elements := make([]*entities.InfoElement, 0)
+	record := entities.NewTemplateRecord(fieldCount, templateID)
 
 	for i := 0; i < int(fieldCount); i++ {
-		field := templateField{}
+		var element *entities.InfoElement
 		// check whether enterprise ID is 0 or not
 		elementID := make([]byte, 2)
-		err = decode(templateBuffer, &elementID, &field.elementLength)
+		var elementLength uint16
+		err = decode(templateBuffer, &elementID, &elementLength)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
 		indicator := elementID[0] >> 7
 		if indicator != 1 {
-			field.enterpriseID = uint32(0)
+			elementid := binary.BigEndian.Uint16(elementID)
+			element, err = cp.ianaRegistry.GetElementFromID(elementid, 0)
+			if err != nil {
+				return nil, err
+			}
 		} else {
-			err = decode(templateBuffer, &field.enterpriseID)
+			var enterpriseID uint32
+			err = decode(templateBuffer, &enterpriseID)
 			if err != nil {
 				return nil, fmt.Errorf("Error in decoding message: %v", err)
 			}
 			elementID[0] = elementID[0] ^ 0x80
+			elementid := binary.BigEndian.Uint16(elementID)
+			element, err = cp.antreaRegistry.GetElementFromID(elementid, enterpriseID)
+			if err != nil {
+				return nil, err
+			}
 		}
-		field.elementID = binary.BigEndian.Uint16(elementID)
-		fields = append(fields, &field)
+		record.AddInfoElement(element, nil)
+		elements = append(elements, element)
 	}
-	cp.addTemplate(obsDomainID, templateID, fields)
-	return set, nil
+	cp.addTemplate(obsDomainID, templateID, elements)
+	return record, nil
 }
 
-func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (*entities.Set, error) {
+func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (*entities.DataRecord, error) {
 	// make sure template exists
-	_, err := cp.getTemplate(obsDomainID, templateID)
+	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	buff := bytes.Buffer{}
-	set := entities.NewSet(&buff)
-	set.CreateNewSet(entities.Data, templateID)
-
-	// decode data record using template?
-
-	return set, nil
+	record := entities.NewDataRecord(templateID)
+	for _, field := range template {
+		// TODO: decode using data type
+		val := decode(dataBuffer, field.DataType)
+		record.AddInfoElement(field, val)
+		record.AddInfoElementValue(field, val)
+	}
+	return record, nil
 }
 
-func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, fields []*templateField) {
+func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []*entities.InfoElement) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
-		cp.templatesMap[obsDomainID] = make(map[uint16][]*templateField)
+		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
 	}
-	cp.templatesMap[obsDomainID][templateID] = fields
+	cp.templatesMap[obsDomainID][templateID] = elements
 	cp.templatesLock.Unlock()
 	// template lifetime management
 	if cp.address.Network() == "tcp" {
@@ -151,7 +153,7 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 
 	// Handle udp template expiration
 	if cp.templateTTL == 0 {
-		cp.templateTTL = 1800 * 3 // Default value is 5400s
+		cp.templateTTL = config.TemplateTTL // Default value
 	}
 	go func() {
 		ticker := time.NewTicker(time.Duration(cp.templateTTL) * time.Second)
@@ -165,11 +167,11 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}()
 }
 
-func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*templateField, error) {
+func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
 	cp.templatesLock.RLock()
 	defer cp.templatesLock.RUnlock()
-	if fields, exists := cp.templatesMap[obsDomainID][templateID]; exists {
-		return fields, nil
+	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {
+		return elements, nil
 	} else {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist.", templateID, obsDomainID)
 	}
@@ -179,22 +181,6 @@ func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 	cp.templatesLock.Lock()
 	defer cp.templatesLock.Unlock()
 	delete(cp.templatesMap[obsDomainID], templateID)
-}
-
-func (cp *collectingProcess) getDataType(templateField *templateField) entities.IEDataType {
-	var registry registry.Registry
-	if templateField.enterpriseID == 0 { // IANA Registry
-		registry = cp.ianaRegistry
-	} else if templateField.enterpriseID == AntreaEnterpriseID { // Antrea Registry
-		registry = cp.antreaRegistry
-	}
-	fieldName, err := registry.GetIENameFromID(templateField.elementID)
-	if err != nil {
-		klog.Errorf("Information Element with id %d cannot be found.", templateField.elementID)
-		return 255
-	}
-	ie, _ := registry.GetInfoElement(fieldName)
-	return ie.DataType
 }
 
 func decode(buffer io.Reader, output ...interface{}) error {

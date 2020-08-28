@@ -38,7 +38,7 @@ func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPColle
 	antreaReg.LoadRegistry()
 	collectProc := &TCPCollectingProcess{
 		collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*templateField),
+			templatesMap:   make(map[uint32]map[uint16][]*entities.InfoElement),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    0,
 			ianaRegistry:   ianaReg,
@@ -123,8 +123,8 @@ func (cp *TCPCollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize
 // get buffer length by decoding the header
 func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 	packet := entities.Message{}
-	flowSetHeader := entities.SetHeader{}
-	err := decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &flowSetHeader)
+	var id, length uint16
+	err := decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &id, &length)
 	if err != nil {
 		return 0, fmt.Errorf("Cannot decode message: %v", err)
 	}

@@ -27,34 +27,34 @@ type Registry interface {
 	LoadRegistry()
 	GetInfoElement(name string) (*entities.InfoElement, error)
 	GetReverseInfoElement(name string) (*entities.InfoElement, error)
-	GetIENameFromID(id uint16) (string, error)
+	GetElementFromID(elementID uint16, enterpriseID uint32) (*entities.InfoElement, error)
 }
 
 type ianaRegistry struct {
-	registry  map[string]entities.InfoElement
-	nameIDMap map[uint16]string
+	registry     map[string]entities.InfoElement
+	idElementMap map[uint32]map[uint16]entities.InfoElement
 }
 
 type antreaRegistry struct {
-	registry  map[string]entities.InfoElement
-	nameIDMap map[uint16]string
+	registry     map[string]entities.InfoElement
+	idElementMap map[uint32]map[uint16]entities.InfoElement
 }
 
 func NewIanaRegistry() *ianaRegistry {
 	reg := make(map[string]entities.InfoElement)
-	nameID := make(map[uint16]string)
+	idElement := make(map[uint32]map[uint16]entities.InfoElement)
 	return &ianaRegistry{
-		registry:  reg,
-		nameIDMap: nameID,
+		registry:     reg,
+		idElementMap: idElement,
 	}
 }
 
 func NewAntreaRegistry() *antreaRegistry {
 	reg := make(map[string]entities.InfoElement)
-	nameID := make(map[uint16]string)
+	idElement := make(map[uint32]map[uint16]entities.InfoElement)
 	return &antreaRegistry{
-		registry:  reg,
-		nameIDMap: nameID,
+		registry:     reg,
+		idElementMap: idElement,
 	}
 }
 
@@ -63,7 +63,10 @@ func (reg *ianaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("IANA Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
-	reg.nameIDMap[ie.ElementId] = ie.Name
+	if _, exist := reg.idElementMap[ie.EnterpriseId]; !exist {
+		reg.idElementMap[ie.EnterpriseId] = make(map[uint16]entities.InfoElement)
+	}
+	reg.idElementMap[ie.EnterpriseId][ie.ElementId] = ie
 	return nil
 }
 
@@ -92,12 +95,12 @@ func (reg *ianaRegistry) GetReverseInfoElement(name string) (*entities.InfoEleme
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
 }
 
-func (reg *ianaRegistry) GetIENameFromID(id uint16) (string, error) {
-	var name string
-	if name, exist := reg.nameIDMap[id]; !exist {
-		return name, fmt.Errorf("IANA Registry: The information element with id %d does not exist.", id)
+func (reg *ianaRegistry) GetElementFromID(elementID uint16, enterpriseID uint32) (*entities.InfoElement, error) {
+	if element, exist := reg.idElementMap[enterpriseID][elementID]; !exist {
+		return nil, fmt.Errorf("IANA Registry: The information element with id %d does not exist.", elementID)
+	} else {
+		return &element, nil
 	}
-	return name, nil
 }
 
 func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
@@ -105,7 +108,10 @@ func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("Antrea Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
-	reg.nameIDMap[ie.ElementId] = ie.Name
+	if _, exist := reg.idElementMap[ie.EnterpriseId]; !exist {
+		reg.idElementMap[ie.EnterpriseId] = make(map[uint16]entities.InfoElement)
+	}
+	reg.idElementMap[ie.EnterpriseId][ie.ElementId] = ie
 	return nil
 }
 
@@ -130,12 +136,12 @@ func (reg *antreaRegistry) GetReverseInfoElement(name string) (*entities.InfoEle
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
 }
 
-func (reg *antreaRegistry) GetIENameFromID(id uint16) (string, error) {
-	var name string
-	if name, exist := reg.nameIDMap[id]; !exist {
-		return name, fmt.Errorf("Antrea Registry: The information element with id %d does not exist.", id)
+func (reg *antreaRegistry) GetElementFromID(elementID uint16, enterpriseID uint32) (*entities.InfoElement, error) {
+	if element, exist := reg.idElementMap[enterpriseID][elementID]; !exist {
+		return nil, fmt.Errorf("IANA Registry: The information element with id %d does not exist.", elementID)
+	} else {
+		return &element, nil
 	}
-	return name, nil
 }
 
 // Non-reversible Information Elements follow Section 6.1 of RFC5103

@@ -22,6 +22,7 @@ import (
 
 	"k8s.io/klog/v2"
 
+	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
@@ -76,8 +77,8 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 	// Template refresh logic is only for UDP transport.
 	if collectorAddr.Network() == "udp" {
 		if tempRefTimeout == 0 {
-			// Default value is 1800s
-			tempRefTimeout = 1800
+			// Default value
+			tempRefTimeout = config.TemplateRefreshTimeOut
 		}
 		go func() {
 			ticker := time.NewTicker(time.Duration(tempRefTimeout) * time.Second)

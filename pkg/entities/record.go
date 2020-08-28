@@ -51,17 +51,19 @@ type baseRecord struct {
 	Record
 }
 
-type dataRecord struct {
+type DataRecord struct {
 	*baseRecord
+	Elements map[*InfoElement]interface{}
 }
 
-func NewDataRecord(id uint16) *dataRecord {
-	return &dataRecord{
-		&baseRecord{buff: bytes.Buffer{}, len: 0, fieldCount: 0, templateID: id},
+func NewDataRecord(id uint16) *DataRecord {
+	return &DataRecord{
+		baseRecord: &baseRecord{buff: bytes.Buffer{}, len: 0, fieldCount: 0, templateID: id},
+		Elements: make(map[*InfoElement]interface{}),
 	}
 }
 
-type templateRecord struct {
+type TemplateRecord struct {
 	*baseRecord
 	templateElements []*InfoElement
 	// Minimum data record length required to be sent for this template.
@@ -69,8 +71,8 @@ type templateRecord struct {
 	minDataRecLength uint16
 }
 
-func NewTemplateRecord(count uint16, id uint16) *templateRecord {
-	return &templateRecord{
+func NewTemplateRecord(count uint16, id uint16) *TemplateRecord {
+	return &TemplateRecord{
 		&baseRecord{
 			buff:       bytes.Buffer{},
 			len:        0,
@@ -94,12 +96,12 @@ func (b *baseRecord) GetFieldCount() uint16 {
 	return b.fieldCount
 }
 
-func (d *dataRecord) PrepareRecord() (uint16, error) {
+func (d *DataRecord) PrepareRecord() (uint16, error) {
 	// We do not have to do anything if it is data record
 	return 0, nil
 }
 
-func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
+func (d *DataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
 	d.fieldCount++
 	var bytesToAppend []byte
 	if element.Len != VariableLength {
@@ -244,7 +246,15 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 	return uint16(bytesWritten), nil
 }
 
-func (t *templateRecord) PrepareRecord() (uint16, error) {
+func (d *DataRecord) AddInfoElementValue(element *InfoElement, val interface{}) error {
+	if _, exist :=  d.Elements[element]; exist {
+		return fmt.Errorf("Value has already been assigned to %s", element.Name)
+	}
+	d.Elements[element] = val
+	return nil
+}
+
+func (t *TemplateRecord) PrepareRecord() (uint16, error) {
 	// Add Template Record Header
 	header := make([]byte, 4)
 	binary.BigEndian.PutUint16(header[0:2], t.templateID)
@@ -258,7 +268,7 @@ func (t *templateRecord) PrepareRecord() (uint16, error) {
 	return uint16(len(header)), nil
 }
 
-func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
+func (t *TemplateRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
 	// val could be used to specify smaller length than default? For now assert it to be nil
 	if val != nil {
 		return 0, fmt.Errorf("AddInfoElement(templateRecord) cannot take value %v (nil is expected)", val)
@@ -289,10 +299,10 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 	return uint16(bytesWritten), nil
 }
 
-func (t *templateRecord) GetTemplateElements() []*InfoElement {
+func (t *TemplateRecord) GetTemplateElements() []*InfoElement {
 	return t.templateElements
 }
 
-func (t *templateRecord) GetMinDataRecordLen() uint16 {
+func (t *TemplateRecord) GetMinDataRecordLen() uint16 {
 	return t.minDataRecLength
 }

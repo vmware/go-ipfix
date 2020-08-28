@@ -16,12 +16,12 @@ package collector
 
 import (
 	"bytes"
-	"github.com/vmware/go-ipfix/pkg/entities"
 	"net"
 	"sync"
 
 	"k8s.io/klog"
 
+	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
@@ -44,7 +44,7 @@ func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum 
 	workerPool := make(chan chan *bytes.Buffer)
 	collectProc := &UDPCollectingProcess{
 		collectingProcess: collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*templateField),
+			templatesMap:   make(map[uint32]map[uint16][]*entities.InfoElement),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    templateTTL,
 			ianaRegistry:   ianaReg,
