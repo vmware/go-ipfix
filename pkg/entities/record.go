@@ -53,7 +53,6 @@ type baseRecord struct {
 
 type DataRecord struct {
 	*baseRecord
-	Elements map[*InfoElement]interface{}
 }
 
 func NewDataRecord(id uint16) *DataRecord {
