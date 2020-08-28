@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type Address struct {
@@ -40,7 +39,7 @@ func (addr Address) String() string {
 
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	address := Address{"tcp", "4730"}
-	cp, err := InitTCPCollectingProcess(address, 1024)
+	cp, err := InitCollectingProcess(address, 1024, 0)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
@@ -62,7 +61,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	address := Address{"udp", "4731"}
-	cp, err := InitUDPCollectingProcess(address, 1024, 2, 0)
+	cp, err := InitCollectingProcess(address, 1024, 0)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
@@ -82,13 +81,13 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		cp.stopChan <- true
 	}()
 	cp.Start()
-	time.Sleep(2 * time.Second)
+	time.Sleep(5 * time.Second)
 	assert.NotNil(t, cp.templatesMap[1], "UDP Collecting Process should receive and store the received template.")
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	address := Address{"tcp", "4732"}
-	cp, err := InitTCPCollectingProcess(address, 1024)
+	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	templateFields := []*templateField{
 		{8, 4, 0},
@@ -111,13 +110,13 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		cp.stopChan <- true
 	}()
 	cp.Start()
-	time.Sleep(time.Second)
+	time.Sleep(2 * time.Second)
 	assert.Equal(t, 1, len(cp.messages), "TCP Collecting Process should receive and store the received data record.")
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	address := Address{"udp", "4733"}
-	cp, err := InitUDPCollectingProcess(address, 1024, 2, 0)
+	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	templateFields := []*templateField{
 		{8, 4, 0},
@@ -153,12 +152,6 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := collectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
 	cp.templatesLock = &sync.RWMutex{}
-	ianaReg := registry.NewIanaRegistry()
-	antreaReg := registry.NewAntreaRegistry()
-	ianaReg.LoadRegistry()
-	antreaReg.LoadRegistry()
-	cp.ianaRegistry = ianaReg
-	cp.antreaRegistry = antreaReg
 	cp.address = Address{"tcp", "4734"}
 	message, err := cp.decodePacket(bytes.NewBuffer(templateRecord))
 	if err != nil {
@@ -188,12 +181,6 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
 	cp.templatesLock = &sync.RWMutex{}
 	cp.address = Address{"tcp", "4735"}
-	ianaReg := registry.NewIanaRegistry()
-	antreaReg := registry.NewAntreaRegistry()
-	ianaReg.LoadRegistry()
-	antreaReg.LoadRegistry()
-	cp.ianaRegistry = ianaReg
-	cp.antreaRegistry = ianaReg
 	// Decode without template
 	_, err := cp.decodePacket(bytes.NewBuffer(dataRecord))
 	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
@@ -217,7 +204,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	address := Address{"udp", "4736"}
-	cp, err := InitUDPCollectingProcess(address, 1024, 2, 5)
+	cp, err := InitCollectingProcess(address, 1024, 5)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
