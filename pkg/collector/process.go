@@ -32,7 +32,7 @@ import (
 
 type collectingProcess struct {
 	// for each obsDomainID, there is a map of templates
-	templatesMap map[uint32]map[uint16][]*entities.InfoElement
+	templatesMap map[uint32]map[uint16][]*templateField
 	// templatesLock allows multiple readers or one writer at the same time
 	templatesLock *sync.RWMutex
 	// template lifetime
@@ -48,6 +48,12 @@ type collectingProcess struct {
 	stopChan chan bool
 	// packet list
 	messages []*entities.Message
+}
+
+type templateField struct {
+	elementID     uint16
+	elementLength uint16
+	enterpriseID  uint32
 }
 
 func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
@@ -77,18 +83,18 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities
 	return &message, nil
 }
 
-func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) (*entities.TemplateRecord, error) {
+func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) (interface{}, error) {
 	var templateID uint16
 	var fieldCount uint16
 	err := decode(templateBuffer, &templateID, &fieldCount)
 	if err != nil {
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
-	elements := make([]*entities.InfoElement, 0)
-	record := entities.NewTemplateRecord(fieldCount, templateID)
+	elements := make([]*templateField, 0)
+	templateMsg := entities.NewTemplateMessage()
 
 	for i := 0; i < int(fieldCount); i++ {
-		var element *entities.InfoElement
+		element := templateField{}
 		// check whether enterprise ID is 0 or not
 		elementID := make([]byte, 2)
 		var elementLength uint16
@@ -98,51 +104,44 @@ func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, 
 		}
 		indicator := elementID[0] >> 7
 		if indicator != 1 {
-			elementid := binary.BigEndian.Uint16(elementID)
-			element, err = cp.ianaRegistry.GetElementFromID(elementid, 0)
-			if err != nil {
-				return nil, err
-			}
+			element.elementID = binary.BigEndian.Uint16(elementID)
+			element.enterpriseID = uint32(0)
+			element.elementLength = elementLength
 		} else {
-			var enterpriseID uint32
-			err = decode(templateBuffer, &enterpriseID)
+			err = decode(templateBuffer, &element.enterpriseID)
 			if err != nil {
 				return nil, fmt.Errorf("Error in decoding message: %v", err)
 			}
 			elementID[0] = elementID[0] ^ 0x80
-			elementid := binary.BigEndian.Uint16(elementID)
-			element, err = cp.antreaRegistry.GetElementFromID(elementid, enterpriseID)
-			if err != nil {
-				return nil, err
-			}
+			element.elementID = binary.BigEndian.Uint16(elementID)
+			element.elementLength = elementLength
 		}
-		record.AddInfoElement(element, nil)
-		elements = append(elements, element)
+		templateMsg.AddInfoElement(element.enterpriseID, element.elementID, nil)
+		elements = append(elements, &element)
 	}
 	cp.addTemplate(obsDomainID, templateID, elements)
-	return record, nil
+	return templateMsg, nil
 }
 
-func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (*entities.DataRecord, error) {
+func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (interface{}, error) {
 	// make sure template exists
 	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	record := entities.NewDataRecord(templateID)
+	dataMsg := entities.NewDataMessage()
 	for _, field := range template {
 		// TODO: decode using data type
-		val := decode(dataBuffer, field.DataType)
-		record.AddInfoElement(field, val)
-		record.AddInfoElementValue(field, val)
+		val := decode(dataBuffer, field.elementLength)
+		dataMsg.AddInfoElement(field.enterpriseID, field.elementID, val)
 	}
-	return record, nil
+	return dataMsg, nil
 }
 
-func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []*entities.InfoElement) {
+func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []*templateField) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
-		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
+		cp.templatesMap[obsDomainID] = make(map[uint16][]*templateField)
 	}
 	cp.templatesMap[obsDomainID][templateID] = elements
 	cp.templatesLock.Unlock()
@@ -167,7 +166,7 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}()
 }
 
-func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
+func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*templateField, error) {
 	cp.templatesLock.RLock()
 	defer cp.templatesLock.RUnlock()
 	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {

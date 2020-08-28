@@ -53,13 +53,11 @@ type baseRecord struct {
 
 type DataRecord struct {
 	*baseRecord
-	Elements map[*InfoElement]interface{}
 }
 
 func NewDataRecord(id uint16) *DataRecord {
 	return &DataRecord{
 		baseRecord: &baseRecord{buff: bytes.Buffer{}, len: 0, fieldCount: 0, templateID: id},
-		Elements: make(map[*InfoElement]interface{}),
 	}
 }
 
@@ -246,13 +244,6 @@ func (d *DataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 	return uint16(bytesWritten), nil
 }
 
-func (d *DataRecord) AddInfoElementValue(element *InfoElement, val interface{}) error {
-	if _, exist :=  d.Elements[element]; exist {
-		return fmt.Errorf("Value has already been assigned to %s", element.Name)
-	}
-	d.Elements[element] = val
-	return nil
-}
 
 func (t *TemplateRecord) PrepareRecord() (uint16, error) {
 	// Add Template Record Header

@@ -55,3 +55,38 @@ func (m *MsgBuffer) GetDataRecFlag() bool {
 func (m *MsgBuffer) SetDataRecFlag(flag bool) {
 	m.dataRecFlag = flag
 }
+
+type templateMessage struct {
+	// enterpriseID -> elementID
+	elements map[uint32][]uint16
+}
+
+type dataMessage struct {
+	// enterpriseID -> elementID -> val
+	elements map[uint32]map[uint16]interface{}
+}
+
+func NewTemplateMessage() *templateMessage {
+	return 	&templateMessage{
+		make(map[uint32][]uint16),
+	}
+}
+
+func NewDataMessage() *dataMessage {
+	return &dataMessage{
+		make(map[uint32]map[uint16]interface{}),
+	}
+}
+
+func (d *dataMessage) AddInfoElement(enterpriseID uint32, elementID uint16, val interface{}) {
+	if _, exist :=  d.elements[enterpriseID]; !exist {
+		d.elements[enterpriseID] = make(map[uint16]interface{})
+	}
+	d.elements[enterpriseID][elementID] = val
+}
+func (t *templateMessage) AddInfoElement(enterpriseID uint32, elementID uint16, val interface{}) {
+	if _, exist := t.elements[enterpriseID]; !exist {
+		t.elements[enterpriseID] = make([]uint16, 0)
+	}
+	t.elements[enterpriseID]= append(t.elements[enterpriseID], elementID)
+}

@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
@@ -91,10 +90,10 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	address := Address{"tcp", "4732"}
 	cp, err := InitTCPCollectingProcess(address, 1024)
 	// Add the templates before sending data record
-	templateFields := []*entities.InfoElement{
-		{"sourceIPv4Address", 8, 18, 0, 4},
-		{"destinationIPv4Address", 12, 18, 0, 4},
-		{"destinationNodeName", 105, 13, 55829, 65535},
+	templateFields := []*templateField{
+		{8, 4, 0},
+		{12, 4, 0},
+		{105, 65535, 55829},
 	}
 	cp.addTemplate(uint32(1), uint16(256), templateFields)
 	if err != nil {
@@ -120,10 +119,10 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	address := Address{"udp", "4733"}
 	cp, err := InitUDPCollectingProcess(address, 1024, 2, 0)
 	// Add the templates before sending data record
-	templateFields := []*entities.InfoElement{
-		{"sourceIPv4Address", 8, 18, 0, 4},
-		{"destinationIPv4Address", 12, 18, 0, 4},
-		{"destinationNodeName", 105, 13, 55829, 65535},
+	templateFields := []*templateField{
+		{8, 4, 0},
+		{12, 4, 0},
+		{105, 65535, 55829},
 	}
 	cp.addTemplate(uint32(1), uint16(256), templateFields)
 	if err != nil {
@@ -152,7 +151,7 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	templateRecord := []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 	cp := collectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
 	cp.templatesLock = &sync.RWMutex{}
 	ianaReg := registry.NewIanaRegistry()
 	antreaReg := registry.NewAntreaRegistry()
@@ -175,7 +174,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	assert.NotNil(t, err, "Error should be logged for invalid version")
 	// Malformed record
 	templateRecord = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0}
-	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
 	message, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
 	assert.NotNil(t, err, "Error should be logged for malformed template record")
 	if _, exist := cp.templatesMap[uint32(1)]; exist {
@@ -186,7 +185,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 89, 105, 111, 117}
 	cp := collectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
 	cp.templatesLock = &sync.RWMutex{}
 	cp.address = Address{"tcp", "4735"}
 	ianaReg := registry.NewIanaRegistry()
@@ -199,10 +198,10 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	_, err := cp.decodePacket(bytes.NewBuffer(dataRecord))
 	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
 	// Decode with template
-	templateFields := []*entities.InfoElement{
-		{"sourceIPv4Address", 8, 18, 0, 4},
-		{"destinationIPv4Address", 12, 18, 0, 4},
-		{"destinationNodeName", 105, 13, 55829, 65535},
+	templateFields := []*templateField{
+		{8, 4, 0},
+		{12, 4, 0},
+		{105, 65535, 55829},
 	}
 	cp.addTemplate(uint32(1), uint16(256), templateFields)
 	message, err := cp.decodePacket(bytes.NewBuffer(dataRecord))

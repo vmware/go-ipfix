@@ -38,7 +38,7 @@ func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPColle
 	antreaReg.LoadRegistry()
 	collectProc := &TCPCollectingProcess{
 		collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*entities.InfoElement),
+			templatesMap:   make(map[uint32]map[uint16][]*templateField),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    0,
 			ianaRegistry:   ianaReg,
@@ -52,7 +52,7 @@ func InitTCPCollectingProcess(address net.Addr, maxBufferSize uint16) (*TCPColle
 	return collectProc, nil
 }
 
-func (cp *TCPCollectingProcess) Start() {
+func (cp *collectingProcess) Start() {
 	listener, err := net.Listen("tcp", cp.address.String())
 	if err != nil {
 		klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
@@ -70,7 +70,7 @@ func (cp *TCPCollectingProcess) Start() {
 		}
 		errChan := make(chan bool)
 		go func() {
-			cp.handleTCPConnection(conn, cp.maxBufferSize, cp.address, errChan)
+			cp.handleConnection(conn, cp.maxBufferSize, cp.address, errChan)
 		}()
 		select {
 		case <-errChan:
@@ -79,7 +79,7 @@ func (cp *TCPCollectingProcess) Start() {
 	}
 }
 
-func (cp *TCPCollectingProcess) handleTCPConnection(conn net.Conn, maxBufferSize uint16, address net.Addr, errChan chan bool) {
+func (cp *collectingProcess) handleConnection(conn net.Conn, maxBufferSize uint16, address net.Addr, errChan chan bool) {
 	for {
 		select {
 		case <-cp.stopChan:

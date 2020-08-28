@@ -44,7 +44,7 @@ func InitUDPCollectingProcess(address net.Addr, maxBufferSize uint16, workerNum 
 	workerPool := make(chan chan *bytes.Buffer)
 	collectProc := &UDPCollectingProcess{
 		collectingProcess: collectingProcess{
-			templatesMap:   make(map[uint32]map[uint16][]*entities.InfoElement),
+			templatesMap:   make(map[uint32]map[uint16][]*templateField),
 			templatesLock:  &sync.RWMutex{},
 			templateTTL:    templateTTL,
 			ianaRegistry:   ianaReg,
