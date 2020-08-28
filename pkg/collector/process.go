@@ -276,7 +276,7 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}()
 }
 
-func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*templateField, error) {
+func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
 	cp.templatesLock.RLock()
 	defer cp.templatesLock.RUnlock()
 	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {
