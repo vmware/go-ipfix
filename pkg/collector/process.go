@@ -44,6 +44,8 @@ type collectingProcess struct {
 	stopChan chan bool
 	// packet list
 	messages []*entities.Message
+	// workers to deal with clients (client address -> packet channel)
+	workers map[string]*worker
 }
 
 type templateField struct {
@@ -54,13 +56,14 @@ type templateField struct {
 
 func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*collectingProcess, error) {
 	collectProc := &collectingProcess{
-		templatesMap:   make(map[uint32]map[uint16][]*templateField),
-		templatesLock:  &sync.RWMutex{},
-		templateTTL:    templateTTL,
-		address:        address,
-		maxBufferSize:  maxBufferSize,
-		stopChan:       make(chan bool),
-		messages:       make([]*entities.Message, 0),
+		templatesMap:  make(map[uint32]map[uint16][]*templateField),
+		templatesLock: &sync.RWMutex{},
+		templateTTL:   templateTTL,
+		address:       address,
+		maxBufferSize: maxBufferSize,
+		stopChan:      make(chan bool),
+		messages:      make([]*entities.Message, 0),
+		workers:       make(map[string]*worker),
 	}
 	return collectProc, nil
 }
@@ -73,97 +76,8 @@ func (cp *collectingProcess) Start() {
 	}
 }
 
-func (cp *collectingProcess) startTCPServer() {
-	listener, err := net.Listen("tcp", cp.address.String())
-	if err != nil {
-		klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
-		return
-	}
-
-	klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
-	defer listener.Close()
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
-			return
-		}
-		errChan := make(chan bool)
-		go func() {
-			cp.handleConnection(conn, cp.maxBufferSize, cp.address, errChan)
-		}()
-		select {
-		case <-errChan:
-			return
-		}
-	}
-}
-
-func (cp *collectingProcess) startUDPServer() {
-	s, err := net.ResolveUDPAddr("udp", cp.address.String())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	conn, err := net.ListenUDP("udp", s)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer conn.Close()
-
-	for {
-		errChan := make(chan bool)
-		go func() {
-			cp.handleConnection(conn, cp.maxBufferSize, cp.address, errChan)
-		}()
-		select {
-		case <-errChan:
-			return
-		}
-	}
-}
-
-func (cp *collectingProcess) handleConnection(conn net.Conn, maxBufferSize uint16, address net.Addr, errChan chan bool) {
-	for {
-		select {
-		case <-cp.stopChan:
-			errChan <- true
-			return
-		default:
-			buff := make([]byte, maxBufferSize)
-			size, err := conn.Read(buff)
-			if err != nil {
-				if err == io.EOF {
-					klog.Infof("Connection %s has been closed.", address.String())
-				} else {
-					klog.Errorf("Error in collecting process: %v", err)
-				}
-				return
-			}
-			klog.Infof("Receiving %d bytes from %s", size, address.String())
-			message := make([]byte, size)
-			copy(message, buff[0:size])
-			for size > 0 {
-				length, err := getMessageLength(bytes.NewBuffer(message))
-				if err != nil {
-					klog.Error(err)
-					return
-				}
-				size = size - length
-				// get the packet here
-				packet, err := cp.decodePacket(bytes.NewBuffer(message[0:length]))
-				if err != nil {
-					klog.Error(err)
-					return
-				}
-				klog.Info(packet)
-				message = message[length:]
-			}
-		}
-	}
-	conn.Close()
+func (cp *collectingProcess) Stop() {
+	cp.stopChan <- true
 }
 
 func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
