@@ -140,7 +140,7 @@ func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, 
 			element.elementID = binary.BigEndian.Uint16(elementID)
 			element.elementLength = elementLength
 		}
-		templateMsg.AddInfoElement(element.enterpriseID, element.elementID, nil)
+		templateMsg.AddInfoElement(element.enterpriseID, element.elementID)
 		elements = append(elements, &element)
 	}
 	cp.addTemplate(obsDomainID, templateID, elements)
@@ -155,8 +155,13 @@ func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomai
 	}
 	dataMsg := entities.NewDataMessage()
 	for _, field := range template {
-		// TODO: decode using data type
-		val := decode(dataBuffer, field.elementLength)
+		var length int
+		if field.elementLength == entities.VariableLength { // string
+			length = getFieldLength(dataBuffer)
+		} else {
+			length = int(field.elementLength)
+		}
+		val := dataBuffer.Next(length)
 		dataMsg.AddInfoElement(field.enterpriseID, field.elementID, val)
 	}
 	return dataMsg, nil
@@ -223,4 +228,18 @@ func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 		return 0, fmt.Errorf("Cannot decode message: %v", err)
 	}
 	return int(packet.BufferLength), nil
+}
+
+// get string field length for data record
+func getFieldLength(dataBuffer *bytes.Buffer) int {
+	lengthBuff := dataBuffer.Next(1)
+	var length1 uint8
+	decode(bytes.NewBuffer(lengthBuff), &length1)
+	if length1 < 255 { // string length is less than 255
+		return int(length1)
+	}
+	var length2 uint16
+	lengthBuff = dataBuffer.Next(2)
+	decode(bytes.NewBuffer(lengthBuff), &length2)
+	return int(length2)
 }

@@ -27,7 +27,7 @@ type Message struct {
 	SeqNumber    uint32
 	ObsDomainID  uint32
 	ExportTime   uint32
-	Record		 interface{}
+	Record       interface{}
 }
 
 // Does it need an interface?
@@ -67,7 +67,7 @@ type dataMessage struct {
 }
 
 func NewTemplateMessage() *templateMessage {
-	return 	&templateMessage{
+	return &templateMessage{
 		make(map[uint32][]uint16),
 	}
 }
@@ -78,15 +78,17 @@ func NewDataMessage() *dataMessage {
 	}
 }
 
-func (d *dataMessage) AddInfoElement(enterpriseID uint32, elementID uint16, val interface{}) {
-	if _, exist :=  d.elements[enterpriseID]; !exist {
+func (d *dataMessage) AddInfoElement(enterpriseID uint32, elementID uint16, val []byte) {
+	if _, exist := d.elements[enterpriseID]; !exist {
 		d.elements[enterpriseID] = make(map[uint16]interface{})
 	}
+	// TODO: Decode data using element datatype
 	d.elements[enterpriseID][elementID] = val
 }
-func (t *templateMessage) AddInfoElement(enterpriseID uint32, elementID uint16, val interface{}) {
+
+func (t *templateMessage) AddInfoElement(enterpriseID uint32, elementID uint16) {
 	if _, exist := t.elements[enterpriseID]; !exist {
 		t.elements[enterpriseID] = make([]uint16, 0)
 	}
-	t.elements[enterpriseID]= append(t.elements[enterpriseID], elementID)
+	t.elements[enterpriseID] = append(t.elements[enterpriseID], elementID)
 }
