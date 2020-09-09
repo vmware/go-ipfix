@@ -16,12 +16,12 @@ package collector
 
 import (
 	"bytes"
-	"io"
+	"github.com/vmware/go-ipfix/pkg/config"
 	"net"
+	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
-
-	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
 func (cp *collectingProcess) startUDPServer() {
@@ -36,75 +36,60 @@ func (cp *collectingProcess) startUDPServer() {
 		return
 	}
 	klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
+	var wg sync.WaitGroup
 	defer conn.Close()
 	go func() {
 		for {
 			buff := make([]byte, cp.maxBufferSize)
 			size, address, err := conn.ReadFromUDP(buff)
+			cp.handleUDPClient(address, &wg)
+			cp.clients[address.String()].packetChan <- bytes.NewBuffer(buff[0:size])
 			if err != nil {
-				if err == io.EOF {
-					klog.Infof("Connection %s has been closed.", cp.address.String())
-				} else {
-					klog.Errorf("Error in collecting process: %v", err)
-				}
+				klog.Errorf("Error in collecting process: %v", err)
 				return
 			}
-			packet := make([]byte, size)
-			copy(packet, buff)
-			if _, exist := cp.workers[address.String()]; !exist {
-				worker := createWorker(address.String(), cp.decodePacket)
-				worker.start()
-				cp.workers[address.String()] = worker
-			}
-			worker := cp.workers[address.String()]
-			worker.packetChan <- bytes.NewBuffer(packet)
 		}
 	}()
 	select {
 	case <-cp.stopChan:
 		// stop all the workers before closing collector
-		for _, worker := range cp.workers {
-			worker.stop()
+		for _, client := range cp.clients {
+			client.errChan <- true
 		}
+		wg.Wait()
 		return
 	}
 }
 
-type worker struct {
-	address    string
-	packetChan chan *bytes.Buffer
-	errChan    chan bool
-	decodeFunc func(packet *bytes.Buffer) (*entities.Message, error)
-}
-
-func createWorker(address string, decodeFunc func(packet *bytes.Buffer) (*entities.Message, error)) *worker {
-	return &worker{
-		address:    address,
-		packetChan: make(chan *bytes.Buffer),
-		errChan:    make(chan bool),
-		decodeFunc: decodeFunc,
-	}
-}
-
-func (w *worker) start() {
-	go func() {
-		for {
-			select {
-			case <-w.errChan:
-				return
-			case packet := <-w.packetChan:
-				// get the message here
-				message, err := w.decodeFunc(packet)
-				if err != nil {
-					klog.Error(err)
+func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGroup) {
+	if _, exist := cp.clients[address.String()]; !exist {
+		client := cp.createClient()
+		cp.clients[address.String()] = client
+		wg.Add(1)
+		defer wg.Done()
+		go func() {
+			ticker := time.NewTicker(time.Duration(config.TemplateRefreshTimeOut) * time.Second)
+			for {
+				select {
+				case <-client.errChan:
+					klog.Infof("UDP connection from %s has been closed.", address.String())
 					return
+				case <-ticker.C: // set timeout for udp connection
+					klog.Errorf("UDP connection from %s timed out.", address.String())
+					cp.deleteClient(address.Network())
+					return
+				case packet := <-client.packetChan:
+					// get the message here
+					message, err := cp.decodePacket(packet)
+					if err != nil {
+						klog.Error(err)
+						return
+					}
+					klog.Info(message)
+					ticker.Stop()
+					ticker = time.NewTicker(time.Duration(config.TemplateRefreshTimeOut) * time.Second)
 				}
-				klog.Info(message)
 			}
-		}
-	}()
-}
-
-func (w *worker) stop() {
-	w.errChan <- true
+		}()
+	}
 }

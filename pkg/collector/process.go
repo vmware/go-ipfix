@@ -33,7 +33,7 @@ type collectingProcess struct {
 	// for each obsDomainID, there is a map of templates
 	templatesMap map[uint32]map[uint16][]*templateField
 	// templatesLock allows multiple readers or one writer at the same time
-	templatesLock *sync.RWMutex
+	templatesLock sync.RWMutex
 	// template lifetime
 	templateTTL uint32
 	// server information
@@ -44,8 +44,8 @@ type collectingProcess struct {
 	stopChan chan bool
 	// packet list
 	messages []*entities.Message
-	// workers to deal with clients (client address -> packet channel)
-	workers map[string]*worker
+	// channels to handle clients
+	clients map[string]*client
 }
 
 type templateField struct {
@@ -54,16 +54,21 @@ type templateField struct {
 	enterpriseID  uint32
 }
 
+type client struct {
+	packetChan chan *bytes.Buffer
+	errChan    chan bool
+}
+
 func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*collectingProcess, error) {
 	collectProc := &collectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*templateField),
-		templatesLock: &sync.RWMutex{},
+		templatesLock: sync.RWMutex{},
 		templateTTL:   templateTTL,
 		address:       address,
 		maxBufferSize: maxBufferSize,
 		stopChan:      make(chan bool),
 		messages:      make([]*entities.Message, 0),
-		workers:       make(map[string]*worker),
+		clients:       make(map[string]*client),
 	}
 	return collectProc, nil
 }
@@ -80,24 +85,39 @@ func (cp *collectingProcess) Stop() {
 	cp.stopChan <- true
 }
 
+func (cp *collectingProcess) createClient() *client {
+	return &client{
+		packetChan: make(chan *bytes.Buffer),
+		errChan:    make(chan bool),
+	}
+}
+
+func (cp *collectingProcess) deleteClient(name string) {
+	delete(cp.clients, name)
+}
+
+func (cp *collectingProcess) getClientCount() int {
+	return len(cp.clients)
+}
+
 func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
 	message := entities.Message{}
-	var id, length uint16
-	err := decode(packetBuffer, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &id, &length)
+	var setID, length uint16
+	err := decode(packetBuffer, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setID, &length)
 	if err != nil {
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
 	if message.Version != uint16(10) {
 		return nil, fmt.Errorf("Collector only supports IPFIX (v10). Invalid version %d received.", message.Version)
 	}
-	if id == 2 {
-		record, err := cp.decodeTemplateRecord(packetBuffer, message.ObsDomainID)
+	if setID == config.TemplateSetID {
+		record, err := cp.decodeTemplateSet(packetBuffer, message.ObsDomainID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
 		message.Record = record
 	} else {
-		record, err := cp.decodeDataRecord(packetBuffer, message.ObsDomainID, id)
+		record, err := cp.decodeDataSet(packetBuffer, message.ObsDomainID, setID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
@@ -107,7 +127,7 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities
 	return &message, nil
 }
 
-func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, obsDomainID uint32) (interface{}, error) {
+func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (interface{}, error) {
 	var templateID uint16
 	var fieldCount uint16
 	err := decode(templateBuffer, &templateID, &fieldCount)
@@ -115,7 +135,7 @@ func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, 
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
 	elements := make([]*templateField, 0)
-	templateMsg := entities.NewTemplateMessage()
+	templateMsg := entities.NewTemplateSet()
 
 	for i := 0; i < int(fieldCount); i++ {
 		element := templateField{}
@@ -147,13 +167,13 @@ func (cp *collectingProcess) decodeTemplateRecord(templateBuffer *bytes.Buffer, 
 	return templateMsg, nil
 }
 
-func (cp *collectingProcess) decodeDataRecord(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (interface{}, error) {
+func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (interface{}, error) {
 	// make sure template exists
 	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	dataMsg := entities.NewDataMessage()
+	dataMsg := entities.NewDataSet()
 	for _, field := range template {
 		var length int
 		if field.elementLength == entities.VariableLength { // string
@@ -211,9 +231,10 @@ func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 	delete(cp.templatesMap[obsDomainID], templateID)
 }
 
-func decode(buffer io.Reader, output ...interface{}) error {
+// a common binary decoder to specified interfaces
+func decode(buffer io.Reader, outputs ...interface{}) error {
 	var err error
-	for _, out := range output {
+	for _, out := range outputs {
 		err = binary.Read(buffer, binary.BigEndian, out)
 	}
 	return err

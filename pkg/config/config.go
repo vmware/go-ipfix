@@ -19,4 +19,6 @@ const (
 	TemplateRefreshTimeOut uint32 = 1800
 	// template time to live for collecting process
 	TemplateTTL			   uint32 = TemplateRefreshTimeOut * 3
+	// setID for template record
+	TemplateSetID		   uint16 = 2
 )

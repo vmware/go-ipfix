@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/vmware/go-ipfix/pkg/config"
 )
 
 type ContentType uint8
@@ -39,6 +40,17 @@ type Set struct {
 	setType ContentType
 }
 
+type templateSet struct {
+	// enterpriseID -> elementID
+	elements map[uint32][]uint16
+}
+
+type dataSet struct {
+	// enterpriseID -> elementID -> val
+	elements map[uint32]map[uint16]interface{}
+}
+
+
 func NewSet(buffer *bytes.Buffer) *Set {
 	return &Set{
 		buffer:  buffer,
@@ -51,7 +63,7 @@ func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
-		binary.BigEndian.PutUint16(header[0:2], 2)
+		binary.BigEndian.PutUint16(header[0:2], config.TemplateSetID)
 	} else if setType == Data {
 		// Supporting only one templateID per exporting process
 		// TODO: Add support to multiple template IDs
@@ -67,6 +79,18 @@ func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	s.currLen = s.currLen + uint16(len(header))
 
 	return nil
+}
+
+func NewTemplateSet() *templateSet {
+	return &templateSet{
+		make(map[uint32][]uint16),
+	}
+}
+
+func NewDataSet() *dataSet {
+	return &dataSet{
+		make(map[uint32]map[uint16]interface{}),
+	}
 }
 
 func (s *Set) GetBuffLen() uint16 {
@@ -95,4 +119,19 @@ func (s *Set) FinishSet() {
 	binary.BigEndian.PutUint16(byteSlice[setOffset+2:setOffset+4], s.currLen)
 	// Reset the length
 	s.currLen = 0
+}
+
+func (d *dataSet) AddInfoElement(enterpriseID uint32, elementID uint16, val []byte) {
+	if _, exist := d.elements[enterpriseID]; !exist {
+		d.elements[enterpriseID] = make(map[uint16]interface{})
+	}
+	// TODO: Decode data using element datatype
+	d.elements[enterpriseID][elementID] = val
+}
+
+func (t *templateSet) AddInfoElement(enterpriseID uint32, elementID uint16) {
+	if _, exist := t.elements[enterpriseID]; !exist {
+		t.elements[enterpriseID] = make([]uint16, 0)
+	}
+	t.elements[enterpriseID] = append(t.elements[enterpriseID], elementID)
 }

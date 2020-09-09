@@ -59,7 +59,9 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplateRecord)
-		time.Sleep(2 * time.Second)
+	}()
+	go func() {
+		time.Sleep(4 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
@@ -84,7 +86,9 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplateRecord)
-		time.Sleep(2 * time.Second)
+	}()
+	go func() {
+		time.Sleep(4 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
@@ -107,7 +111,9 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validDataRecord)
-		time.Sleep(2 * time.Second)
+	}()
+	go func() {
+		time.Sleep(4 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
@@ -134,7 +140,9 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validDataRecord)
-		time.Sleep(2 * time.Second)
+	}()
+	go func() {
+		time.Sleep(5 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
@@ -158,7 +166,7 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 			t.Fatalf("Cannot establish connection to %s", address.String())
 		}
 		time.Sleep(2 * time.Second)
-		assert.Equal(t, 2, connCount, "There should be two tcp clients.")
+		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
@@ -192,8 +200,11 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplateRecord)
-		time.Sleep(2 * time.Second)
-		assert.Equal(t, 2, len(cp.workers), "There should be two tcp clients.")
+		time.Sleep(time.Second)
+		assert.Equal(t, 2, len(cp.clients), "There should be two tcp clients.")
+	}()
+	go func() {
+		time.Sleep(6 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
@@ -202,7 +213,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := collectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
-	cp.templatesLock = &sync.RWMutex{}
+	cp.templatesLock = sync.RWMutex{}
 	cp.address = Address{"tcp", "4736"}
 	message, err := cp.decodePacket(bytes.NewBuffer(validTemplateRecord))
 	if err != nil {
@@ -268,7 +279,9 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error in sending data to collector: %v", err)
 		}
-		time.Sleep(2 * time.Second)
+	}()
+	go func() {
+		time.Sleep(5 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
