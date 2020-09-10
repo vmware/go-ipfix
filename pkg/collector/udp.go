@@ -16,12 +16,13 @@ package collector
 
 import (
 	"bytes"
-	"github.com/vmware/go-ipfix/pkg/config"
 	"net"
 	"sync"
 	"time"
 
 	"k8s.io/klog/v2"
+
+	"github.com/vmware/go-ipfix/pkg/config"
 )
 
 func (cp *collectingProcess) startUDPServer() {
@@ -72,7 +73,7 @@ func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGrou
 			for {
 				select {
 				case <-client.errChan:
-					klog.Infof("UDP connection from %s has been closed.", address.String())
+					klog.Infof("Collecting process from %s has stopped.", address.String())
 					return
 				case <-ticker.C: // set timeout for udp connection
 					klog.Errorf("UDP connection from %s timed out.", address.String())
@@ -85,7 +86,7 @@ func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGrou
 						klog.Error(err)
 						return
 					}
-					klog.Info(message)
+					klog.V(4).Info(message)
 					ticker.Stop()
 					ticker = time.NewTicker(time.Duration(config.TemplateRefreshTimeOut) * time.Second)
 				}

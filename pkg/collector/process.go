@@ -44,8 +44,8 @@ type collectingProcess struct {
 	stopChan chan bool
 	// packet list
 	messages []*entities.Message
-	// channels to handle clients
-	clients map[string]*client
+	// channels to handle clients (address -> client)
+	clients map[string]*clientHandler
 }
 
 type templateField struct {
@@ -54,7 +54,7 @@ type templateField struct {
 	enterpriseID  uint32
 }
 
-type client struct {
+type clientHandler struct {
 	packetChan chan *bytes.Buffer
 	errChan    chan bool
 }
@@ -68,7 +68,7 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL u
 		maxBufferSize: maxBufferSize,
 		stopChan:      make(chan bool),
 		messages:      make([]*entities.Message, 0),
-		clients:       make(map[string]*client),
+		clients:       make(map[string]*clientHandler),
 	}
 	return collectProc, nil
 }
@@ -85,8 +85,8 @@ func (cp *collectingProcess) Stop() {
 	cp.stopChan <- true
 }
 
-func (cp *collectingProcess) createClient() *client {
-	return &client{
+func (cp *collectingProcess) createClient() *clientHandler {
+	return &clientHandler{
 		packetChan: make(chan *bytes.Buffer),
 		errChan:    make(chan bool),
 	}
@@ -135,7 +135,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		return nil, fmt.Errorf("Error in decoding message: %v", err)
 	}
 	elements := make([]*templateField, 0)
-	templateMsg := entities.NewTemplateSet()
+	templateSet := entities.NewTemplateSet()
 
 	for i := 0; i < int(fieldCount); i++ {
 		element := templateField{}
@@ -146,8 +146,8 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
-		indicator := elementID[0] >> 7
-		if indicator != 1 {
+		isIANARegistry := elementID[0] >> 7
+		if isIANARegistry != 1 {
 			element.elementID = binary.BigEndian.Uint16(elementID)
 			element.enterpriseID = uint32(0)
 			element.elementLength = elementLength
@@ -156,15 +156,16 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 			if err != nil {
 				return nil, fmt.Errorf("Error in decoding message: %v", err)
 			}
+			// encoding format: elementID[0] = elementID[0] | 0x80
 			elementID[0] = elementID[0] ^ 0x80
 			element.elementID = binary.BigEndian.Uint16(elementID)
 			element.elementLength = elementLength
 		}
-		templateMsg.AddInfoElement(element.enterpriseID, element.elementID)
+		templateSet.AddInfoElement(element.enterpriseID, element.elementID)
 		elements = append(elements, &element)
 	}
 	cp.addTemplate(obsDomainID, templateID, elements)
-	return templateMsg, nil
+	return templateSet, nil
 }
 
 func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (interface{}, error) {
@@ -173,7 +174,7 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	dataMsg := entities.NewDataSet()
+	dataSet := entities.NewDataSet()
 	for _, field := range template {
 		var length int
 		if field.elementLength == entities.VariableLength { // string
@@ -182,9 +183,9 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 			length = int(field.elementLength)
 		}
 		val := dataBuffer.Next(length)
-		dataMsg.AddInfoElement(field.enterpriseID, field.elementID, val)
+		dataSet.AddInfoElement(field.enterpriseID, field.elementID, val)
 	}
-	return dataMsg, nil
+	return dataSet, nil
 }
 
 func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []*templateField) {
@@ -231,7 +232,7 @@ func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 	delete(cp.templatesMap[obsDomainID], templateID)
 }
 
-// a common binary decoder to specified interfaces
+// decode decodes data from io reader to specified interfaces
 func decode(buffer io.Reader, outputs ...interface{}) error {
 	var err error
 	for _, out := range outputs {
@@ -240,7 +241,7 @@ func decode(buffer io.Reader, outputs ...interface{}) error {
 	return err
 }
 
-// get buffer length by decoding the header
+// getMessageLength returns buffer length by decoding the header
 func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 	packet := entities.Message{}
 	var id, length uint16
@@ -251,7 +252,7 @@ func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 	return int(packet.BufferLength), nil
 }
 
-// get string field length for data record
+// getFieldLength returns string field length for data record
 func getFieldLength(dataBuffer *bytes.Buffer) int {
 	lengthBuff := dataBuffer.Next(1)
 	var length1 uint8
