@@ -27,7 +27,7 @@ type Message struct {
 	SeqNumber    uint32
 	ObsDomainID  uint32
 	ExportTime   uint32
-	Record       interface{}
+	Set          interface{}
 }
 
 // Does it need an interface?

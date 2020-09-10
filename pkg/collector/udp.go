@@ -43,12 +43,16 @@ func (cp *collectingProcess) startUDPServer() {
 		for {
 			buff := make([]byte, cp.maxBufferSize)
 			size, address, err := conn.ReadFromUDP(buff)
-			cp.handleUDPClient(address, &wg)
-			cp.clients[address.String()].packetChan <- bytes.NewBuffer(buff[0:size])
 			if err != nil {
+				if size == 0 { // received stop collector message
+					return
+				}
 				klog.Errorf("Error in collecting process: %v", err)
 				return
 			}
+			klog.Infof("Receiving %d bytes from %s", size, address.String())
+			cp.handleUDPClient(address, &wg)
+			cp.clients[address.String()].packetChan <- bytes.NewBuffer(buff[0:size])
 		}
 	}()
 	select {

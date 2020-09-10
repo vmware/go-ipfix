@@ -59,7 +59,7 @@ func (cp *collectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 				}
 				break out
 			}
-			klog.Infof("Receiving %d bytes from %s", size, cp.address.String())
+			klog.Infof("Receiving %d bytes from %s", size, address)
 			for size > 0 {
 				length, err := getMessageLength(bytes.NewBuffer(buff))
 				if err != nil {
@@ -73,7 +73,7 @@ func (cp *collectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 					klog.Error(err)
 					break out
 				}
-				klog.Info(message)
+				klog.V(4).Info(message)
 				buff = buff[length:]
 			}
 		}

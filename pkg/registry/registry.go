@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
@@ -39,6 +40,7 @@ type antreaRegistry struct {
 
 func NewIanaRegistry() *ianaRegistry {
 	reg := make(map[string]entities.InfoElement)
+	globalReg[config.IANAEnterpriseID] = make(map[uint16]entities.InfoElement)
 	return &ianaRegistry{
 		registry: reg,
 	}
@@ -46,6 +48,7 @@ func NewIanaRegistry() *ianaRegistry {
 
 func NewAntreaRegistry() *antreaRegistry {
 	reg := make(map[string]entities.InfoElement)
+	globalReg[config.AntreaEnterpriseID] = make(map[uint16]entities.InfoElement)
 	return &antreaRegistry{
 		registry: reg,
 	}
@@ -56,6 +59,7 @@ func (reg *ianaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("IANA Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
+	globalReg[config.IANAEnterpriseID][ie.ElementId] = ie
 	return nil
 }
 
@@ -89,6 +93,7 @@ func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("Antrea Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
+	globalReg[config.AntreaEnterpriseID][ie.ElementId] = ie
 	return nil
 }
 

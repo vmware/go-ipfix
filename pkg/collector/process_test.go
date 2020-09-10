@@ -22,6 +22,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type Address struct {
@@ -39,10 +41,14 @@ func (addr Address) String() string {
 
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 var validDataPacket = []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 89, 105, 111, 117}
-var templateFields = []*templateField{
-	{8, 4, 0},
-	{12, 4, 0},
-	{105, 65535, 55829},
+var templateElements = []entities.InfoElement{
+	{"sourceIPv4Address", 8, 18, 0, 4},
+	{"destinationIPv4Address", 12, 18, 0, 4},
+	{"destinationNodeName", 105, 13, 55829, 65535},
+}
+
+func init() {
+	registry.LoadRegistry()
 }
 
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
@@ -99,7 +105,7 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	address := Address{"tcp", "4732"}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), templateFields)
+	cp.addTemplate(uint32(1), uint16(256), templateElements)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
@@ -124,7 +130,7 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	address := Address{"udp", "4733"}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), templateFields)
+	cp.addTemplate(uint32(1), uint16(256), templateElements)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
@@ -212,7 +218,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := collectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
+	cp.templatesMap = make(map[uint32]map[uint16][]entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
 	cp.address = Address{"tcp", "4736"}
 	message, err := cp.decodePacket(bytes.NewBuffer(validTemplatePacket))
@@ -221,7 +227,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	}
 	assert.Equal(t, uint16(10), message.Version, "Flow record version should be 10.")
 	assert.Equal(t, uint32(1), message.ObsDomainID, "Flow record obsDomainID should be 1.")
-	assert.NotNil(t, message.Record, "Template record should be stored in message flowset")
+	assert.NotNil(t, message.Set, "Template record should be stored in message flowset")
 	assert.NotNil(t, cp.templatesMap[message.ObsDomainID], "Template should be stored in template map")
 	// Invalid version
 	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
@@ -229,7 +235,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	assert.NotNil(t, err, "Error should be logged for invalid version")
 	// Malformed record
 	templateRecord = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0}
-	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
+	cp.templatesMap = make(map[uint32]map[uint16][]entities.InfoElement)
 	message, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
 	assert.NotNil(t, err, "Error should be logged for malformed template record")
 	if _, exist := cp.templatesMap[uint32(1)]; exist {
@@ -239,19 +245,26 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 
 func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := collectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]*templateField)
+	cp.templatesMap = make(map[uint32]map[uint16][]entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
 	cp.address = Address{"tcp", "4737"}
 	// Decode without template
 	_, err := cp.decodePacket(bytes.NewBuffer(validDataPacket))
 	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
 	// Decode with template
-	cp.addTemplate(uint32(1), uint16(256), templateFields)
+	cp.addTemplate(uint32(1), uint16(256), templateElements)
 	message, err := cp.decodePacket(bytes.NewBuffer(validDataPacket))
 	assert.Nil(t, err, "Error should not be logged if corresponding template exists.")
 	assert.Equal(t, uint16(10), message.Version, "Flow record version should be 10.")
 	assert.Equal(t, uint32(1), message.ObsDomainID, "Flow record obsDomainID should be 1.")
-	assert.NotNil(t, message.Record, "Data record should be stored in message set")
+	assert.NotNil(t, message.Set, "Data set should be stored in message set")
+	v, ok := message.Set.(entities.DataSet)
+	if !ok {
+		t.Error("Message.Set does not store data in correct format")
+	}
+	ipAddress := []byte{1, 2, 3, 4}
+	assert.Equal(t, ipAddress, v[0][8], "sourceIPv4Address should be decoded and stored correctly.")
+
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
 	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord))

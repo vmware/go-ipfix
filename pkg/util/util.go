@@ -12,17 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package config
+package util
 
-const (
-	// TemplateRefreshTimeOut is the template refresh time out for exporting process
-	TemplateRefreshTimeOut uint32 = 1800
-	// TemplateTTL is the template time to live for collecting process
-	TemplateTTL uint32 = TemplateRefreshTimeOut * 3
-	// TemplateSetID is the setID for template record
-	TemplateSetID uint16 = 2
-	// AntreaEnterpriseID is the enterprise ID for Antrea Information Elements
-	AntreaEnterpriseID uint32 = 55829
-	// IANAEnterpriseID is the enterprise ID for IANA Information Elements
-	IANAEnterpriseID uint32 = 0
+import (
+	"encoding/binary"
+	"io"
 )
+
+// Decode decodes data from io reader to specified interfaces
+func Decode(buffer io.Reader, outputs ...interface{}) error {
+	var err error
+	for _, out := range outputs {
+		err = binary.Read(buffer, binary.BigEndian, out)
+	}
+	return err
+}
