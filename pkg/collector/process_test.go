@@ -41,7 +41,7 @@ func (addr Address) String() string {
 
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 var validDataPacket = []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 89, 105, 111, 117}
-var templateElements = []entities.InfoElement{
+var templateElements = []*entities.InfoElement{
 	{"sourceIPv4Address", 8, 18, 0, 4},
 	{"destinationIPv4Address", 12, 18, 0, 4},
 	{"destinationNodeName", 105, 13, 55829, 65535},
@@ -218,7 +218,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := collectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
 	cp.address = Address{"tcp", "4736"}
 	message, err := cp.decodePacket(bytes.NewBuffer(validTemplatePacket))
@@ -235,7 +235,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	assert.NotNil(t, err, "Error should be logged for invalid version")
 	// Malformed record
 	templateRecord = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0}
-	cp.templatesMap = make(map[uint32]map[uint16][]entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	message, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
 	assert.NotNil(t, err, "Error should be logged for malformed template record")
 	if _, exist := cp.templatesMap[uint32(1)]; exist {
@@ -245,7 +245,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 
 func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := collectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
 	cp.address = Address{"tcp", "4737"}
 	// Decode without template

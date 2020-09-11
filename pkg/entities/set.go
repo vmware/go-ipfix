@@ -19,8 +19,16 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/util"
+)
+
+const (
+	// TemplateRefreshTimeOut is the template refresh time out for exporting process
+	TemplateRefreshTimeOut uint32 = 1800
+	// TemplateTTL is the template time to live for collecting process
+	TemplateTTL uint32 = TemplateRefreshTimeOut * 3
+	// TemplateSetID is the setID for template record
+	TemplateSetID uint16 = 2
 )
 
 type ContentType uint8
@@ -60,7 +68,7 @@ func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
-		binary.BigEndian.PutUint16(header[0:2], config.TemplateSetID)
+		binary.BigEndian.PutUint16(header[0:2], TemplateSetID)
 	} else if setType == Data {
 		// Supporting only one templateID per exporting process
 		// TODO: Add support to multiple template IDs
@@ -115,7 +123,7 @@ func (s *Set) FinishSet() {
 	s.currLen = 0
 }
 
-func (d DataSet) AddInfoElement(element InfoElement, val *bytes.Buffer) error {
+func (d DataSet) AddInfoElement(element *InfoElement, val *bytes.Buffer) error {
 	if _, exist := d[element.EnterpriseId]; !exist {
 		d[element.EnterpriseId] = make(map[uint16]interface{})
 	}

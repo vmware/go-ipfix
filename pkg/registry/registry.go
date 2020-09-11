@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
@@ -38,9 +37,27 @@ type antreaRegistry struct {
 	registry map[string]entities.InfoElement
 }
 
+var globalReg map[uint32]map[uint16]entities.InfoElement
+
+func LoadRegistry() {
+	globalReg = make(map[uint32]map[uint16]entities.InfoElement)
+	antreaReg := NewAntreaRegistry()
+	antreaReg.LoadRegistry()
+	ianaReg := NewIanaRegistry()
+	ianaReg.LoadRegistry()
+}
+
+func GetInfoElementFromID(elementID uint16, enterpriseID uint32) (entities.InfoElement, error) {
+	if element, exist := globalReg[enterpriseID][elementID]; !exist {
+		return element, fmt.Errorf("Information Element with elementID %d and enterpriseID %d cannot be found.", elementID, enterpriseID)
+	} else {
+		return element, nil
+	}
+}
+
 func NewIanaRegistry() *ianaRegistry {
 	reg := make(map[string]entities.InfoElement)
-	globalReg[config.IANAEnterpriseID] = make(map[uint16]entities.InfoElement)
+	globalReg[IANAEnterpriseID] = make(map[uint16]entities.InfoElement)
 	return &ianaRegistry{
 		registry: reg,
 	}
@@ -48,7 +65,7 @@ func NewIanaRegistry() *ianaRegistry {
 
 func NewAntreaRegistry() *antreaRegistry {
 	reg := make(map[string]entities.InfoElement)
-	globalReg[config.AntreaEnterpriseID] = make(map[uint16]entities.InfoElement)
+	globalReg[AntreaEnterpriseID] = make(map[uint16]entities.InfoElement)
 	return &antreaRegistry{
 		registry: reg,
 	}
@@ -59,7 +76,7 @@ func (reg *ianaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("IANA Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
-	globalReg[config.IANAEnterpriseID][ie.ElementId] = ie
+	globalReg[IANAEnterpriseID][ie.ElementId] = ie
 	return nil
 }
 
@@ -93,7 +110,7 @@ func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("Antrea Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
-	globalReg[config.AntreaEnterpriseID][ie.ElementId] = ie
+	globalReg[AntreaEnterpriseID][ie.ElementId] = ie
 	return nil
 }
 
