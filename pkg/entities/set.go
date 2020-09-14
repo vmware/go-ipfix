@@ -130,77 +130,77 @@ func (d DataSet) AddInfoElement(element *InfoElement, val *bytes.Buffer) error {
 	switch dataType := element.DataType; dataType {
 	case Unsigned8:
 		var v uint8
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to uint8: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Unsigned16:
 		var v uint16
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to uint16: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Unsigned32:
 		var v uint32
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to uint32: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Unsigned64:
 		var v uint64
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to uint64: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Signed8:
 		var v int8
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to int8: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Signed16:
 		var v int16
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to int16: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Signed32:
 		var v int32
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to int32: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Signed64:
 		var v int64
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to int64: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Float32:
 		var v float32
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to float32: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Float64:
 		var v float64
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to float64: %v", err)
 		}
 		d[element.EnterpriseId][element.ElementId] = v
 	case Boolean:
 		var v int
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to boolean: %v", err)
 		}
@@ -211,7 +211,7 @@ func (d DataSet) AddInfoElement(element *InfoElement, val *bytes.Buffer) error {
 		}
 	case DateTimeSeconds, DateTimeMilliseconds:
 		var v uint64
-		err := util.Decode(val, v)
+		err := util.Decode(val, &v)
 		if err != nil {
 			return fmt.Errorf("Error in decoding val to uint64: %v", err)
 		}

@@ -21,8 +21,6 @@ import (
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
-const reversePen = uint32(29305)
-
 type Registry interface {
 	LoadRegistry()
 	GetInfoElement(name string) (*entities.InfoElement, error)
@@ -44,6 +42,8 @@ const (
 	AntreaEnterpriseID uint32 = 55829
 	// IANAEnterpriseID is the enterprise ID for IANA Information Elements
 	IANAEnterpriseID uint32 = 0
+	// Enterprise ID for reverse Information Elements
+	ReverseEnterpriseID uint32 = 29305
 )
 
 func LoadRegistry() {
@@ -65,6 +65,7 @@ func GetInfoElementFromID(elementID uint16, enterpriseID uint32) (entities.InfoE
 func NewIanaRegistry() *ianaRegistry {
 	reg := make(map[string]entities.InfoElement)
 	globalReg[IANAEnterpriseID] = make(map[uint16]entities.InfoElement)
+	globalReg[ReverseEnterpriseID] = make(map[uint16]entities.InfoElement)
 	return &ianaRegistry{
 		registry: reg,
 	}
@@ -84,6 +85,10 @@ func (reg *ianaRegistry) registerInfoElement(ie entities.InfoElement) error {
 	}
 	reg.registry[ie.Name] = ie
 	globalReg[IANAEnterpriseID][ie.ElementId] = ie
+	reverseIE, err := reg.GetReverseInfoElement(ie.Name)
+	if err == nil { // the information element has reverse information element
+		globalReg[ReverseEnterpriseID][ie.ElementId] = *reverseIE
+	}
 	return nil
 }
 
@@ -108,8 +113,8 @@ func (reg *ianaRegistry) GetReverseInfoElement(name string) (*entities.InfoEleme
 		err := fmt.Errorf("IANA Registry: The information element %s is not reverse element", name)
 		return &ie, err
 	}
-	reverseName := "reverse_" + strings.Title(ie.Name)
-	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
+	reverseName := "reverse" + strings.Title(ie.Name)
+	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, ReverseEnterpriseID, ie.Len), nil
 }
 
 func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
@@ -139,7 +144,7 @@ func (reg *antreaRegistry) GetReverseInfoElement(name string) (*entities.InfoEle
 		return &ie, err
 	}
 	reverseName := "reverse_" + strings.Title(ie.Name)
-	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
+	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, ReverseEnterpriseID, ie.Len), nil
 }
 
 // Non-reversible Information Elements follow Section 6.1 of RFC5103
