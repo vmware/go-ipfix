@@ -160,10 +160,14 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				 0                   1                   2                   3
 				 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-				|1| Information Element id. = 15 | Field Length = 4 |
-				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+++
-				| Enterprise number |
+				|1| Information Element id. = 15 | Field Length = 4  (16 bits)  |
 				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+				| Enterprise number (32 bits)                                   |
+				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+				1: 1 bit
+				Information Element id: 15 bits
+				Field Length: 16 bits
+				Enterprise ID: 32 bits
 				(Reference: https://tools.ietf.org/html/rfc7011#appendix-A.2.2)
 			*/
 			err = util.Decode(templateBuffer, &enterpriseID)
