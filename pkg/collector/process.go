@@ -156,15 +156,15 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 			}
 		} else {
 			/*
-					Encoding format for Enterprise-Specific Information Elements:
-				     0                   1                   2                   3
-					 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-					+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-					|1| Information Element id. = 15 | Field Length = 4 |
-					+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+++
-					| Enterprise number |
-					+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-					(Reference: https://tools.ietf.org/html/rfc7011#appendix-A.2.2)
+				Encoding format for Enterprise-Specific Information Elements:
+				 0                   1                   2                   3
+				 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+				|1| Information Element id. = 15 | Field Length = 4 |
+				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+++
+				| Enterprise number |
+				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+				(Reference: https://tools.ietf.org/html/rfc7011#appendix-A.2.2)
 			*/
 			err = util.Decode(templateBuffer, &enterpriseID)
 			if err != nil {

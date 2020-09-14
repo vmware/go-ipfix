@@ -39,6 +39,13 @@ type antreaRegistry struct {
 
 var globalReg map[uint32]map[uint16]entities.InfoElement
 
+const (
+	// AntreaEnterpriseID is the enterprise ID for Antrea Information Elements
+	AntreaEnterpriseID uint32 = 55829
+	// IANAEnterpriseID is the enterprise ID for IANA Information Elements
+	IANAEnterpriseID uint32 = 0
+)
+
 func LoadRegistry() {
 	globalReg = make(map[uint32]map[uint16]entities.InfoElement)
 	antreaReg := NewAntreaRegistry()
