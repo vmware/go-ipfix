@@ -18,6 +18,17 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+
+	"github.com/vmware/go-ipfix/pkg/util"
+)
+
+const (
+	// TemplateRefreshTimeOut is the template refresh time out for exporting process
+	TemplateRefreshTimeOut uint32 = 1800
+	// TemplateTTL is the template time to live for collecting process
+	TemplateTTL uint32 = TemplateRefreshTimeOut * 3
+	// TemplateSetID is the setID for template record
+	TemplateSetID uint16 = 2
 )
 
 type ContentType uint8
@@ -39,6 +50,12 @@ type Set struct {
 	setType ContentType
 }
 
+// enterpriseID -> elementID
+type TemplateSet map[uint32][]uint16
+
+// enterpriseID -> elementID -> val
+type DataSet map[uint32]map[uint16]interface{}
+
 func NewSet(buffer *bytes.Buffer) *Set {
 	return &Set{
 		buffer:  buffer,
@@ -51,7 +68,7 @@ func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
-		binary.BigEndian.PutUint16(header[0:2], 2)
+		binary.BigEndian.PutUint16(header[0:2], TemplateSetID)
 	} else if setType == Data {
 		// Supporting only one templateID per exporting process
 		// TODO: Add support to multiple template IDs
@@ -67,6 +84,15 @@ func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	s.currLen = s.currLen + uint16(len(header))
 
 	return nil
+}
+
+func NewTemplateSet() TemplateSet {
+	return make(map[uint32][]uint16)
+
+}
+
+func NewDataSet() DataSet {
+	return make(map[uint32]map[uint16]interface{})
 }
 
 func (s *Set) GetBuffLen() uint16 {
@@ -95,4 +121,116 @@ func (s *Set) FinishSet() {
 	binary.BigEndian.PutUint16(byteSlice[setOffset+2:setOffset+4], s.currLen)
 	// Reset the length
 	s.currLen = 0
+}
+
+func (d DataSet) AddInfoElement(element *InfoElement, val *bytes.Buffer) error {
+	if _, exist := d[element.EnterpriseId]; !exist {
+		d[element.EnterpriseId] = make(map[uint16]interface{})
+	}
+	switch dataType := element.DataType; dataType {
+	case Unsigned8:
+		var v uint8
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to uint8: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Unsigned16:
+		var v uint16
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to uint16: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Unsigned32:
+		var v uint32
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to uint32: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Unsigned64:
+		var v uint64
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to uint64: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Signed8:
+		var v int8
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to int8: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Signed16:
+		var v int16
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to int16: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Signed32:
+		var v int32
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to int32: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Signed64:
+		var v int64
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to int64: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Float32:
+		var v float32
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to float32: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Float64:
+		var v float64
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to float64: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case Boolean:
+		var v int
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to boolean: %v", err)
+		}
+		if v == 1 {
+			d[element.EnterpriseId][element.ElementId] = true
+		} else {
+			d[element.EnterpriseId][element.ElementId] = false
+		}
+	case DateTimeSeconds, DateTimeMilliseconds:
+		var v uint64
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to uint64: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case DateTimeMicroseconds, DateTimeNanoseconds:
+		return fmt.Errorf("This API does not support micro and nano seconds types yet")
+	case MacAddress, Ipv4Address, Ipv6Address:
+		d[element.EnterpriseId][element.ElementId] = val.Bytes()
+	case String:
+		d[element.EnterpriseId][element.ElementId] = val.String()
+	default:
+		return fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
+	}
+	return nil
+}
+
+func (t TemplateSet) AddInfoElement(enterpriseID uint32, elementID uint16) {
+	if _, exist := t[enterpriseID]; !exist {
+		t[enterpriseID] = make([]uint16, 0)
+	}
+	t[enterpriseID] = append(t[enterpriseID], elementID)
 }

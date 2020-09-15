@@ -21,7 +21,14 @@ import (
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
-const reversePen = uint32(29305)
+const (
+	// AntreaEnterpriseID is the enterprise ID for Antrea Information Elements
+	AntreaEnterpriseID uint32 = 55829
+	// IANAEnterpriseID is the enterprise ID for IANA Information Elements
+	IANAEnterpriseID uint32 = 0
+	// Enterprise ID for reverse Information Elements
+	ReverseEnterpriseID uint32 = 29305
+)
 
 type Registry interface {
 	LoadRegistry()
@@ -37,8 +44,28 @@ type antreaRegistry struct {
 	registry map[string]entities.InfoElement
 }
 
+var globalReg map[uint32]map[uint16]entities.InfoElement
+
+func LoadRegistry() {
+	globalReg = make(map[uint32]map[uint16]entities.InfoElement)
+	antreaReg := NewAntreaRegistry()
+	antreaReg.LoadRegistry()
+	ianaReg := NewIanaRegistry()
+	ianaReg.LoadRegistry()
+}
+
+func GetInfoElementFromID(elementID uint16, enterpriseID uint32) (entities.InfoElement, error) {
+	if element, exist := globalReg[enterpriseID][elementID]; !exist {
+		return element, fmt.Errorf("Information Element with elementID %d and enterpriseID %d cannot be found.", elementID, enterpriseID)
+	} else {
+		return element, nil
+	}
+}
+
 func NewIanaRegistry() *ianaRegistry {
 	reg := make(map[string]entities.InfoElement)
+	globalReg[IANAEnterpriseID] = make(map[uint16]entities.InfoElement)
+	globalReg[ReverseEnterpriseID] = make(map[uint16]entities.InfoElement)
 	return &ianaRegistry{
 		registry: reg,
 	}
@@ -46,6 +73,7 @@ func NewIanaRegistry() *ianaRegistry {
 
 func NewAntreaRegistry() *antreaRegistry {
 	reg := make(map[string]entities.InfoElement)
+	globalReg[AntreaEnterpriseID] = make(map[uint16]entities.InfoElement)
 	return &antreaRegistry{
 		registry: reg,
 	}
@@ -56,6 +84,11 @@ func (reg *ianaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("IANA Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
+	globalReg[IANAEnterpriseID][ie.ElementId] = ie
+	reverseIE, err := reg.GetReverseInfoElement(ie.Name)
+	if err == nil { // the information element has reverse information element
+		globalReg[ReverseEnterpriseID][ie.ElementId] = *reverseIE
+	}
 	return nil
 }
 
@@ -80,8 +113,8 @@ func (reg *ianaRegistry) GetReverseInfoElement(name string) (*entities.InfoEleme
 		err := fmt.Errorf("IANA Registry: The information element %s is not reverse element", name)
 		return &ie, err
 	}
-	reverseName := "reverse_" + strings.Title(ie.Name)
-	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
+	reverseName := "reverse" + strings.Title(ie.Name)
+	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, ReverseEnterpriseID, ie.Len), nil
 }
 
 func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
@@ -89,6 +122,7 @@ func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
 		return fmt.Errorf("Antrea Registry: Information element %s has already been registered", ie.Name)
 	}
 	reg.registry[ie.Name] = ie
+	globalReg[AntreaEnterpriseID][ie.ElementId] = ie
 	return nil
 }
 
@@ -110,7 +144,7 @@ func (reg *antreaRegistry) GetReverseInfoElement(name string) (*entities.InfoEle
 		return &ie, err
 	}
 	reverseName := "reverse_" + strings.Title(ie.Name)
-	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, reversePen, ie.Len), nil
+	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, ReverseEnterpriseID, ie.Len), nil
 }
 
 // Non-reversible Information Elements follow Section 6.1 of RFC5103

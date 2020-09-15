@@ -20,6 +20,16 @@ const (
 	MaxTcpSocketMsgSize uint16 = 65535
 )
 
+// data struct of processed message
+type Message struct {
+	Version      uint16
+	BufferLength uint16
+	SeqNumber    uint32
+	ObsDomainID  uint32
+	ExportTime   uint32
+	Set          interface{}
+}
+
 // Does it need an interface?
 
 type MsgBuffer struct {
