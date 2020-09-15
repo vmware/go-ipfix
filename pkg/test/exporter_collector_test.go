@@ -19,14 +19,13 @@ import (
 	"testing"
 	"time"
 
-	"k8s.io/klog/v2"
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/exporter"
 	"github.com/vmware/go-ipfix/pkg/registry"
-
 )
 
 type Addr struct {
@@ -42,12 +41,12 @@ func (addr Addr) String() string{
 	return addr.address
 }
 
-func TestExporterToCollectorUDP(t *testing.T) {
+func TestUDPTransport(t *testing.T) {
 	address := Addr{"udp", "0.0.0.0:4739"}
 	testExporterToCollector(address, t)
 }
 
-func TestExporterToCollectorTCP(t *testing.T) {
+func TestTCPTransport(t *testing.T) {
 	address := Addr{"tcp", "0.0.0.0:4739"}
 	testExporterToCollector(address, t)
 }
