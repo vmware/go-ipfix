@@ -270,13 +270,13 @@ func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 // (encoding reference: https://tools.ietf.org/html/rfc7011#appendix-A.5)
 func getFieldLength(dataBuffer *bytes.Buffer) int {
 	lengthBuff := dataBuffer.Next(1)
-	var lengthVal1 uint8
-	util.Decode(bytes.NewBuffer(lengthBuff), &lengthVal1)
-	if lengthVal1 < 255 { // string length is less than 255
-		return int(lengthVal1)
+	var lengthOneByte uint8
+	util.Decode(bytes.NewBuffer(lengthBuff), &lengthOneByte)
+	if lengthOneByte < 255 { // string length is less than 255
+		return int(lengthOneByte)
 	}
-	var lengthVal2 uint16
+	var lengthTwoBytes uint16
 	lengthBuff = dataBuffer.Next(2)
-	util.Decode(bytes.NewBuffer(lengthBuff), &lengthVal2)
-	return int(lengthVal2)
+	util.Decode(bytes.NewBuffer(lengthBuff), &lengthTwoBytes)
+	return int(lengthTwoBytes)
 }
