@@ -20,10 +20,9 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-
 	"github.com/stretchr/testify/assert"
+
 	"github.com/vmware/go-ipfix/pkg/collector"
-	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/exporter"
 	"github.com/vmware/go-ipfix/pkg/registry"
@@ -141,13 +140,13 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 	if !ok {
 		t.Error("Template packet is not decoded correctly.")
 	}
-	assert.Equal(t, []uint16{8, 12}, templateSet[config.IANAEnterpriseID], "TemplateSet does not store template elements (IANA) correctly.")
-	assert.Equal(t, []uint16{101}, templateSet[config.AntreaEnterpriseID], "TemplateSet does not store template elements (Antrea) correctly.")
+	assert.Equal(t, []uint16{8, 12}, templateSet[registry.IANAEnterpriseID], "TemplateSet does not store template elements (IANA) correctly.")
+	assert.Equal(t, []uint16{101}, templateSet[registry.AntreaEnterpriseID], "TemplateSet does not store template elements (Antrea) correctly.")
 
 	dataSet, ok := dataMsg.Set.(entities.DataSet)
 	if !ok {
 		t.Error("Data packet is not decoded correctly.")
 	}
-	assert.Equal(t, []byte{1,2,3,4}, dataSet[config.IANAEnterpriseID][8], "DataSet does not store elements (IANA) correctly.")
-	assert.Equal(t, "pod1", dataSet[config.AntreaEnterpriseID][101], "DataSet does not store elements (Antrea) correctly.")
+	assert.Equal(t, []byte{1,2,3,4}, dataSet[registry.IANAEnterpriseID][8], "DataSet does not store elements (IANA) correctly.")
+	assert.Equal(t, "pod1", dataSet[registry.AntreaEnterpriseID][101], "DataSet does not store elements (Antrea) correctly.")
 }
