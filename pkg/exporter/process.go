@@ -22,7 +22,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
@@ -78,7 +77,7 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 	if collectorAddr.Network() == "udp" {
 		if tempRefTimeout == 0 {
 			// Default value
-			tempRefTimeout = config.TemplateRefreshTimeOut
+			tempRefTimeout = entities.TemplateRefreshTimeOut
 		}
 		go func() {
 			ticker := time.NewTicker(time.Duration(tempRefTimeout) * time.Second)

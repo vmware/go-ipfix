@@ -22,7 +22,7 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/vmware/go-ipfix/pkg/config"
+	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
 func (cp *collectingProcess) startUDPServer() {
@@ -50,7 +50,7 @@ func (cp *collectingProcess) startUDPServer() {
 				klog.Errorf("Error in collecting process: %v", err)
 				return
 			}
-			klog.Infof("Receiving %d bytes from %s", size, address.String())
+			klog.V(2).Infof("Receiving %d bytes from %s", size, address.String())
 			cp.handleUDPClient(address, &wg)
 			cp.clients[address.String()].packetChan <- bytes.NewBuffer(buff[0:size])
 		}
@@ -73,7 +73,7 @@ func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGrou
 		wg.Add(1)
 		defer wg.Done()
 		go func() {
-			ticker := time.NewTicker(time.Duration(config.TemplateRefreshTimeOut) * time.Second)
+			ticker := time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
 			for {
 				select {
 				case <-client.errChan:
@@ -92,7 +92,7 @@ func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGrou
 					}
 					klog.V(4).Info(message)
 					ticker.Stop()
-					ticker = time.NewTicker(time.Duration(config.TemplateRefreshTimeOut) * time.Second)
+					ticker = time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
 				}
 			}
 		}()

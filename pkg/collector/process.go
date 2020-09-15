@@ -24,7 +24,6 @@ import (
 
 	"k8s.io/klog/v2"
 
-	"github.com/vmware/go-ipfix/pkg/config"
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 	"github.com/vmware/go-ipfix/pkg/util"
@@ -32,7 +31,7 @@ import (
 
 type collectingProcess struct {
 	// for each obsDomainID, there is a map of templates
-	templatesMap map[uint32]map[uint16][]entities.InfoElement
+	templatesMap map[uint32]map[uint16][]*entities.InfoElement
 	// templatesLock allows multiple readers or one writer at the same time
 	templatesLock sync.RWMutex
 	// template lifetime
@@ -45,7 +44,7 @@ type collectingProcess struct {
 	stopChan chan bool
 	// packet list
 	messages []*entities.Message
-	// channels to handle clients (address -> client)
+	// maps each client to its client handler (required channels)
 	clients map[string]*clientHandler
 }
 
@@ -56,7 +55,7 @@ type clientHandler struct {
 
 func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*collectingProcess, error) {
 	collectProc := &collectingProcess{
-		templatesMap:  make(map[uint32]map[uint16][]entities.InfoElement),
+		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		templatesLock: sync.RWMutex{},
 		templateTTL:   templateTTL,
 		address:       address,
@@ -104,12 +103,12 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities
 	var setID, length uint16
 	err := util.Decode(packetBuffer, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setID, &length)
 	if err != nil {
-		return nil, fmt.Errorf("Error in decoding message: %v", err)
+		return nil, err
 	}
 	if message.Version != uint16(10) {
 		return nil, fmt.Errorf("Collector only supports IPFIX (v10). Invalid version %d received.", message.Version)
 	}
-	if setID == config.TemplateSetID {
+	if setID == entities.TemplateSetID {
 		set, err := cp.decodeTemplateSet(packetBuffer, message.ObsDomainID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
@@ -131,9 +130,9 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 	var fieldCount uint16
 	err := util.Decode(templateBuffer, &templateID, &fieldCount)
 	if err != nil {
-		return nil, fmt.Errorf("Error in decoding message: %v", err)
+		return nil, err
 	}
-	elements := make([]entities.InfoElement, 0)
+	elements := make([]*entities.InfoElement, 0)
 	templateSet := entities.NewTemplateSet()
 
 	for i := 0; i < int(fieldCount); i++ {
@@ -145,22 +144,36 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		var elementLength uint16
 		err = util.Decode(templateBuffer, &elementid, &elementLength)
 		if err != nil {
-			return nil, fmt.Errorf("Error in decoding message: %v", err)
+			return nil, err
 		}
-		isIANARegistry := elementid[0] >> 7
-		if isIANARegistry != 1 {
+		isNonIANARegistry := elementid[0]>>7 == 1
+		if !isNonIANARegistry {
 			elementID = binary.BigEndian.Uint16(elementid)
-			enterpriseID = uint32(0)
+			enterpriseID = registry.IANAEnterpriseID
 			element, err = registry.GetInfoElementFromID(elementID, enterpriseID)
 			if err != nil {
 				return nil, err
 			}
 		} else {
+			/*
+				Encoding format for Enterprise-Specific Information Elements:
+				 0                   1                   2                   3
+				 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+				|1| Information Element id. = 15 | Field Length = 4  (16 bits)  |
+				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+				| Enterprise number (32 bits)                                   |
+				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+				1: 1 bit
+				Information Element id: 15 bits
+				Field Length: 16 bits
+				Enterprise ID: 32 bits
+				(Reference: https://tools.ietf.org/html/rfc7011#appendix-A.2.2)
+			*/
 			err = util.Decode(templateBuffer, &enterpriseID)
 			if err != nil {
-				return nil, fmt.Errorf("Error in decoding message: %v", err)
+				return nil, err
 			}
-			// encoding format: elementID[0] = elementID[0] | 0x80
 			elementid[0] = elementid[0] ^ 0x80
 			elementID = binary.BigEndian.Uint16(elementid)
 			element, err = registry.GetInfoElementFromID(elementID, enterpriseID)
@@ -169,7 +182,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 			}
 		}
 		templateSet.AddInfoElement(enterpriseID, elementID)
-		elements = append(elements, element)
+		elements = append(elements, &element)
 	}
 	cp.addTemplate(obsDomainID, templateID, elements)
 	return templateSet, nil
@@ -198,10 +211,10 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	return dataSet, nil
 }
 
-func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []entities.InfoElement) {
+func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []*entities.InfoElement) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
-		cp.templatesMap[obsDomainID] = make(map[uint16][]entities.InfoElement)
+		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
 	}
 	cp.templatesMap[obsDomainID][templateID] = elements
 	cp.templatesLock.Unlock()
@@ -212,7 +225,7 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 
 	// Handle udp template expiration
 	if cp.templateTTL == 0 {
-		cp.templateTTL = config.TemplateTTL // Default value
+		cp.templateTTL = entities.TemplateTTL // Default value
 	}
 	go func() {
 		ticker := time.NewTicker(time.Duration(cp.templateTTL) * time.Second)
@@ -226,7 +239,7 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}()
 }
 
-func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]entities.InfoElement, error) {
+func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
 	cp.templatesLock.RLock()
 	defer cp.templatesLock.RUnlock()
 	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {
@@ -254,15 +267,16 @@ func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 }
 
 // getFieldLength returns string field length for data record
+// (encoding reference: https://tools.ietf.org/html/rfc7011#appendix-A.5)
 func getFieldLength(dataBuffer *bytes.Buffer) int {
 	lengthBuff := dataBuffer.Next(1)
-	var length1 uint8
-	util.Decode(bytes.NewBuffer(lengthBuff), &length1)
-	if length1 < 255 { // string length is less than 255
-		return int(length1)
+	var lengthVal1 uint8
+	util.Decode(bytes.NewBuffer(lengthBuff), &lengthVal1)
+	if lengthVal1 < 255 { // string length is less than 255
+		return int(lengthVal1)
 	}
-	var length2 uint16
+	var lengthVal2 uint16
 	lengthBuff = dataBuffer.Next(2)
-	util.Decode(bytes.NewBuffer(lengthBuff), &length2)
-	return int(length2)
+	util.Decode(bytes.NewBuffer(lengthBuff), &lengthVal2)
+	return int(lengthVal2)
 }
