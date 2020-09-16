@@ -69,18 +69,25 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 		antrea := registry.NewAntreaRegistry()
 		antrea.LoadRegistry()
 
-		// Create template record with 3 fields
+		// Create template record with 4 fields
 		templateID := export.NewTemplateID()
-		tempRec := entities.NewTemplateRecord(3, templateID)
+		tempRec := entities.NewTemplateRecord(4, templateID)
 		tempRec.PrepareRecord()
 		element, err := reg.GetInfoElement("sourceIPv4Address")
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourceIPv4Address")
 		}
 		tempRec.AddInfoElement(element, nil)
+
 		element, err = reg.GetInfoElement("destinationIPv4Address")
 		if err != nil {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
+		}
+		tempRec.AddInfoElement(element, nil)
+
+		element, err = reg.GetReverseInfoElement("octetDeltaCount")
+		if err != nil {
+			klog.Errorf("Did not find the reverse element of octetDeltaCount")
 		}
 		tempRec.AddInfoElement(element, nil)
 
@@ -109,6 +116,12 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
 		}
 		dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
+
+		element, err = reg.GetReverseInfoElement("octetDeltaCount")
+		if err != nil {
+			klog.Errorf("Did not find the reverse element of octetDeltaCount")
+		}
+		dataRec.AddInfoElement(element, uint64(12345678))
 
 		element, err = antrea.GetInfoElement("sourcePodName")
 		if err != nil {
@@ -140,6 +153,7 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 		t.Error("Template packet is not decoded correctly.")
 	}
 	assert.Equal(t, []uint16{8, 12}, templateSet[registry.IANAEnterpriseID], "TemplateSet does not store template elements (IANA) correctly.")
+	assert.Equal(t, []uint16{1}, templateSet[registry.ReverseEnterpriseID], "TemplateSet does not store template elements (reverse information element) correctly.")
 	assert.Equal(t, []uint16{101}, templateSet[registry.AntreaEnterpriseID], "TemplateSet does not store template elements (Antrea) correctly.")
 
 	dataSet, ok := dataMsg.Set.(entities.DataSet)
@@ -147,5 +161,6 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 		t.Error("Data packet is not decoded correctly.")
 	}
 	assert.Equal(t, []byte{1,2,3,4}, dataSet[registry.IANAEnterpriseID][8], "DataSet does not store elements (IANA) correctly.")
+	assert.Equal(t, uint64(12345678), dataSet[registry.ReverseEnterpriseID][1], "DataSet does not store reverse information elements (IANA) correctly.")
 	assert.Equal(t, "pod1", dataSet[registry.AntreaEnterpriseID][101], "DataSet does not store elements (Antrea) correctly.")
 }
