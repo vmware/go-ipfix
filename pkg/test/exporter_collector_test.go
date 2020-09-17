@@ -28,26 +28,19 @@ import (
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
-type Addr struct {
-	network string
-	address string
-}
-
-func (addr Addr) Network() string{
-	return addr.network
-}
-
-func (addr Addr) String() string{
-	return addr.address
-}
-
 func TestUDPTransport(t *testing.T) {
-	address := Addr{"udp", "0.0.0.0:4739"}
+	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
+	if err != nil {
+		t.Error(err)
+	}
 	testExporterToCollector(address, t)
 }
 
 func TestTCPTransport(t *testing.T) {
-	address := Addr{"tcp", "0.0.0.0:4739"}
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4739")
+	if err != nil {
+		t.Error(err)
+	}
 	testExporterToCollector(address, t)
 }
 
@@ -58,7 +51,7 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 	cp, _ := collector.InitCollectingProcess(address, 1024, 0)
 
 	go func() { // Start exporting process in go routine
-		time.Sleep(2 * time.Second)  // wait for collector to be ready
+		time.Sleep(2 * time.Second) // wait for collector to be ready
 		export, err := exporter.InitExportingProcess(address, 1, 0)
 		if err != nil {
 			klog.Fatalf("Got error when connecting to %s", address.String())
@@ -160,7 +153,7 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 	if !ok {
 		t.Error("Data packet is not decoded correctly.")
 	}
-	assert.Equal(t, []byte{1,2,3,4}, dataSet[registry.IANAEnterpriseID][8], "DataSet does not store elements (IANA) correctly.")
+	assert.Equal(t, []byte{1, 2, 3, 4}, dataSet[registry.IANAEnterpriseID][8], "DataSet does not store elements (IANA) correctly.")
 	assert.Equal(t, uint64(12345678), dataSet[registry.ReverseEnterpriseID][1], "DataSet does not store reverse information elements (IANA) correctly.")
 	assert.Equal(t, "pod1", dataSet[registry.AntreaEnterpriseID][101], "DataSet does not store elements (Antrea) correctly.")
 }
