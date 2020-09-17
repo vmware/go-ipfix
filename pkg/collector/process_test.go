@@ -22,22 +22,10 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
-
-type Address struct {
-	network string
-	port    string
-}
-
-func (addr Address) Network() string {
-	return addr.network
-}
-
-func (addr Address) String() string {
-	return "0.0.0.0:" + addr.port
-}
 
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 var validDataPacket = []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 89, 105, 111, 117}
@@ -52,7 +40,10 @@ func init() {
 }
 
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	address := Address{"tcp", "4730"}
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4730")
+	if err != nil {
+		t.Error(err)
+	}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
@@ -75,7 +66,10 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	address := Address{"udp", "4731"}
+	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4731")
+	if err != nil {
+		t.Error(err)
+	}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
@@ -102,7 +96,10 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	address := Address{"tcp", "4732"}
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4732")
+	if err != nil {
+		t.Error(err)
+	}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	cp.addTemplate(uint32(1), uint16(256), templateElements)
@@ -127,7 +124,10 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	address := Address{"udp", "4733"}
+	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4733")
+	if err != nil {
+		t.Error(err)
+	}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	cp.addTemplate(uint32(1), uint16(256), templateElements)
@@ -156,7 +156,10 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
-	address := Address{"tcp", "4734"}
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4734")
+	if err != nil {
+		t.Error(err)
+	}
 	cp, _ := InitCollectingProcess(address, 1024, 0)
 	go func() {
 		time.Sleep(time.Second)
@@ -179,7 +182,10 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
-	address := Address{"udp", "4735"}
+	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4735")
+	if err != nil {
+		t.Error(err)
+	}
 	cp, _ := InitCollectingProcess(address, 1024, 0)
 	go func() {
 		time.Sleep(time.Second)
@@ -220,7 +226,11 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := collectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
-	cp.address = Address{"tcp", "4736"}
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4736")
+	if err != nil {
+		t.Error(err)
+	}
+	cp.address = address
 	message, err := cp.decodePacket(bytes.NewBuffer(validTemplatePacket))
 	if err != nil {
 		t.Fatalf("Got error in decoding template record: %v", err)
@@ -247,9 +257,13 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := collectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
-	cp.address = Address{"tcp", "4737"}
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4737")
+	if err != nil {
+		t.Error(err)
+	}
+	cp.address = address
 	// Decode without template
-	_, err := cp.decodePacket(bytes.NewBuffer(validDataPacket))
+	_, err = cp.decodePacket(bytes.NewBuffer(validDataPacket))
 	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
 	// Decode with template
 	cp.addTemplate(uint32(1), uint16(256), templateElements)
@@ -272,7 +286,10 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
-	address := Address{"udp", "4738"}
+	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4738")
+	if err != nil {
+		t.Error(err)
+	}
 	cp, err := InitCollectingProcess(address, 1024, 5)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
