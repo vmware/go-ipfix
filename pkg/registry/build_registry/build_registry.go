@@ -63,7 +63,7 @@ import (
 
 // AUTO GENERATED, DO NOT CHANGE
 
-func (registry *ianaRegistry) LoadRegistry() {
+func loadIANARegistry() {
 `)
 
 	for idx, row := range data {
@@ -72,7 +72,7 @@ func (registry *ianaRegistry) LoadRegistry() {
 			continue
 		}
 
-		writer.WriteString("	registry.registerInfoElement(*entities.NewInfoElement(")
+		writer.WriteString("	registerIANAIE(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], "0")
 		fmt.Fprintf(writer, parameters)
 		writer.WriteString("))\n")
@@ -112,7 +112,7 @@ import (
 
 // AUTO GENERATED, DO NOT CHANGE
 
-func (registry *antreaRegistry) LoadRegistry() {
+func loadAntreaRegistry() {
 `)
 
 	for idx, row := range data {
@@ -121,7 +121,7 @@ func (registry *antreaRegistry) LoadRegistry() {
 			continue
 		}
 
-		writer.WriteString("	registry.registerInfoElement(*entities.NewInfoElement(")
+		writer.WriteString("	registerAntreaIE(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], row[12])
 		fmt.Fprintf(writer, parameters)
 		writer.WriteString("))\n")
