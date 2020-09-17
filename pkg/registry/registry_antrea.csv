@@ -8,3 +8,7 @@ ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,R
 106,destinationClusterIP,ipv4Address,,current,,,,,,,,55829,
 107,destinationServicePort,unsigned16,,current,,,,,,,,55829,
 108,destinationServicePortName,string,,current,,,,,,,,55829,
+109,ingressNetworkPolicyName,string,,current,,,,,,,,55829,
+110,ingressNetworkPolicyNamespace,string,,current,,,,,,,,55829,
+111,egressNetworkPolicyName,string,,current,,,,,,,,55829,
+112,egressNetworkPolicyNamespace,string,,current,,,,,,,,55829,
