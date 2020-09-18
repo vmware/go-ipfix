@@ -56,35 +56,30 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 		if err != nil {
 			klog.Fatalf("Got error when connecting to %s", address.String())
 		}
-		// TODO: change to global registry API here
-		reg := registry.NewIanaRegistry()
-		reg.LoadRegistry()
-		antrea := registry.NewAntreaRegistry()
-		antrea.LoadRegistry()
 
 		// Create template record with 4 fields
 		templateID := export.NewTemplateID()
 		tempRec := entities.NewTemplateRecord(4, templateID)
 		tempRec.PrepareRecord()
-		element, err := reg.GetInfoElement("sourceIPv4Address")
+		element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourceIPv4Address")
 		}
 		tempRec.AddInfoElement(element, nil)
 
-		element, err = reg.GetInfoElement("destinationIPv4Address")
+		element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
 		}
 		tempRec.AddInfoElement(element, nil)
 
-		element, err = reg.GetReverseInfoElement("octetDeltaCount")
+		element, err = registry.GetInfoElement("reverse_OctetDeltaCount", registry.ReverseEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the reverse element of octetDeltaCount")
 		}
 		tempRec.AddInfoElement(element, nil)
 
-		element, err = antrea.GetInfoElement("sourcePodName")
+		element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourcePodName")
 		}
@@ -98,25 +93,25 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 		// Create data record using the same template above
 		dataRec := entities.NewDataRecord(templateID)
 		dataRec.PrepareRecord()
-		element, err = reg.GetInfoElement("sourceIPv4Address")
+		element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourceIPv4Address")
 		}
 		dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
 
-		element, err = reg.GetInfoElement("destinationIPv4Address")
+		element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
 		}
 		dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
 
-		element, err = reg.GetReverseInfoElement("octetDeltaCount")
+		element, err = registry.GetInfoElement("reverse_OctetDeltaCount", registry.ReverseEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the reverse element of octetDeltaCount")
 		}
 		dataRec.AddInfoElement(element, uint64(12345678))
 
-		element, err = antrea.GetInfoElement("sourcePodName")
+		element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourcePodName")
 		}

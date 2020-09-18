@@ -26,9 +26,12 @@ func TestLoadRegistry(t *testing.T) {
 	assert.Equal(t, 0, len(globalRegistryByID))
 	assert.Equal(t, 0, len(globalRegistryByName))
 	LoadRegistry()
-	assert.NotEmpty(t, len(globalRegistryByName[IANAEnterpriseID]))
-	assert.NotEmpty(t, len(globalRegistryByName[AntreaEnterpriseID]))
-	assert.NotEmpty(t, len(globalRegistryByName[ReverseEnterpriseID]))
+	assert.NotEmpty(t, globalRegistryByName[IANAEnterpriseID])
+	assert.NotEmpty(t, globalRegistryByName[AntreaEnterpriseID])
+	assert.NotEmpty(t, globalRegistryByName[ReverseEnterpriseID])
+	assert.NotEmpty(t, globalRegistryByID[IANAEnterpriseID])
+	assert.NotEmpty(t, globalRegistryByID[AntreaEnterpriseID])
+	assert.NotEmpty(t, globalRegistryByID[ReverseEnterpriseID])
 }
 
 func TestGetInfoElement(t *testing.T) {

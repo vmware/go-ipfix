@@ -81,8 +81,7 @@ func registerInfoElement(ie entities.InfoElement, enterpriseID uint32) error {
 		reverseIE, err := getIANAReverseIE(ie.Name)
 		if err == nil { // the information element has reverse information element
 			globalRegistryByID[ReverseEnterpriseID][reverseIE.ElementId] = *reverseIE
-			reverseName := "reverse_" + strings.Title(reverseIE.Name)
-			globalRegistryByName[ReverseEnterpriseID][reverseName] = *reverseIE
+			globalRegistryByName[ReverseEnterpriseID][reverseIE.Name] = *reverseIE
 		}
 	}
 	return nil
