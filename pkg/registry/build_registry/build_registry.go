@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
+	"github.com/vmware/go-ipfix/pkg/registry"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -72,10 +73,12 @@ func loadIANARegistry() {
 			continue
 		}
 
-		writer.WriteString("	registerIANAIE(*entities.NewInfoElement(")
+		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], "0")
 		fmt.Fprintf(writer, parameters)
-		writer.WriteString("))\n")
+		writer.WriteString("), " )
+		fmt.Fprintf(writer, fmt.Sprint(registry.IANAEnterpriseID))
+		writer.WriteString(")\n" )
 	}
 	writer.WriteString("}\n")
 	writer.Flush()
@@ -121,10 +124,12 @@ func loadAntreaRegistry() {
 			continue
 		}
 
-		writer.WriteString("	registerAntreaIE(*entities.NewInfoElement(")
+		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], row[12])
 		fmt.Fprintf(writer, parameters)
-		writer.WriteString("))\n")
+		writer.WriteString("), " )
+		fmt.Fprintf(writer, fmt.Sprint(registry.AntreaEnterpriseID))
+		writer.WriteString(")\n" )
 	}
 	writer.WriteString("}\n")
 	writer.Flush()

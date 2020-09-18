@@ -20,18 +20,14 @@ import (
 
 // AUTO GENERATED, DO NOT CHANGE
 
-func (registry *antreaRegistry) LoadRegistry() {
-	registry.registerInfoElement(*entities.NewInfoElement("sourcePodNamespace", 100, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("destinationPodNamespace", 102, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("sourceNodeName", 104, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("destinationNodeName", 105, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4))
-	registry.registerInfoElement(*entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2))
-	registry.registerInfoElement(*entities.NewInfoElement("destinationServicePortName", 108, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyName", 109, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyNamespace", 110, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyName", 111, 13, 55829, 65535))
-	registry.registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyNamespace", 112, 13, 55829, 65535))
+func loadAntreaRegistry() {
+	registerInfoElement(*entities.NewInfoElement("sourcePodNamespace", 100, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("destinationPodNamespace", 102, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("sourceNodeName", 104, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("destinationNodeName", 105, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), 55829)
+	registerInfoElement(*entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), 55829)
+	registerInfoElement(*entities.NewInfoElement("destinationServicePortName", 108, 13, 55829, 65535), 55829)
 }
