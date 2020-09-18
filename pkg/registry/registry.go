@@ -30,118 +30,79 @@ const (
 	ReverseEnterpriseID uint32 = 29305
 )
 
-type Registry interface {
-	LoadRegistry()
-	GetInfoElement(name string) (*entities.InfoElement, error)
-	GetReverseInfoElement(name string) (*entities.InfoElement, error)
-}
-
-type ianaRegistry struct {
-	registry map[string]entities.InfoElement
-}
-
-type antreaRegistry struct {
-	registry map[string]entities.InfoElement
-}
-
-var globalReg map[uint32]map[uint16]entities.InfoElement
+var (
+	// globalRegistryByID shows mapping EnterpriseID -> Info Element ID -> Info Element
+	globalRegistryByID map[uint32]map[uint16]*entities.InfoElement
+	// globalRegistryByName shows mapping EnterpriseID -> Info Element name -> Info Element
+	globalRegistryByName map[uint32]map[string]*entities.InfoElement
+)
 
 func LoadRegistry() {
-	globalReg = make(map[uint32]map[uint16]entities.InfoElement)
-	antreaReg := NewAntreaRegistry()
-	antreaReg.LoadRegistry()
-	ianaReg := NewIanaRegistry()
-	ianaReg.LoadRegistry()
+	globalRegistryByID = make(map[uint32]map[uint16]*entities.InfoElement)
+	globalRegistryByID[AntreaEnterpriseID] = make(map[uint16]*entities.InfoElement)
+	globalRegistryByID[IANAEnterpriseID] = make(map[uint16]*entities.InfoElement)
+	globalRegistryByID[ReverseEnterpriseID] = make(map[uint16]*entities.InfoElement)
+
+	globalRegistryByName = make(map[uint32]map[string]*entities.InfoElement)
+	globalRegistryByName[AntreaEnterpriseID] = make(map[string]*entities.InfoElement)
+	globalRegistryByName[IANAEnterpriseID] = make(map[string]*entities.InfoElement)
+	globalRegistryByName[ReverseEnterpriseID] = make(map[string]*entities.InfoElement)
+
+	loadIANARegistry()
+	loadAntreaRegistry()
 }
 
-func GetInfoElementFromID(elementID uint16, enterpriseID uint32) (entities.InfoElement, error) {
-	if element, exist := globalReg[enterpriseID][elementID]; !exist {
-		return element, fmt.Errorf("Information Element with elementID %d and enterpriseID %d cannot be found.", elementID, enterpriseID)
+func GetInfoElementFromID(elementID uint16, enterpriseID uint32) (*entities.InfoElement, error) {
+	if _, exist := globalRegistryByID[enterpriseID]; !exist {
+		return nil, fmt.Errorf("Registry with EnterpriseID %d is not supported.", enterpriseID)
+	}
+	if element, exist := globalRegistryByID[enterpriseID][elementID]; !exist {
+		return element, fmt.Errorf("Information Element with elementID %d in registry with enterpriseID %d cannot be found.", elementID, enterpriseID)
 	} else {
 		return element, nil
 	}
 }
 
-func NewIanaRegistry() *ianaRegistry {
-	reg := make(map[string]entities.InfoElement)
-	globalReg[IANAEnterpriseID] = make(map[uint16]entities.InfoElement)
-	globalReg[ReverseEnterpriseID] = make(map[uint16]entities.InfoElement)
-	return &ianaRegistry{
-		registry: reg,
+func GetInfoElement(name string, enterpriseID uint32) (*entities.InfoElement, error) {
+	if _, exist := globalRegistryByName[enterpriseID]; !exist {
+		return nil, fmt.Errorf("Registry with EnterpriseID %d is not supported.", enterpriseID)
+	}
+	if element, exist := globalRegistryByName[enterpriseID][name]; !exist {
+		return element, fmt.Errorf("Information Element with name %s in registry with enterpriseID %d cannot be found.", name, enterpriseID)
+	} else {
+		return element, nil
 	}
 }
 
-func NewAntreaRegistry() *antreaRegistry {
-	reg := make(map[string]entities.InfoElement)
-	globalReg[AntreaEnterpriseID] = make(map[uint16]entities.InfoElement)
-	return &antreaRegistry{
-		registry: reg,
+func registerInfoElement(ie entities.InfoElement, enterpriseID uint32) error {
+	if _, exist := globalRegistryByName[enterpriseID]; !exist {
+		return fmt.Errorf("Registry with EnterpriseID %d is not supported.", ie.EnterpriseId)
+	} else if _, exist = globalRegistryByName[enterpriseID][ie.Name]; exist {
+		fmt.Errorf("Information element %s in registry with EnterpriseID %d has already been registered", ie.Name, ie.EnterpriseId)
 	}
-}
+	globalRegistryByID[ie.EnterpriseId][ie.ElementId] = &ie
+	globalRegistryByName[ie.EnterpriseId][ie.Name] = &ie
 
-func (reg *ianaRegistry) registerInfoElement(ie entities.InfoElement) error {
-	if _, exist := reg.registry[ie.Name]; exist {
-		return fmt.Errorf("IANA Registry: Information element %s has already been registered", ie.Name)
-	}
-	reg.registry[ie.Name] = ie
-	globalReg[IANAEnterpriseID][ie.ElementId] = ie
-	reverseIE, err := reg.GetReverseInfoElement(ie.Name)
-	if err == nil { // the information element has reverse information element
-		globalReg[ReverseEnterpriseID][ie.ElementId] = *reverseIE
+	if ie.EnterpriseId == IANAEnterpriseID { // handle reverse information element for IANA registry
+		reverseIE, err := getIANAReverseInfoElement(ie.Name)
+		if err == nil { // the information element has reverse information element
+			globalRegistryByID[ReverseEnterpriseID][reverseIE.ElementId] = reverseIE
+			globalRegistryByName[ReverseEnterpriseID][reverseIE.Name] = reverseIE
+		}
 	}
 	return nil
 }
 
-func (reg *ianaRegistry) GetInfoElement(name string) (*entities.InfoElement, error) {
+func getIANAReverseInfoElement(name string) (*entities.InfoElement, error) {
 	var exist bool
-	var ie entities.InfoElement
-	if ie, exist = reg.registry[name]; !exist {
+	var ie *entities.InfoElement
+	if ie, exist = globalRegistryByName[IANAEnterpriseID][name]; !exist {
 		err := fmt.Errorf("IANA Registry: There is no information element with name %s", name)
-		return &ie, err
-	}
-	return &ie, nil
-}
-
-func (reg *ianaRegistry) GetReverseInfoElement(name string) (*entities.InfoElement, error) {
-	var exist bool
-	var ie entities.InfoElement
-	if ie, exist = reg.registry[name]; !exist {
-		err := fmt.Errorf("IANA Registry: There is no information element with name %s", name)
-		return &ie, err
+		return ie, err
 	}
 	if !isReversible(ie.Name) {
 		err := fmt.Errorf("IANA Registry: The information element %s is not reverse element", name)
-		return &ie, err
-	}
-	reverseName := "reverse" + strings.Title(ie.Name)
-	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, ReverseEnterpriseID, ie.Len), nil
-}
-
-func (reg *antreaRegistry) registerInfoElement(ie entities.InfoElement) error {
-	if _, exist := reg.registry[ie.Name]; exist {
-		return fmt.Errorf("Antrea Registry: Information element %s has already been registered", ie.Name)
-	}
-	reg.registry[ie.Name] = ie
-	globalReg[AntreaEnterpriseID][ie.ElementId] = ie
-	return nil
-}
-
-func (reg *antreaRegistry) GetInfoElement(name string) (*entities.InfoElement, error) {
-	var exist bool
-	var ie entities.InfoElement
-	if ie, exist = reg.registry[name]; !exist {
-		err := fmt.Errorf("Antrea Registry: There is no information element with name %s", name)
-		return &ie, err
-	}
-	return &ie, nil
-}
-
-func (reg *antreaRegistry) GetReverseInfoElement(name string) (*entities.InfoElement, error) {
-	var exist bool
-	var ie entities.InfoElement
-	if ie, exist = reg.registry[name]; !exist {
-		err := fmt.Errorf("Antrea Registry: There is no information element with name %s", name)
-		return &ie, err
+		return ie, err
 	}
 	reverseName := "reverse_" + strings.Title(ie.Name)
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, ReverseEnterpriseID, ie.Len), nil

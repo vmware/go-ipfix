@@ -24,6 +24,10 @@ import (
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
+func init() {
+	registry.LoadRegistry()
+}
+
 func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	// Create local server for testing
 	listener, err := net.Listen("tcp", ":0")
@@ -60,20 +64,16 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", listener.Addr().String())
 
-	// Add template to exporting process
-	reg := registry.NewIanaRegistry()
-	reg.LoadRegistry()
-
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
 	tempRec := entities.NewTemplateRecord(2, templateID)
 	tempRec.PrepareRecord()
-	element, err := reg.GetInfoElement("sourceIPv4Address")
+	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
 	tempRec.AddInfoElement(element, nil)
-	element, err = reg.GetInfoElement("destinationIPv4Address")
+	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
@@ -134,20 +134,16 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
 
-	// Add template to exporting process
-	reg := registry.NewIanaRegistry()
-	reg.LoadRegistry()
-
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
 	tempRec := entities.NewTemplateRecord(2, templateID)
 	tempRec.PrepareRecord()
-	element, err := reg.GetInfoElement("sourceIPv4Address")
+	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
 	tempRec.AddInfoElement(element, nil)
-	element, err = reg.GetInfoElement("destinationIPv4Address")
+	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
@@ -213,18 +209,14 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", listener.Addr().String())
 
-	// Add data to exporting process
-	reg := registry.NewIanaRegistry()
-	reg.LoadRegistry()
-
 	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
 	templateID := exporter.NewTemplateID()
 	// Get the element to update template in exporting process
-	element1, err := reg.GetInfoElement("sourceIPv4Address")
+	element1, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	element2, err := reg.GetInfoElement("destinationIPv4Address")
+	element2, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
@@ -234,13 +226,13 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	// Create data record with two fields
 	dataRec := entities.NewDataRecord(templateID)
 	dataRec.PrepareRecord()
-	element, err := reg.GetInfoElement("sourceIPv4Address")
+	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
 	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
 
-	element, err = reg.GetInfoElement("destinationIPv4Address")
+	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
@@ -291,17 +283,14 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
 
-	// Add data to exporting process
-	reg := registry.NewIanaRegistry()
-	reg.LoadRegistry()
 	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
 	templateID := exporter.NewTemplateID()
 	// Get the element to update template in exporting process
-	element1, err := reg.GetInfoElement("sourceIPv4Address")
+	element1, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	element2, err := reg.GetInfoElement("destinationIPv4Address")
+	element2, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
@@ -312,13 +301,13 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	// Create data record with two fields
 	dataRec := entities.NewDataRecord(templateID)
 	dataRec.PrepareRecord()
-	element, err := reg.GetInfoElement("sourceIPv4Address")
+	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
 	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
 
-	element, err = reg.GetInfoElement("destinationIPv4Address")
+	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}

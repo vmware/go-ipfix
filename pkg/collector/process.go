@@ -136,7 +136,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 	templateSet := entities.NewTemplateSet()
 
 	for i := 0; i < int(fieldCount); i++ {
-		var element entities.InfoElement
+		var element *entities.InfoElement
 		var enterpriseID uint32
 		var elementID uint16
 		// check whether enterprise ID is 0 or not
@@ -182,7 +182,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 			}
 		}
 		templateSet.AddInfoElement(enterpriseID, elementID)
-		elements = append(elements, &element)
+		elements = append(elements, element)
 	}
 	cp.addTemplate(obsDomainID, templateID, elements)
 	return templateSet, nil

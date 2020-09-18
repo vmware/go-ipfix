@@ -31,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 func initIANARegistry() {
@@ -63,7 +64,7 @@ import (
 
 // AUTO GENERATED, DO NOT CHANGE
 
-func (registry *ianaRegistry) LoadRegistry() {
+func loadIANARegistry() {
 `)
 
 	for idx, row := range data {
@@ -72,10 +73,12 @@ func (registry *ianaRegistry) LoadRegistry() {
 			continue
 		}
 
-		writer.WriteString("	registry.registerInfoElement(*entities.NewInfoElement(")
+		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], "0")
 		fmt.Fprintf(writer, parameters)
-		writer.WriteString("))\n")
+		writer.WriteString("), " )
+		fmt.Fprintf(writer, fmt.Sprint(registry.IANAEnterpriseID))
+		writer.WriteString(")\n" )
 	}
 	writer.WriteString("}\n")
 	writer.Flush()
@@ -112,7 +115,7 @@ import (
 
 // AUTO GENERATED, DO NOT CHANGE
 
-func (registry *antreaRegistry) LoadRegistry() {
+func loadAntreaRegistry() {
 `)
 
 	for idx, row := range data {
@@ -121,10 +124,12 @@ func (registry *antreaRegistry) LoadRegistry() {
 			continue
 		}
 
-		writer.WriteString("	registry.registerInfoElement(*entities.NewInfoElement(")
+		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], row[12])
 		fmt.Fprintf(writer, parameters)
-		writer.WriteString("))\n")
+		writer.WriteString("), " )
+		fmt.Fprintf(writer, fmt.Sprint(registry.AntreaEnterpriseID))
+		writer.WriteString(")\n" )
 	}
 	writer.WriteString("}\n")
 	writer.Flush()
