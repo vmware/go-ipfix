@@ -36,8 +36,9 @@ func TestLoadRegistry(t *testing.T) {
 
 func TestGetInfoElement(t *testing.T) {
 	LoadRegistry()
+	var expectedIE *entities.InfoElement
 	ie, error := GetInfoElement("ingressInterfaceTest", IANAEnterpriseID)
-	assert.Equal(t, entities.InfoElement{}, *ie, "GetIANAInfoElement did not return correct value.")
+	assert.Equal(t, expectedIE, ie, "GetIANAInfoElement did not return correct value.")
 	assert.NotEqual(t, nil, error, "GetIANAInfoElement should return error if cannot find InfoElement.")
 
 	ie, error = GetInfoElement("ingressInterface", IANAEnterpriseID)
@@ -48,13 +49,13 @@ func TestGetInfoElement(t *testing.T) {
 func TestGetIANAReverseIE(t *testing.T) {
 	LoadRegistry()
 	// InfoElement does not exist in the registry
-	reverseIE, error := getIANAReverseIE("sourcePodName")
+	reverseIE, error := getIANAReverseInfoElement("sourcePodName")
 	assert.NotEqual(t, nil, error, "GetIANAReverseIE should return error when ie does not exist.")
 	// InfoElement is not reversible
-	reverseIE, error = getIANAReverseIE("flowKeyIndicator")
+	reverseIE, error = getIANAReverseInfoElement("flowKeyIndicator")
 	assert.NotEqual(t, nil, error, "GetIANAReverseIE should return error when ie is not reversible.")
 	// reverse InfoElement exists
-	reverseIE, error = getIANAReverseIE("deltaFlowCount")
+	reverseIE, error = getIANAReverseInfoElement("deltaFlowCount")
 	assert.Equal(t, "reverse_DeltaFlowCount", reverseIE.Name, "GetIANAReverseIE does not return correct reverse ie.")
 	assert.Equal(t, ReverseEnterpriseID, reverseIE.EnterpriseId, "GetIANAReverseIE does not return correct reverse ie.")
 }

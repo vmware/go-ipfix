@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"encoding/csv"
 	"fmt"
-	"github.com/vmware/go-ipfix/pkg/registry"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -32,6 +31,7 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 func initIANARegistry() {
