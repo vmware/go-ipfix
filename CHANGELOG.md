@@ -17,5 +17,3 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - IPFIX exporter support based on RFC 7011.
 - Support for IANA and Antrea Registries.
-
-
