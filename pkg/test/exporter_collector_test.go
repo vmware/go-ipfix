@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/entities"

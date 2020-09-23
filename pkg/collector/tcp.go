@@ -6,7 +6,7 @@ import (
 	"net"
 	"sync"
 
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 )
 
 func (cp *collectingProcess) startTCPServer() {
