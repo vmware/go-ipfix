@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
