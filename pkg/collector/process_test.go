@@ -169,7 +169,7 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 		}
 	}()
 	go func() {
-		time.Sleep(time.Second)
+		time.Sleep(time.Second * 2)
 		_, err := net.Dial(address.Network(), address.String())
 		if err != nil {
 			t.Fatalf("Cannot establish connection to %s", address.String())
