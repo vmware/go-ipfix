@@ -44,7 +44,7 @@ func (cp *collectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 	defer wg.Done()
 	address := conn.RemoteAddr().String()
 	client := cp.createClient()
-	cp.clients[address] = client
+	cp.addClient(address, client)
 	go func() {
 		defer conn.Close()
 	out:
