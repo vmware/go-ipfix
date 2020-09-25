@@ -28,10 +28,10 @@ func TestLoadRegistry(t *testing.T) {
 	LoadRegistry()
 	assert.NotEmpty(t, globalRegistryByName[IANAEnterpriseID])
 	assert.NotEmpty(t, globalRegistryByName[AntreaEnterpriseID])
-	assert.NotEmpty(t, globalRegistryByName[ReverseEnterpriseID])
+	assert.NotEmpty(t, globalRegistryByName[IANAReversedEnterpriseID])
 	assert.NotEmpty(t, globalRegistryByID[IANAEnterpriseID])
 	assert.NotEmpty(t, globalRegistryByID[AntreaEnterpriseID])
-	assert.NotEmpty(t, globalRegistryByID[ReverseEnterpriseID])
+	assert.NotEmpty(t, globalRegistryByID[IANAReversedEnterpriseID])
 }
 
 func TestGetInfoElement(t *testing.T) {
@@ -56,8 +56,8 @@ func TestGetIANAReverseIE(t *testing.T) {
 	assert.NotEqual(t, nil, error, "GetIANAReverseIE should return error when ie is not reversible.")
 	// reverse InfoElement exists
 	reverseIE, error = getIANAReverseInfoElement("deltaFlowCount")
-	assert.Equal(t, "reverse_DeltaFlowCount", reverseIE.Name, "GetIANAReverseIE does not return correct reverse ie.")
-	assert.Equal(t, ReverseEnterpriseID, reverseIE.EnterpriseId, "GetIANAReverseIE does not return correct reverse ie.")
+	assert.Equal(t, "deltaFlowCount", reverseIE.Name, "GetIANAReverseIE does not return correct reverse ie.")
+	assert.Equal(t, IANAReversedEnterpriseID, reverseIE.EnterpriseId, "GetIANAReverseIE does not return correct reverse ie.")
 }
 
 func TestGetInfoElementFromID(t *testing.T) {
@@ -66,9 +66,9 @@ func TestGetInfoElementFromID(t *testing.T) {
 	ie, err := GetInfoElementFromID(1, 1)
 	assert.NotEqual(t, nil, err, "TestGetInfoElementFromID should return error when ie does not exist.")
 	// InfoElement exists (reverse InfoElement)
-	ie, err = GetInfoElementFromID(1, ReverseEnterpriseID)
-	assert.Equal(t, "reverse_OctetDeltaCount", ie.Name, "TestGetInfoElementFromID does not return correct reverse ie.")
-	assert.Equal(t, ReverseEnterpriseID, ie.EnterpriseId, "TestGetInfoElementFromID does not return correct reverse ie.")
+	ie, err = GetInfoElementFromID(1, IANAReversedEnterpriseID)
+	assert.Equal(t, "octetDeltaCount", ie.Name, "TestGetInfoElementFromID does not return correct reverse ie.")
+	assert.Equal(t, IANAReversedEnterpriseID, ie.EnterpriseId, "TestGetInfoElementFromID does not return correct reverse ie.")
 	// InfoElement exists (IANA InfoElement)
 	ie, err = GetInfoElementFromID(1, IANAEnterpriseID)
 	assert.Equal(t, "octetDeltaCount", ie.Name, "TestGetInfoElementFromID does not return correct IANA ie.")
