@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.2.1 09-23-2020
+### Changed
+- Revert klog version from 2.0 to 1.0. (#33, @zyiou)
 ## 0.2.0 09-18-2020
 ### Added 
 - IPFIX collector support based on RFC 7011, which can stream and decode the IPFIX packets.
