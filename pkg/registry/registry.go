@@ -16,8 +16,6 @@ package registry
 
 import (
 	"fmt"
-	"strings"
-
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
@@ -27,7 +25,7 @@ const (
 	// IANAEnterpriseID is the enterprise ID for IANA Information Elements
 	IANAEnterpriseID uint32 = 0
 	// Enterprise ID for reverse Information Elements
-	ReverseEnterpriseID uint32 = 29305
+	IANAReversedEnterpriseID uint32 = 29305
 )
 
 var (
@@ -41,12 +39,12 @@ func LoadRegistry() {
 	globalRegistryByID = make(map[uint32]map[uint16]*entities.InfoElement)
 	globalRegistryByID[AntreaEnterpriseID] = make(map[uint16]*entities.InfoElement)
 	globalRegistryByID[IANAEnterpriseID] = make(map[uint16]*entities.InfoElement)
-	globalRegistryByID[ReverseEnterpriseID] = make(map[uint16]*entities.InfoElement)
+	globalRegistryByID[IANAReversedEnterpriseID] = make(map[uint16]*entities.InfoElement)
 
 	globalRegistryByName = make(map[uint32]map[string]*entities.InfoElement)
 	globalRegistryByName[AntreaEnterpriseID] = make(map[string]*entities.InfoElement)
 	globalRegistryByName[IANAEnterpriseID] = make(map[string]*entities.InfoElement)
-	globalRegistryByName[ReverseEnterpriseID] = make(map[string]*entities.InfoElement)
+	globalRegistryByName[IANAReversedEnterpriseID] = make(map[string]*entities.InfoElement)
 
 	loadIANARegistry()
 	loadAntreaRegistry()
@@ -86,8 +84,8 @@ func registerInfoElement(ie entities.InfoElement, enterpriseID uint32) error {
 	if ie.EnterpriseId == IANAEnterpriseID { // handle reverse information element for IANA registry
 		reverseIE, err := getIANAReverseInfoElement(ie.Name)
 		if err == nil { // the information element has reverse information element
-			globalRegistryByID[ReverseEnterpriseID][reverseIE.ElementId] = reverseIE
-			globalRegistryByName[ReverseEnterpriseID][reverseIE.Name] = reverseIE
+			globalRegistryByID[IANAReversedEnterpriseID][reverseIE.ElementId] = reverseIE
+			globalRegistryByName[IANAReversedEnterpriseID][reverseIE.Name] = reverseIE
 		}
 	}
 	return nil
@@ -104,8 +102,7 @@ func getIANAReverseInfoElement(name string) (*entities.InfoElement, error) {
 		err := fmt.Errorf("IANA Registry: The information element %s is not reverse element", name)
 		return ie, err
 	}
-	reverseName := "reverse_" + strings.Title(ie.Name)
-	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, ReverseEnterpriseID, ie.Len), nil
+	return entities.NewInfoElement(name, ie.ElementId, ie.DataType, IANAReversedEnterpriseID, ie.Len), nil
 }
 
 // Non-reversible Information Elements follow Section 6.1 of RFC5103
