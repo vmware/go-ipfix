@@ -69,7 +69,7 @@ func (cp *collectingProcess) startUDPServer() {
 func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGroup) {
 	if _, exist := cp.clients[address.String()]; !exist {
 		client := cp.createClient()
-		cp.clients[address.String()] = client
+		cp.addClient(address.String(), client)
 		wg.Add(1)
 		defer wg.Done()
 		go func() {
