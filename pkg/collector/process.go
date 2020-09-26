@@ -46,6 +46,8 @@ type collectingProcess struct {
 	messages []*entities.Message
 	// maps each client to its client handler (required channels)
 	clients map[string]*clientHandler
+	// clientsLock allows multiple readers or one writer to access clients map at the same time
+	clientsLock sync.RWMutex
 }
 
 type clientHandler struct {
@@ -90,11 +92,21 @@ func (cp *collectingProcess) createClient() *clientHandler {
 	}
 }
 
+func (cp *collectingProcess) addClient(address string, client *clientHandler) {
+	cp.clientsLock.Lock()
+	defer cp.clientsLock.Unlock()
+	cp.clients[address] = client
+}
+
 func (cp *collectingProcess) deleteClient(name string) {
+	cp.clientsLock.Lock()
+	defer cp.clientsLock.Unlock()
 	delete(cp.clients, name)
 }
 
 func (cp *collectingProcess) getClientCount() int {
+	cp.clientsLock.RLock()
+	defer cp.clientsLock.RUnlock()
 	return len(cp.clients)
 }
 
