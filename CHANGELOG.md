@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.2.2 09-25-2020
+### Changed
+- Change reverse information element and const naming. (#45, @zyiou)
+### Fixed
+- Fix collector concurrent map writes failure in unit tests. (#42, @zyiou)
 ## 0.2.1 09-23-2020
 ### Changed
 - Revert klog version from 2.0 to 1.0. (#33, @zyiou)
