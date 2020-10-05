@@ -115,6 +115,7 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 		for _, byte := range record.GetBuffer().Bytes() {
 			recBytes = append(recBytes, byte)
 		}
+		ep.msg.SetNumOfRecords(ep.msg.GetNumOfRecords() + 1)
 	}
 
 	msgBuffer := ep.msg.GetMsgBuffer()
@@ -151,7 +152,6 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 	}
 
 	// Send the message right after attaching the record
-	// TODO: Will add API to send multiple records at once
 	ep.set.FinishSet()
 
 	b, err := ep.sendMsg()
@@ -187,7 +187,7 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 	binary.BigEndian.PutUint32(byteSlice[4:8], uint32(time.Now().Unix()))
 	binary.BigEndian.PutUint32(byteSlice[8:12], ep.seqNumber)
 	if ep.msg.GetDataRecFlag() {
-		ep.seqNumber = ep.seqNumber + 1
+		ep.seqNumber = ep.seqNumber + ep.msg.GetNumOfRecords()
 	}
 	// Send msg on the connection
 	bytesSent, err := ep.connToCollector.Write(byteSlice)
@@ -195,6 +195,7 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 		// Reset the message buffer and return error
 		msgBuffer.Reset()
 		ep.msg.SetDataRecFlag(false)
+		ep.msg.SetNumOfRecords(0)
 		return bytesSent, fmt.Errorf("error when sending message on controller connection: %v", err)
 	} else if bytesSent == 0 && len(byteSlice) != 0 {
 		return 0, fmt.Errorf("sent 0 bytes; message is of length: %d", len(byteSlice))
@@ -202,6 +203,7 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 	// Reset the message buffer
 	msgBuffer.Reset()
 	ep.msg.SetDataRecFlag(false)
+	ep.msg.SetNumOfRecords(0)
 
 	return bytesSent, nil
 }

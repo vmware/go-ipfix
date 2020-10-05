@@ -33,19 +33,29 @@ type Message struct {
 // Does it need an interface?
 
 type MsgBuffer struct {
-	buffer      bytes.Buffer
-	dataRecFlag bool
+	buffer       bytes.Buffer
+	dataRecFlag  bool
+	numOfRecords uint32
 }
 
 func NewMsgBuffer() *MsgBuffer {
 	return &MsgBuffer{
-		buffer:      bytes.Buffer{},
-		dataRecFlag: false,
+		buffer:       bytes.Buffer{},
+		dataRecFlag:  false,
+		numOfRecords: 0,
 	}
 }
 
 func (m *MsgBuffer) GetMsgBuffer() *bytes.Buffer {
 	return &m.buffer
+}
+
+func (m *MsgBuffer) GetNumOfRecords() uint32 {
+	return m.numOfRecords
+}
+
+func (m *MsgBuffer) SetNumOfRecords(num uint32) {
+	m.numOfRecords = num
 }
 
 func (m *MsgBuffer) GetDataRecFlag() bool {
