@@ -66,7 +66,9 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	// Load the global registry
 	registry.LoadRegistry()
 	// Initialize collecting process
-	cp, _ := collector.InitCollectingProcess(address, 1024, 0)
+	messageChan := make(chan *entities.Message)
+	messages := make([]*entities.Message, 0)
+	cp, _ := collector.InitCollectingProcess(address, 1024, 0, messageChan)
 
 	go func() { // Start exporting process in go routine
 		time.Sleep(2 * time.Second) // wait for collector to be ready
@@ -210,11 +212,15 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		time.Sleep(2 * time.Second)
 		cp.Stop() // Close collecting process
 	}()
-
+	go func() {
+		for message := range messageChan {
+			messages = append(messages, message)
+		}
+	}()
 	// Start collecting process
 	cp.Start()
-	templateMsg := cp.GetMessages()[0]
-	dataMsg := cp.GetMessages()[1]
+	templateMsg := messages[0]
+	dataMsg := messages[1]
 	assert.Equal(t, uint16(10), templateMsg.Version, "Version of flow record (template) should be 10.")
 	assert.Equal(t, uint32(1), templateMsg.ObsDomainID, "ObsDomainID (template) should be 1.")
 	assert.Equal(t, uint16(10), dataMsg.Version, "Version of flow record (template) should be 10.")

@@ -22,12 +22,13 @@ const (
 
 // data struct of processed message
 type Message struct {
-	Version      uint16
-	BufferLength uint16
-	SeqNumber    uint32
-	ObsDomainID  uint32
-	ExportTime   uint32
-	Set          Set
+	Version       uint16
+	BufferLength  uint16
+	SeqNumber     uint32
+	ObsDomainID   uint32
+	ExportTime    uint32
+	ExportAddress string
+	Set           Set
 }
 
 // Does it need an interface?

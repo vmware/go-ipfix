@@ -19,6 +19,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,8 +43,8 @@ type collectingProcess struct {
 	maxBufferSize uint16
 	// chanel to receive stop information
 	stopChan chan bool
-	// packet list
-	messages []*entities.Message
+	// messageChan is the channel to output message
+	messageChan chan *entities.Message
 	// maps each client to its client handler (required channels)
 	clients map[string]*clientHandler
 	// clientsLock allows multiple readers or one writer to access clients map at the same time
@@ -55,7 +56,7 @@ type clientHandler struct {
 	errChan    chan bool
 }
 
-func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*collectingProcess, error) {
+func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32, messageChan chan *entities.Message) (*collectingProcess, error) {
 	collectProc := &collectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		templatesLock: sync.RWMutex{},
@@ -63,7 +64,7 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL u
 		address:       address,
 		maxBufferSize: maxBufferSize,
 		stopChan:      make(chan bool),
-		messages:      make([]*entities.Message, 0),
+		messageChan:   messageChan,
 		clients:       make(map[string]*clientHandler),
 	}
 	return collectProc, nil
@@ -79,10 +80,9 @@ func (cp *collectingProcess) Start() {
 
 func (cp *collectingProcess) Stop() {
 	cp.stopChan <- true
-}
-
-func (cp *collectingProcess) GetMessages() []*entities.Message {
-	return cp.messages
+	if cp.messageChan != nil {
+		close(cp.messageChan)
+	}
 }
 
 func (cp *collectingProcess) createClient() *clientHandler {
@@ -110,8 +110,10 @@ func (cp *collectingProcess) getClientCount() int {
 	return len(cp.clients)
 }
 
-func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
+func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
 	message := entities.Message{}
+	exportAddr := strings.Split(exportAddress, ":")[0]
+	message.ExportAddress = exportAddr
 	var setID, length uint16
 	err := util.Decode(packetBuffer, binary.BigEndian, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setID, &length)
 	if err != nil {
@@ -133,7 +135,10 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities
 		}
 		message.Set = set
 	}
-	cp.messages = append(cp.messages, &message)
+	addOriginalExporterInfo(&message)
+	if cp.messageChan != nil {
+		cp.messageChan <- &message
+	}
 	return &message, nil
 }
 
@@ -299,4 +304,48 @@ func getFieldLength(dataBuffer *bytes.Buffer) int {
 	lengthBuff = dataBuffer.Next(2)
 	util.Decode(bytes.NewBuffer(lengthBuff), binary.BigEndian, &lengthTwoBytes)
 	return int(lengthTwoBytes)
+}
+
+// addOriginalExporterInfo adds originalExporterIPv4Address and originalObservationDomainId to records in message set
+func addOriginalExporterInfo(message *entities.Message) error {
+	set := message.Set
+	records := set.GetRecords()
+	for _, record := range records {
+		var originalExporterIPv4Address, originalObservationDomainId *entities.InfoElementWithValue
+
+		// Add originalExporterIPv4Address
+		ie, err := registry.GetInfoElement("originalExporterIPv4Address", registry.IANAEnterpriseID)
+		if err != nil {
+			return fmt.Errorf("IANA Registry is not loaded correctly with originalExporterIPv4Address.")
+		}
+		if set.GetSetType() == entities.Template {
+			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, nil)
+		} else if set.GetSetType() == entities.Data {
+			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, net.ParseIP(message.ExportAddress))
+		} else {
+			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
+		}
+		_, err = record.AddInfoElement(originalExporterIPv4Address, false)
+		if err != nil {
+			return err
+		}
+
+		// Add originalObservationDomainId
+		ie, err = registry.GetInfoElement("originalObservationDomainId", registry.IANAEnterpriseID)
+		if err != nil {
+			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId.")
+		}
+		if set.GetSetType() == entities.Template {
+			originalObservationDomainId = entities.NewInfoElementWithValue(ie, nil)
+		} else if set.GetSetType() == entities.Data {
+			originalObservationDomainId = entities.NewInfoElementWithValue(ie, message.ObsDomainID)
+		} else {
+			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
+		}
+		_, err = record.AddInfoElement(originalObservationDomainId, false)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
