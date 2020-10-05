@@ -193,9 +193,9 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				return nil, err
 			}
 		}
-		templateSet.AddInfoElement(enterpriseID, elementID)
 		elements = append(elements, element)
 	}
+	templateSet.AddRecord(elements, templateID, true)
 	cp.addTemplate(obsDomainID, templateID, elements)
 	return templateSet, nil
 }
@@ -207,18 +207,21 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
 	dataSet := entities.NewDataSet()
-	for _, element := range template {
-		var length int
-		if element.Len == entities.VariableLength { // string
-			length = getFieldLength(dataBuffer)
-		} else {
-			length = int(element.Len)
+
+	for dataBuffer.Len() > 0 {
+		elements := make([]*entities.InfoElementValue, 0)
+		for _, element := range template {
+			var length int
+			if element.Len == entities.VariableLength { // string
+				length = getFieldLength(dataBuffer)
+			} else {
+				length = int(element.Len)
+			}
+			val := dataBuffer.Next(length)
+			ieValue := entities.NewInfoElementValue(element, bytes.NewBuffer(val))
+			elements = append(elements, ieValue)
 		}
-		val := dataBuffer.Next(length)
-		err := dataSet.AddInfoElement(element, bytes.NewBuffer(val))
-		if err != nil {
-			return nil, err
-		}
+		dataSet.AddRecord(elements, templateID, true)
 	}
 	return dataSet, nil
 }

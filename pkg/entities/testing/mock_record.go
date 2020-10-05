@@ -49,18 +49,18 @@ func (m *MockRecord) EXPECT() *MockRecordMockRecorder {
 }
 
 // AddInfoElement mocks base method
-func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElement, arg1 interface{}) (uint16, error) {
+func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElement, arg1 interface{}, arg2 bool) (uint16, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddInfoElement", arg0, arg1)
+	ret := m.ctrl.Call(m, "AddInfoElement", arg0, arg1, arg2)
 	ret0, _ := ret[0].(uint16)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // AddInfoElement indicates an expected call of AddInfoElement
-func (mr *MockRecordMockRecorder) AddInfoElement(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRecordMockRecorder) AddInfoElement(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), arg0, arg1, arg2)
 }
 
 // GetBuffer mocks base method
@@ -75,6 +75,20 @@ func (m *MockRecord) GetBuffer() *bytes.Buffer {
 func (mr *MockRecordMockRecorder) GetBuffer() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBuffer", reflect.TypeOf((*MockRecord)(nil).GetBuffer))
+}
+
+// GetDataElements mocks base method
+func (m *MockRecord) GetDataElements() []*entities.InfoElementValue {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetDataElements")
+	ret0, _ := ret[0].([]*entities.InfoElementValue)
+	return ret0
+}
+
+// GetDataElements indicates an expected call of GetDataElements
+func (mr *MockRecordMockRecorder) GetDataElements() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDataElements", reflect.TypeOf((*MockRecord)(nil).GetDataElements))
 }
 
 // GetFieldCount mocks base method

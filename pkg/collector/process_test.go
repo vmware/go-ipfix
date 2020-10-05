@@ -239,6 +239,12 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	assert.Equal(t, uint32(1), message.ObsDomainID, "Flow record obsDomainID should be 1.")
 	assert.NotNil(t, message.Set, "Template record should be stored in message flowset")
 	assert.NotNil(t, cp.templatesMap[message.ObsDomainID], "Template should be stored in template map")
+	templateSet, ok := message.Set.(*entities.TemplateSet)
+	if !ok {
+		t.Error("Template packet is not decoded correctly.")
+	}
+	elements := templateSet.GetRecords()[0].GetTemplateElements()
+	assert.Equal(t, uint32(0), elements[0].EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
 	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 	message, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
@@ -272,13 +278,13 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	assert.Equal(t, uint16(10), message.Version, "Flow record version should be 10.")
 	assert.Equal(t, uint32(1), message.ObsDomainID, "Flow record obsDomainID should be 1.")
 	assert.NotNil(t, message.Set, "Data set should be stored in message set")
-	v, ok := message.Set.(entities.DataSet)
+	v, ok := message.Set.(*entities.DataSet)
 	if !ok {
 		t.Error("Message.Set does not store data in correct format")
 	}
 	ipAddress := []byte{1, 2, 3, 4}
-	assert.Equal(t, ipAddress, v[0][8], "sourceIPv4Address should be decoded and stored correctly.")
-
+	elements := v.GetRecords()[0].GetDataElements()
+	assert.Equal(t, ipAddress, elements[0].Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
 	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord))

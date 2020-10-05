@@ -101,16 +101,21 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 	return expProc, nil
 }
 
-func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, rec entities.Record) (int, error) {
-	if recType == entities.Template {
-		ep.updateTemplate(rec.GetTemplateID(), rec.GetTemplateElements(), rec.GetMinDataRecordLen())
-	} else if recType == entities.Data {
-		err := ep.dataRecSanityCheck(rec)
-		if err != nil {
-			return 0, fmt.Errorf("AddRecordAndSendMsg: error when doing sanity check:%v", err)
+func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, records ...entities.Record) (int, error) {
+	recBytes := make([]byte, 0)
+	for _, record := range records {
+		if recType == entities.Template {
+			ep.updateTemplate(record.GetTemplateID(), record.GetTemplateElements(), record.GetMinDataRecordLen())
+		} else if recType == entities.Data {
+			err := ep.dataRecSanityCheck(record)
+			if err != nil {
+				return 0, fmt.Errorf("AddRecordAndSendMsg: error when doing sanity check:%v", err)
+			}
+		}
+		for _, byte := range record.GetBuffer().Bytes() {
+			recBytes = append(recBytes, byte)
 		}
 	}
-	recBytes := rec.GetBuffer().Bytes()
 
 	msgBuffer := ep.msg.GetMsgBuffer()
 	var bytesSent int
@@ -131,10 +136,10 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 	}
 	// Check set buffer length and type change to create new set in the message
 	if ep.set.GetBuffLen() == 0 {
-		ep.set.CreateNewSet(recType, rec.GetTemplateID())
+		ep.set.CreateNewSet(recType, records[0].GetTemplateID())
 	} else if ep.set.GetSetType() != recType {
 		ep.set.FinishSet()
-		ep.set.CreateNewSet(recType, rec.GetTemplateID())
+		ep.set.CreateNewSet(recType, records[0].GetTemplateID())
 	}
 	// Write the record to the set
 	err := ep.set.WriteRecordToSet(&recBytes)
@@ -251,7 +256,7 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 			return err
 		}
 		for _, elem := range v.elements {
-			if _, err := tempRec.AddInfoElement(elem, nil); err != nil {
+			if _, err := tempRec.AddInfoElement(elem, nil, false); err != nil {
 				return err
 			}
 		}

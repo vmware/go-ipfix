@@ -15,10 +15,12 @@
 package entities
 
 import (
-	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
+
 var uniqueTemplateID uint16 = 256
 
 func TestPrepareRecord(t *testing.T) {
@@ -86,12 +88,12 @@ func TestAddInfoElements(t *testing.T) {
 			var actualErr error
 			if i == 0 {
 				// For template record
-				actualLen, actualErr = test.record.AddInfoElement(testIE, nil)
+				actualLen, actualErr = test.record.AddInfoElement(testIE, nil, false)
 				// IANA registry elements field specifier length
 				expectLen = 4
 			} else {
 				// For data record
-				actualLen, actualErr = test.record.AddInfoElement(testIE, test.valList[j])
+				actualLen, actualErr = test.record.AddInfoElement(testIE, test.valList[j], false)
 				if testIE.Len == VariableLength {
 					v, ok := test.valList[j].(string)
 					if !ok {

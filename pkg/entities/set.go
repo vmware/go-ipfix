@@ -18,8 +18,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-
-	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 const (
@@ -50,11 +48,13 @@ type Set struct {
 	setType ContentType
 }
 
-// enterpriseID -> elementID
-type TemplateSet map[uint32][]uint16
+type TemplateSet struct {
+	records []*templateRecord
+}
 
-// enterpriseID -> elementID -> val
-type DataSet map[uint32]map[uint16]interface{}
+type DataSet struct {
+	records []*dataRecord
+}
 
 func NewSet(buffer *bytes.Buffer) *Set {
 	return &Set{
@@ -86,13 +86,16 @@ func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
 	return nil
 }
 
-func NewTemplateSet() TemplateSet {
-	return make(map[uint32][]uint16)
-
+func NewTemplateSet() *TemplateSet {
+	return &TemplateSet{
+		records: make([]*templateRecord, 0),
+	}
 }
 
-func NewDataSet() DataSet {
-	return make(map[uint32]map[uint16]interface{})
+func NewDataSet() *DataSet {
+	return &DataSet{
+		records: make([]*dataRecord, 0),
+	}
 }
 
 func (s *Set) GetBuffLen() uint16 {
@@ -123,114 +126,34 @@ func (s *Set) FinishSet() {
 	s.currLen = 0
 }
 
-func (d DataSet) AddInfoElement(element *InfoElement, val *bytes.Buffer) error {
-	if _, exist := d[element.EnterpriseId]; !exist {
-		d[element.EnterpriseId] = make(map[uint16]interface{})
+func (d *DataSet) AddRecord(elements []*InfoElementValue, templateID uint16, isDecoding bool) {
+	record := NewDataRecord(templateID)
+	for _, ieValue := range elements {
+		record.AddInfoElement(ieValue.Element, ieValue.Value, isDecoding)
 	}
-	switch dataType := element.DataType; dataType {
-	case Unsigned8:
-		var v uint8
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to uint8: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Unsigned16:
-		var v uint16
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to uint16: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Unsigned32:
-		var v uint32
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to uint32: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Unsigned64:
-		var v uint64
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to uint64: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Signed8:
-		var v int8
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to int8: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Signed16:
-		var v int16
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to int16: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Signed32:
-		var v int32
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to int32: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Signed64:
-		var v int64
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to int64: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Float32:
-		var v float32
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to float32: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Float64:
-		var v float64
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to float64: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case Boolean:
-		var v int
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to boolean: %v", err)
-		}
-		if v == 1 {
-			d[element.EnterpriseId][element.ElementId] = true
-		} else {
-			d[element.EnterpriseId][element.ElementId] = false
-		}
-	case DateTimeSeconds, DateTimeMilliseconds:
-		var v uint64
-		err := util.Decode(val, binary.BigEndian, &v)
-		if err != nil {
-			return fmt.Errorf("Error in decoding val to uint64: %v", err)
-		}
-		d[element.EnterpriseId][element.ElementId] = v
-	case DateTimeMicroseconds, DateTimeNanoseconds:
-		return fmt.Errorf("This API does not support micro and nano seconds types yet")
-	case MacAddress, Ipv4Address, Ipv6Address:
-		d[element.EnterpriseId][element.ElementId] = val.Bytes()
-	case String:
-		d[element.EnterpriseId][element.ElementId] = val.String()
-	default:
-		return fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
-	}
-	return nil
+	d.records = append(d.records, record)
 }
 
-func (t TemplateSet) AddInfoElement(enterpriseID uint32, elementID uint16) {
-	if _, exist := t[enterpriseID]; !exist {
-		t[enterpriseID] = make([]uint16, 0)
+func (d *DataSet) GetRecords() []Record {
+	var recs []Record
+	for _, rec := range d.records {
+		recs = append(recs, rec)
 	}
-	t[enterpriseID] = append(t[enterpriseID], elementID)
+	return recs
+}
+
+func (t *TemplateSet) AddRecord(elements []*InfoElement, templateID uint16, isDecoding bool) {
+	record := NewTemplateRecord(uint16(len(elements)), templateID)
+	for _, element := range elements {
+		record.AddInfoElement(element, nil, isDecoding)
+	}
+	t.records = append(t.records, record)
+}
+
+func (t *TemplateSet) GetRecords() []Record {
+	var recs []Record
+	for _, rec := range t.records {
+		recs = append(recs, rec)
+	}
+	return recs
 }
