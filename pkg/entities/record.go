@@ -21,6 +21,8 @@ import (
 	"math"
 	"math/big"
 	"net"
+
+	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 //go:generate mockgen -copyright_file ../../license_templates/license_header.raw.txt -destination=testing/mock_record.go -package=testing github.com/vmware/go-ipfix/pkg/entities Record
@@ -101,73 +103,69 @@ func (d *dataRecord) PrepareRecord() (uint16, error) {
 
 func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
 	d.fieldCount++
-	var bytesToAppend []byte
-	if element.Len != VariableLength {
-		bytesToAppend = make([]byte, element.Len)
-	} else {
-		bytesToAppend = make([]byte, 0)
-	}
+	initialLength := d.buff.Len()
+	var err error
 	switch dataType := element.DataType; dataType {
 	case Unsigned8:
 		v, ok := val.(uint8)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type uint8")
 		}
-		bytesToAppend[0] = v
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Unsigned16:
 		v, ok := val.(uint16)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type uint16")
 		}
-		binary.BigEndian.PutUint16(bytesToAppend, v)
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Unsigned32:
 		v, ok := val.(uint32)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type uint32")
 		}
-		binary.BigEndian.PutUint32(bytesToAppend, v)
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Unsigned64:
 		v, ok := val.(uint64)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type uint64")
 		}
-		binary.BigEndian.PutUint64(bytesToAppend, v)
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Signed8:
 		v, ok := val.(int8)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type int8")
 		}
-		bytesToAppend[0] = byte(v)
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Signed16:
 		v, ok := val.(int16)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type int16")
 		}
-		binary.BigEndian.PutUint16(bytesToAppend, uint16(v))
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Signed32:
 		v, ok := val.(int32)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type int32")
 		}
-		binary.BigEndian.PutUint32(bytesToAppend, uint32(v))
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Signed64:
 		v, ok := val.(int64)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type int64")
 		}
-		binary.BigEndian.PutUint64(bytesToAppend, uint64(v))
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 	case Float32:
 		v, ok := val.(float32)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type float32")
 		}
-		binary.BigEndian.PutUint32(bytesToAppend, math.Float32bits(v))
+		err = util.Encode(&d.buff, binary.BigEndian, math.Float32bits(v))
 	case Float64:
 		v, ok := val.(float64)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type float64")
 		}
-		binary.BigEndian.PutUint64(bytesToAppend, math.Float64bits(v))
+		err = util.Encode(&d.buff, binary.BigEndian, math.Float64bits(v))
 	case Boolean:
 		v, ok := val.(bool)
 		if !ok {
@@ -175,9 +173,9 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 		}
 		// Following boolean spec from RFC7011
 		if v {
-			bytesToAppend[0] = 1
+			err = util.Encode(&d.buff, binary.BigEndian, int8(1))
 		} else {
-			bytesToAppend[0] = 2
+			err = util.Encode(&d.buff, binary.BigEndian, int8(2))
 		}
 	case DateTimeSeconds, DateTimeMilliseconds:
 		// We expect time to be given in int64 as unix time type in go
@@ -185,7 +183,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type int64")
 		}
-		binary.BigEndian.PutUint64(bytesToAppend, uint64(v))
+		err = util.Encode(&d.buff, binary.BigEndian, uint64(v))
 		// Currently only supporting seconds and milliseconds
 	case DateTimeMicroseconds, DateTimeNanoseconds:
 		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
@@ -196,9 +194,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type net.HardwareAddr for this element")
 		}
-		for i, b := range v {
-			bytesToAppend[i] = b
-		}
+		err = util.Encode(&d.buff, binary.BigEndian, v)
 		//bytesToAppend = append(bytesToAppend, []byte(v)...)
 	case Ipv4Address, Ipv6Address:
 		// Expects net.IP type
@@ -209,11 +205,9 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 		if ipv4Add := v.To4(); ipv4Add != nil {
 			ipv4Int := big.NewInt(0)
 			ipv4Int.SetBytes(ipv4Add)
-			binary.BigEndian.PutUint32(bytesToAppend, uint32(ipv4Int.Uint64()))
+			err = util.Encode(&d.buff, binary.BigEndian, uint32(ipv4Int.Uint64()))
 		} else {
-			for i, b := range v {
-				bytesToAppend[i] = b
-			}
+			err = util.Encode(&d.buff, binary.BigEndian, v)
 		}
 	case String:
 		v, ok := val.(string)
@@ -221,41 +215,29 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 			return 0, fmt.Errorf("val argument is not of type string for this element")
 		}
 		if len(v) < 255 {
-			bytesToAppend = append(bytesToAppend, byte(len(v)))
-			bytesToAppend = append(bytesToAppend, []byte(v)...)
+			err = util.Encode(&d.buff, binary.BigEndian, uint8(len(v)), []byte(v))
 		} else if len(v) < 65535 {
-			bytesToAppend = append(bytesToAppend, byte(255))
-
-			byteSlice := make([]byte, 2)
-			binary.BigEndian.PutUint16(byteSlice, uint16(len(v)))
-			bytesToAppend = append(bytesToAppend, byteSlice...)
-
-			bytesToAppend = append(bytesToAppend, []byte(v)...)
+			err = util.Encode(&d.buff, binary.BigEndian, byte(255), uint16(len(v)), []byte(v))
 		}
 	default:
 		return 0, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 	}
 
-	bytesWritten, err := d.buff.Write(bytesToAppend)
 	if err != nil {
 		return 0, err
 	}
 
-	return uint16(bytesWritten), nil
+	return uint16(d.buff.Len()-initialLength), nil
 }
 
 func (t *templateRecord) PrepareRecord() (uint16, error) {
 	// Add Template Record Header
-	header := make([]byte, 4)
-	binary.BigEndian.PutUint16(header[0:2], t.templateID)
-	binary.BigEndian.PutUint16(header[2:4], t.fieldCount)
-
-	_, err := t.buff.Write(header)
+	initialLength := t.buff.Len()
+	err := util.Encode(&t.buff, binary.BigEndian, t.templateID, t.fieldCount)
 	if err != nil {
 		return 0, fmt.Errorf("AddInfoElement(templateRecord) error in writing template header: %v", err)
 	}
-
-	return uint16(len(header)), nil
+	return uint16(t.buff.Len()-initialLength), nil
 }
 
 func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (uint16, error) {
@@ -263,21 +245,19 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 	if val != nil {
 		return 0, fmt.Errorf("AddInfoElement(templateRecord) cannot take value %v (nil is expected)", val)
 	}
-	// Add field specifier
-	fieldSpecifier := make([]byte, 4, 8)
-	binary.BigEndian.PutUint16(fieldSpecifier[0:2], element.ElementId)
-	binary.BigEndian.PutUint16(fieldSpecifier[2:4], element.Len)
+	initialLength := t.buff.Len()
+	// Add field specifier {elementID: uint16, elementLen: uint16}
+	err := util.Encode(&t.buff, binary.BigEndian, element.ElementId, element.Len)
+	if err != nil {
+		return 0, err
+	}
 	if element.EnterpriseId != 0 {
 		// Set the MSB of elementID to 1 as per RFC7011
-		fieldSpecifier[0] = fieldSpecifier[0] | 0x80
-		bytesToAppend := make([]byte, 4)
-		binary.BigEndian.PutUint32(bytesToAppend, element.EnterpriseId)
-		fieldSpecifier = append(fieldSpecifier, bytesToAppend...)
-	}
-
-	bytesWritten, err := t.buff.Write(fieldSpecifier)
-	if err != nil {
-		return 0, fmt.Errorf("AddInfoElement(templateRecord) error in writing to buffer: %v", err)
+		t.buff.Bytes()[initialLength] = t.buff.Bytes()[initialLength] | 0x80
+		err = util.Encode(&t.buff, binary.BigEndian, element.EnterpriseId)
+		if err != nil {
+			return 0, err
+		}
 	}
 	t.templateElements = append(t.templateElements, element)
 	// Keep track of minimum data record length required for sanity check
@@ -286,7 +266,7 @@ func (t *templateRecord) AddInfoElement(element *InfoElement, val interface{}) (
 	} else {
 		t.minDataRecLength = t.minDataRecLength + element.Len
 	}
-	return uint16(bytesWritten), nil
+	return uint16(t.buff.Len()-initialLength), nil
 }
 
 func (t *templateRecord) GetTemplateElements() []*InfoElement {

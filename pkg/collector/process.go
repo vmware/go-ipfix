@@ -113,7 +113,7 @@ func (cp *collectingProcess) getClientCount() int {
 func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
 	message := entities.Message{}
 	var setID, length uint16
-	err := util.Decode(packetBuffer, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setID, &length)
+	err := util.Decode(packetBuffer, binary.BigEndian, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setID, &length)
 	if err != nil {
 		return nil, err
 	}
@@ -140,7 +140,7 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities
 func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (interface{}, error) {
 	var templateID uint16
 	var fieldCount uint16
-	err := util.Decode(templateBuffer, &templateID, &fieldCount)
+	err := util.Decode(templateBuffer, binary.BigEndian, &templateID, &fieldCount)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		// check whether enterprise ID is 0 or not
 		elementid := make([]byte, 2)
 		var elementLength uint16
-		err = util.Decode(templateBuffer, &elementid, &elementLength)
+		err = util.Decode(templateBuffer, binary.BigEndian, &elementid, &elementLength)
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +182,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				Enterprise ID: 32 bits
 				(Reference: https://tools.ietf.org/html/rfc7011#appendix-A.2.2)
 			*/
-			err = util.Decode(templateBuffer, &enterpriseID)
+			err = util.Decode(templateBuffer, binary.BigEndian, &enterpriseID)
 			if err != nil {
 				return nil, err
 			}
@@ -271,7 +271,7 @@ func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 	packet := entities.Message{}
 	var id, length uint16
-	err := util.Decode(msgBuffer, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &id, &length)
+	err := util.Decode(msgBuffer, binary.BigEndian, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &id, &length)
 	if err != nil {
 		return 0, fmt.Errorf("Cannot decode message: %v", err)
 	}
@@ -283,12 +283,12 @@ func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 func getFieldLength(dataBuffer *bytes.Buffer) int {
 	lengthBuff := dataBuffer.Next(1)
 	var lengthOneByte uint8
-	util.Decode(bytes.NewBuffer(lengthBuff), &lengthOneByte)
+	util.Decode(bytes.NewBuffer(lengthBuff), binary.BigEndian, &lengthOneByte)
 	if lengthOneByte < 255 { // string length is less than 255
 		return int(lengthOneByte)
 	}
 	var lengthTwoBytes uint16
 	lengthBuff = dataBuffer.Next(2)
-	util.Decode(bytes.NewBuffer(lengthBuff), &lengthTwoBytes)
+	util.Decode(bytes.NewBuffer(lengthBuff), binary.BigEndian, &lengthTwoBytes)
 	return int(lengthTwoBytes)
 }
