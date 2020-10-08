@@ -66,28 +66,26 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	tempRec := entities.NewTemplateRecord(2, templateID)
-	tempRec.PrepareRecord()
+	templateSet := entities.NewTemplateSet()
+	elements := make([]*entities.InfoElement, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil, false)
+	elements = append(elements, element)
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil, false)
-	tempRecBuff := tempRec.GetBuffer()
-	tempRecBytes := tempRecBuff.Bytes()
+	elements = append(elements, element)
+	templateSet.AddRecord(elements, templateID, false)
 
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Template, tempRec)
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
 	// 32 is the size of the IPFIX message including all headers
 	assert.Equal(t, 32, bytesSent)
-	assert.Equal(t, tempRecBytes, <-buffCh)
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 	exporter.CloseConnToCollector()
 }
@@ -135,22 +133,21 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	tempRec := entities.NewTemplateRecord(2, templateID)
-	tempRec.PrepareRecord()
+	templateSet := entities.NewTemplateSet()
+	elements := make([]*entities.InfoElement, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil, false)
+	elements = append(elements, element)
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil, false)
-	tempRecBuff := tempRec.GetBuffer()
-	tempRecBytes := tempRecBuff.Bytes()
+	elements = append(elements, element)
+	templateSet.AddRecord(elements, templateID, false)
 
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Template, tempRec)
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
@@ -161,10 +158,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	bytesAtServer := <-buffCh
 	assert.Equal(t, len(bytesAtServer), 64)
 	assert.Equal(t, bytesAtServer[20:32], bytesAtServer[52:], "both template messages should be same")
-	firstTemplateBytes := bytesAtServer[:32]
 	// 32 is the size of the IPFIX message including all headers
 	assert.Equal(t, 32, bytesSent)
-	assert.Equal(t, tempRecBytes, firstTemplateBytes[20:])
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 
 	exporter.CloseConnToCollector()
@@ -224,25 +219,26 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 
 	// Create data set with 1 data record
 	dataSet := entities.NewDataSet()
-	elements := make([]*entities.InfoElementValue, 0)
+	elements := make([]*entities.InfoElement, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	ieValue1 := entities.NewInfoElementValue(element, net.ParseIP("1.2.3.4"))
+	ie := entities.NewInfoElementWithValue(element, net.ParseIP("1.2.3.4"))
+	elements = append(elements, ie)
 
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	ieValue2 := entities.NewInfoElementValue(element, net.ParseIP("5.6.7.8"))
+	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
+	elements = append(elements, ie)
 
-	elements = append(elements, ieValue1, ieValue2)
 	dataSet.AddRecord(elements, templateID, false)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Data, dataSet.GetRecords()...)
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Data, dataSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
@@ -301,25 +297,26 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 
 	// Create data set with 1 data record
 	dataSet := entities.NewDataSet()
-	elements := make([]*entities.InfoElementValue, 0)
+	elements := make([]*entities.InfoElement, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	ieValue1 := entities.NewInfoElementValue(element, net.ParseIP("1.2.3.4"))
+	ie := entities.NewInfoElementWithValue(element, net.ParseIP("1.2.3.4"))
+	elements = append(elements, ie)
 
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	ieValue2 := entities.NewInfoElementValue(element, net.ParseIP("5.6.7.8"))
+	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
+	elements = append(elements, ie)
 
-	elements = append(elements, ieValue1, ieValue2)
 	dataSet.AddRecord(elements, templateID, false)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Data, dataSet.GetRecords()...)
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Data, dataSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}

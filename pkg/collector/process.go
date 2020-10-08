@@ -209,7 +209,7 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	dataSet := entities.NewDataSet()
 
 	for dataBuffer.Len() > 0 {
-		elements := make([]*entities.InfoElementValue, 0)
+		elements := make([]*entities.InfoElement, 0)
 		for _, element := range template {
 			var length int
 			if element.Len == entities.VariableLength { // string
@@ -218,8 +218,8 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 				length = int(element.Len)
 			}
 			val := dataBuffer.Next(length)
-			ieValue := entities.NewInfoElementValue(element, bytes.NewBuffer(val))
-			elements = append(elements, ieValue)
+			ie := entities.NewInfoElementWithValue(element, bytes.NewBuffer(val))
+			elements = append(elements, ie)
 		}
 		dataSet.AddRecord(elements, templateID, true)
 	}

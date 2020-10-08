@@ -44,7 +44,7 @@ type ExportingProcess struct {
 	obsDomainID     uint32
 	seqNumber       uint32
 	templateID      uint16
-	set             *entities.Set
+	set             *entities.BaseSet
 	msg             *entities.MsgBuffer
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
@@ -101,12 +101,12 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 	return expProc, nil
 }
 
-func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, records ...entities.Record) (int, error) {
+func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set entities.Set) (int, error) {
 	recBytes := make([]byte, 0)
-	for _, record := range records {
-		if recType == entities.Template {
-			ep.updateTemplate(record.GetTemplateID(), record.GetTemplateElements(), record.GetMinDataRecordLen())
-		} else if recType == entities.Data {
+	for _, record := range set.GetRecords() {
+		if setType == entities.Template {
+			ep.updateTemplate(record.GetTemplateID(), record.GetInfoElements(), record.GetMinDataRecordLen())
+		} else if setType == entities.Data {
 			err := ep.dataRecSanityCheck(record)
 			if err != nil {
 				return 0, fmt.Errorf("AddRecordAndSendMsg: error when doing sanity check:%v", err)
@@ -115,7 +115,6 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 		for _, byte := range record.GetBuffer().Bytes() {
 			recBytes = append(recBytes, byte)
 		}
-		ep.msg.SetNumOfRecords(ep.msg.GetNumOfRecords() + 1)
 	}
 
 	msgBuffer := ep.msg.GetMsgBuffer()
@@ -123,7 +122,7 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 	// Check if message is exceeding the limit with new record
 	if uint16(msgBuffer.Len()+len(recBytes)) > entities.MaxTcpSocketMsgSize {
 		ep.set.FinishSet()
-		b, err := ep.sendMsg()
+		b, err := ep.sendMsg(set.GetNumberOfRecords())
 		if err != nil {
 			return b, err
 		}
@@ -137,24 +136,24 @@ func (ep *ExportingProcess) AddRecordAndSendMsg(recType entities.ContentType, re
 	}
 	// Check set buffer length and type change to create new set in the message
 	if ep.set.GetBuffLen() == 0 {
-		ep.set.CreateNewSet(recType, records[0].GetTemplateID())
-	} else if ep.set.GetSetType() != recType {
+		ep.set.CreateNewSet(setType, set.GetRecords()[0].GetTemplateID())
+	} else if ep.set.GetSetType() != setType {
 		ep.set.FinishSet()
-		ep.set.CreateNewSet(recType, records[0].GetTemplateID())
+		ep.set.CreateNewSet(setType, set.GetRecords()[0].GetTemplateID())
 	}
 	// Write the record to the set
 	err := ep.set.WriteRecordToSet(&recBytes)
 	if err != nil {
 		return bytesSent, fmt.Errorf("AddRecordAndSendMsg: %v", err)
 	}
-	if recType == entities.Data && !ep.msg.GetDataRecFlag() {
+	if setType == entities.Data && !ep.msg.GetDataRecFlag() {
 		ep.msg.SetDataRecFlag(true)
 	}
 
 	// Send the message right after attaching the record
 	ep.set.FinishSet()
 
-	b, err := ep.sendMsg()
+	b, err := ep.sendMsg(set.GetNumberOfRecords())
 	if err != nil {
 		return bytesSent, err
 	}
@@ -179,7 +178,7 @@ func (ep *ExportingProcess) createNewMsg() error {
 	return nil
 }
 
-func (ep *ExportingProcess) sendMsg() (int, error) {
+func (ep *ExportingProcess) sendMsg(numOfRecords uint32) (int, error) {
 	// Update length, time and sequence number
 	msgBuffer := ep.msg.GetMsgBuffer()
 	byteSlice := msgBuffer.Bytes()
@@ -187,7 +186,7 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 	binary.BigEndian.PutUint32(byteSlice[4:8], uint32(time.Now().Unix()))
 	binary.BigEndian.PutUint32(byteSlice[8:12], ep.seqNumber)
 	if ep.msg.GetDataRecFlag() {
-		ep.seqNumber = ep.seqNumber + ep.msg.GetNumOfRecords()
+		ep.seqNumber = ep.seqNumber + numOfRecords
 	}
 	// Send msg on the connection
 	bytesSent, err := ep.connToCollector.Write(byteSlice)
@@ -195,7 +194,6 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 		// Reset the message buffer and return error
 		msgBuffer.Reset()
 		ep.msg.SetDataRecFlag(false)
-		ep.msg.SetNumOfRecords(0)
 		return bytesSent, fmt.Errorf("error when sending message on controller connection: %v", err)
 	} else if bytesSent == 0 && len(byteSlice) != 0 {
 		return 0, fmt.Errorf("sent 0 bytes; message is of length: %d", len(byteSlice))
@@ -203,7 +201,6 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 	// Reset the message buffer
 	msgBuffer.Reset()
 	ep.msg.SetDataRecFlag(false)
-	ep.msg.SetNumOfRecords(0)
 
 	return bytesSent, nil
 }
@@ -251,18 +248,10 @@ func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 
 func (ep *ExportingProcess) sendRefreshedTemplates() error {
 	// Send refreshed template for every template in template map
-	for k, v := range ep.templatesMap {
-		tempRec := entities.NewTemplateRecord(uint16(len(v.elements)), k)
-		// Add template header
-		if _, err := tempRec.PrepareRecord(); err != nil {
-			return err
-		}
-		for _, elem := range v.elements {
-			if _, err := tempRec.AddInfoElement(elem, nil, false); err != nil {
-				return err
-			}
-		}
-		if _, err := ep.AddRecordAndSendMsg(entities.Template, tempRec); err != nil {
+	for templateID, tempValue := range ep.templatesMap {
+		tempSet := entities.NewTemplateSet()
+		tempSet.AddRecord(tempValue.elements, templateID, false)
+		if _, err := ep.AddSetAndSendMsg(entities.Template, tempSet); err != nil {
 			return err
 		}
 	}

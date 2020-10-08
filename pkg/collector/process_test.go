@@ -30,9 +30,9 @@ import (
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 var validDataPacket = []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 89, 105, 111, 117}
 var templateElements = []*entities.InfoElement{
-	{"sourceIPv4Address", 8, 18, 0, 4},
-	{"destinationIPv4Address", 12, 18, 0, 4},
-	{"destinationNodeName", 105, 13, 55829, 65535},
+	entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4),
+	entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4),
+	entities.NewInfoElement("destinationNodeName", 105, 13, 55829, 65535),
 }
 
 func init() {
@@ -243,7 +243,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	if !ok {
 		t.Error("Template packet is not decoded correctly.")
 	}
-	elements := templateSet.GetRecords()[0].GetTemplateElements()
+	elements := templateSet.GetRecords()[0].GetInfoElements()
 	assert.Equal(t, uint32(0), elements[0].EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
 	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
@@ -283,7 +283,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 		t.Error("Message.Set does not store data in correct format")
 	}
 	ipAddress := []byte{1, 2, 3, 4}
-	elements := v.GetRecords()[0].GetDataElements()
+	elements := v.GetRecords()[0].GetInfoElements()
 	assert.Equal(t, ipAddress, elements[0].Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}

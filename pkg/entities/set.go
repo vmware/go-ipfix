@@ -41,7 +41,13 @@ const (
 // Do not expose set to IPFIX library user
 // Not creating any interface. Plan to use same struct for Template and Data sets
 
-type Set struct {
+type Set interface {
+	AddRecord(elements []*InfoElement, templateID uint16, isDecoding bool)
+	GetRecords() []Record
+	GetNumberOfRecords() uint32
+}
+
+type BaseSet struct {
 	// Pointer to message buffer
 	buffer  *bytes.Buffer
 	currLen uint16
@@ -56,15 +62,15 @@ type DataSet struct {
 	records []*dataRecord
 }
 
-func NewSet(buffer *bytes.Buffer) *Set {
-	return &Set{
+func NewSet(buffer *bytes.Buffer) *BaseSet {
+	return &BaseSet{
 		buffer:  buffer,
 		currLen: 0,
 		setType: Undefined,
 	}
 }
 
-func (s *Set) CreateNewSet(setType ContentType, templateID uint16) error {
+func (s *BaseSet) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
@@ -98,15 +104,15 @@ func NewDataSet() *DataSet {
 	}
 }
 
-func (s *Set) GetBuffLen() uint16 {
+func (s *BaseSet) GetBuffLen() uint16 {
 	return s.currLen
 }
 
-func (s *Set) GetSetType() ContentType {
+func (s *BaseSet) GetSetType() ContentType {
 	return s.setType
 }
 
-func (s *Set) WriteRecordToSet(recBuffer *[]byte) error {
+func (s *BaseSet) WriteRecordToSet(recBuffer *[]byte) error {
 	_, err := s.buffer.Write(*recBuffer)
 	if err != nil {
 		return fmt.Errorf("error in writing the buffer to set: %v", err)
@@ -116,7 +122,7 @@ func (s *Set) WriteRecordToSet(recBuffer *[]byte) error {
 	return nil
 }
 
-func (s *Set) FinishSet() {
+func (s *BaseSet) FinishSet() {
 	// TODO:Add padding when multiple sets are sent in single IPFIX message
 	// Add length to the message
 	byteSlice := s.buffer.Bytes()
@@ -126,10 +132,11 @@ func (s *Set) FinishSet() {
 	s.currLen = 0
 }
 
-func (d *DataSet) AddRecord(elements []*InfoElementValue, templateID uint16, isDecoding bool) {
+func (d *DataSet) AddRecord(elements []*InfoElement, templateID uint16, isDecoding bool) {
 	record := NewDataRecord(templateID)
-	for _, ieValue := range elements {
-		record.AddInfoElement(ieValue.Element, ieValue.Value, isDecoding)
+	record.PrepareRecord()
+	for _, element := range elements {
+		record.AddInfoElement(element, isDecoding)
 	}
 	d.records = append(d.records, record)
 }
@@ -142,10 +149,15 @@ func (d *DataSet) GetRecords() []Record {
 	return recs
 }
 
+func (d *DataSet) GetNumberOfRecords() uint32 {
+	return uint32(len(d.records))
+}
+
 func (t *TemplateSet) AddRecord(elements []*InfoElement, templateID uint16, isDecoding bool) {
 	record := NewTemplateRecord(uint16(len(elements)), templateID)
+	record.PrepareRecord()
 	for _, element := range elements {
-		record.AddInfoElement(element, nil, isDecoding)
+		record.AddInfoElement(element, isDecoding)
 	}
 	t.records = append(t.records, record)
 }
@@ -156,4 +168,8 @@ func (t *TemplateSet) GetRecords() []Record {
 		recs = append(recs, rec)
 	}
 	return recs
+}
+
+func (t *TemplateSet) GetNumberOfRecords() uint32 {
+	return uint32(len(t.records))
 }

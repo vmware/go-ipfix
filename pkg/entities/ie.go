@@ -84,13 +84,9 @@ type InfoElement struct {
 	EnterpriseId uint32
 	// Length of IE
 	Len uint16
+	// Value of the IE
+	Value interface{}
 	// Add description and dataType semantics if required
-}
-
-// InfoElementValue represents mapping from element to value for data records
-type InfoElementValue struct {
-	Element *InfoElement
-	Value   interface{}
 }
 
 func NewInfoElement(name string, ieID uint16, ieType IEDataType, entID uint32, len uint16) *InfoElement {
@@ -100,12 +96,18 @@ func NewInfoElement(name string, ieID uint16, ieType IEDataType, entID uint32, l
 		DataType:     ieType,
 		EnterpriseId: entID,
 		Len:          len,
+		Value:        nil,
 	}
 }
 
-func NewInfoElementValue(element *InfoElement, value interface{}) *InfoElementValue {
-	return &InfoElementValue{
-		element, value,
+func NewInfoElementWithValue(ie *InfoElement, val interface{}) *InfoElement {
+	return &InfoElement{
+		Name:         ie.Name,
+		ElementId:    ie.ElementId,
+		DataType:     ie.DataType,
+		EnterpriseId: ie.EnterpriseId,
+		Len:          ie.Len,
+		Value:        val,
 	}
 }
 
