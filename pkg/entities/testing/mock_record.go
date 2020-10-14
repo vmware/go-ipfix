@@ -49,7 +49,7 @@ func (m *MockRecord) EXPECT() *MockRecordMockRecorder {
 }
 
 // AddInfoElement mocks base method
-func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElement, arg1 bool) (uint16, error) {
+func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElementValue, arg1 bool) (uint16, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddInfoElement", arg0, arg1)
 	ret0, _ := ret[0].(uint16)
@@ -92,10 +92,10 @@ func (mr *MockRecordMockRecorder) GetFieldCount() *gomock.Call {
 }
 
 // GetInfoElements mocks base method
-func (m *MockRecord) GetInfoElements() []*entities.InfoElement {
+func (m *MockRecord) GetInfoElements() []*entities.InfoElementValue {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetInfoElements")
-	ret0, _ := ret[0].([]*entities.InfoElement)
+	ret0, _ := ret[0].([]*entities.InfoElementValue)
 	return ret0
 }
 

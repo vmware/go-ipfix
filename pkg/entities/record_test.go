@@ -88,13 +88,14 @@ func TestAddInfoElements(t *testing.T) {
 			var actualErr error
 			if i == 0 {
 				// For template record
-				actualLen, actualErr = test.record.AddInfoElement(testIE, false)
+				ie := NewInfoElementValue(testIE, nil)
+				actualLen, actualErr = test.record.AddInfoElement(ie, false)
 				// IANA registry elements field specifier length
 				expectLen = 4
 			} else {
 				// For data record
-				testIE.Value = test.valList[j]
-				actualLen, actualErr = test.record.AddInfoElement(testIE, false)
+				ie := NewInfoElementValue(testIE, test.valList[j])
+				actualLen, actualErr = test.record.AddInfoElement(ie, false)
 				if testIE.Len == VariableLength {
 					v, ok := test.valList[j].(string)
 					if !ok {

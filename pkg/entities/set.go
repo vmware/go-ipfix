@@ -20,6 +20,8 @@ import (
 	"fmt"
 )
 
+//go:generate mockgen -copyright_file ../../license_templates/license_header.raw.txt -destination=testing/mock_set.go -package=testing github.com/vmware/go-ipfix/pkg/entities Set
+
 const (
 	// TemplateRefreshTimeOut is the template refresh time out for exporting process
 	TemplateRefreshTimeOut uint32 = 1800
@@ -38,39 +40,35 @@ const (
 	Undefined = 255
 )
 
-// Do not expose set to IPFIX library user
-// Not creating any interface. Plan to use same struct for Template and Data sets
-
 type Set interface {
-	AddRecord(elements []*InfoElement, templateID uint16, isDecoding bool)
+	CreateNewSet(setType ContentType, templateID uint16) error
+	GetBuffLen() uint16
+	GetSetType() ContentType
+	WriteRecordToSet(recBuffer *[]byte) error
+	FinishSet()
+	AddRecord(elements []*InfoElementValue, templateID uint16, isDecoding bool)
 	GetRecords() []Record
 	GetNumberOfRecords() uint32
 }
 
-type BaseSet struct {
+type baseSet struct {
 	// Pointer to message buffer
 	buffer  *bytes.Buffer
 	currLen uint16
 	setType ContentType
+	records []Record
 }
 
-type TemplateSet struct {
-	records []*templateRecord
-}
-
-type DataSet struct {
-	records []*dataRecord
-}
-
-func NewSet(buffer *bytes.Buffer) *BaseSet {
-	return &BaseSet{
+func NewSet(buffer *bytes.Buffer) Set {
+	return &baseSet{
 		buffer:  buffer,
 		currLen: 0,
 		setType: Undefined,
+		records: make([]Record, 0),
 	}
 }
 
-func (s *BaseSet) CreateNewSet(setType ContentType, templateID uint16) error {
+func (s *baseSet) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
@@ -92,27 +90,15 @@ func (s *BaseSet) CreateNewSet(setType ContentType, templateID uint16) error {
 	return nil
 }
 
-func NewTemplateSet() *TemplateSet {
-	return &TemplateSet{
-		records: make([]*templateRecord, 0),
-	}
-}
-
-func NewDataSet() *DataSet {
-	return &DataSet{
-		records: make([]*dataRecord, 0),
-	}
-}
-
-func (s *BaseSet) GetBuffLen() uint16 {
+func (s *baseSet) GetBuffLen() uint16 {
 	return s.currLen
 }
 
-func (s *BaseSet) GetSetType() ContentType {
+func (s *baseSet) GetSetType() ContentType {
 	return s.setType
 }
 
-func (s *BaseSet) WriteRecordToSet(recBuffer *[]byte) error {
+func (s *baseSet) WriteRecordToSet(recBuffer *[]byte) error {
 	_, err := s.buffer.Write(*recBuffer)
 	if err != nil {
 		return fmt.Errorf("error in writing the buffer to set: %v", err)
@@ -122,7 +108,7 @@ func (s *BaseSet) WriteRecordToSet(recBuffer *[]byte) error {
 	return nil
 }
 
-func (s *BaseSet) FinishSet() {
+func (s *baseSet) FinishSet() {
 	// TODO:Add padding when multiple sets are sent in single IPFIX message
 	// Add length to the message
 	byteSlice := s.buffer.Bytes()
@@ -132,44 +118,24 @@ func (s *BaseSet) FinishSet() {
 	s.currLen = 0
 }
 
-func (d *DataSet) AddRecord(elements []*InfoElement, templateID uint16, isDecoding bool) {
-	record := NewDataRecord(templateID)
+func (b *baseSet) AddRecord(elements []*InfoElementValue, templateID uint16, isDecoding bool) {
+	var record Record
+	if b.setType == Data {
+		record = NewDataRecord(templateID)
+	} else if b.setType == Template {
+		record = NewTemplateRecord(uint16(len(elements)), templateID)
+	}
 	record.PrepareRecord()
 	for _, element := range elements {
 		record.AddInfoElement(element, isDecoding)
 	}
-	d.records = append(d.records, record)
+	b.records = append(b.records, record)
 }
 
-func (d *DataSet) GetRecords() []Record {
-	var recs []Record
-	for _, rec := range d.records {
-		recs = append(recs, rec)
-	}
-	return recs
+func (b *baseSet) GetRecords() []Record {
+	return b.records
 }
 
-func (d *DataSet) GetNumberOfRecords() uint32 {
-	return uint32(len(d.records))
-}
-
-func (t *TemplateSet) AddRecord(elements []*InfoElement, templateID uint16, isDecoding bool) {
-	record := NewTemplateRecord(uint16(len(elements)), templateID)
-	record.PrepareRecord()
-	for _, element := range elements {
-		record.AddInfoElement(element, isDecoding)
-	}
-	t.records = append(t.records, record)
-}
-
-func (t *TemplateSet) GetRecords() []Record {
-	var recs []Record
-	for _, rec := range t.records {
-		recs = append(recs, rec)
-	}
-	return recs
-}
-
-func (t *TemplateSet) GetNumberOfRecords() uint32 {
-	return uint32(len(t.records))
+func (b *baseSet) GetNumberOfRecords() uint32 {
+	return uint32(len(b.records))
 }

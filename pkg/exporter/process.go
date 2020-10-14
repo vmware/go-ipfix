@@ -15,6 +15,7 @@
 package exporter
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -44,7 +45,7 @@ type ExportingProcess struct {
 	obsDomainID     uint32
 	seqNumber       uint32
 	templateID      uint16
-	set             *entities.BaseSet
+	set             entities.Set
 	msg             *entities.MsgBuffer
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
@@ -224,7 +225,7 @@ func (ep *ExportingProcess) NewTemplateID() uint16 {
 	return ep.templateID
 }
 
-func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElement, minDataRecLen uint16) {
+func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElementValue, minDataRecLen uint16) {
 	if _, exist := ep.templatesMap[id]; exist {
 		return
 	}
@@ -233,7 +234,7 @@ func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoE
 		minDataRecLen,
 	}
 	for i, elem := range elements {
-		ep.templatesMap[id].elements[i] = elem
+		ep.templatesMap[id].elements[i] = elem.Element
 	}
 	return
 }
@@ -249,8 +250,14 @@ func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 func (ep *ExportingProcess) sendRefreshedTemplates() error {
 	// Send refreshed template for every template in template map
 	for templateID, tempValue := range ep.templatesMap {
-		tempSet := entities.NewTemplateSet()
-		tempSet.AddRecord(tempValue.elements, templateID, false)
+		tempSet := entities.NewSet(&bytes.Buffer{})
+		tempSet.CreateNewSet(entities.Template, templateID)
+		elements := make([]*entities.InfoElementValue, 0)
+		for _, element := range tempValue.elements {
+			ie := entities.NewInfoElementValue(element, nil)
+			elements = append(elements, ie)
+		}
+		tempSet.AddRecord(elements, templateID, false)
 		if _, err := ep.AddSetAndSendMsg(entities.Template, tempSet); err != nil {
 			return err
 		}
