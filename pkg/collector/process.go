@@ -145,8 +145,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		return nil, err
 	}
 	elementsWithValue := make([]*entities.InfoElementWithValue, 0)
-	templateSet := entities.NewSet(&bytes.Buffer{})
-	templateSet.CreateNewSet(entities.Template, templateID)
+	templateSet := entities.NewSet(entities.Template, templateID)
 
 	for i := 0; i < int(fieldCount); i++ {
 		var element *entities.InfoElement
@@ -208,8 +207,7 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	dataSet := entities.NewSet(&bytes.Buffer{})
-	dataSet.CreateNewSet(entities.Data, templateID)
+	dataSet := entities.NewSet(entities.Data, templateID)
 
 	for dataBuffer.Len() > 0 {
 		elements := make([]*entities.InfoElementWithValue, 0)

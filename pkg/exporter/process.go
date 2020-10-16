@@ -15,7 +15,6 @@
 package exporter
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
@@ -39,13 +38,11 @@ type templateValue struct {
 //    so observation point ID not defined.
 // 3. Supports only TCP session; SCTP and UDP is not supported.
 // TODO:UDP needs to send MTU size packets as per RFC7011
-// TODO: Add function to send multiple records simultaneously
 type ExportingProcess struct {
 	connToCollector net.Conn
 	obsDomainID     uint32
 	seqNumber       uint32
 	templateID      uint16
-	set             entities.Set
 	msg             *entities.MsgBuffer
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
@@ -68,7 +65,6 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 		obsDomainID:     obsID,
 		seqNumber:       0,
 		templateID:      startTemplateID,
-		set:             entities.NewSet(msgBuffer.GetMsgBuffer()),
 		msg:             msgBuffer,
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
@@ -120,14 +116,9 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 
 	msgBuffer := ep.msg.GetMsgBuffer()
 	var bytesSent int
-	// Check if message is exceeding the limit with new record
-	if uint16(msgBuffer.Len()+ int(ep.set.GetBuffLen())) > entities.MaxTcpSocketMsgSize {
-		ep.set.FinishSet()
-		b, err := ep.sendMsg(set.GetNumberOfRecords())
-		if err != nil {
-			return b, err
-		}
-		bytesSent = bytesSent + b
+	// Check if message is exceeding the limit with new set
+	if uint16(msgBuffer.Len()+int(set.GetBuffLen())) > entities.MaxTcpSocketMsgSize {
+		return bytesSent, fmt.Errorf("AddSetAndSendMsg: set size exceeds max socket size.")
 	}
 	if msgBuffer.Len() == 0 {
 		err := ep.createNewMsg()
@@ -135,24 +126,14 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 			return bytesSent, fmt.Errorf("AddSetAndSendMsg: error when creating message: %v", err)
 		}
 	}
-	// Check set buffer length and type change to create new set in the message
-	if ep.set.GetBuffLen() == 0 {
-		ep.set.CreateNewSet(setType, set.GetRecords()[0].GetTemplateID())
-	} else if ep.set.GetSetType() != setType {
-		ep.set.FinishSet()
-		ep.set.CreateNewSet(setType, set.GetRecords()[0].GetTemplateID())
-	}
-	// Write the record to the set
-	err := ep.set.WriteRecordToSet(&recBytes)
-	if err != nil {
-		return bytesSent, fmt.Errorf("AddRecordAndSendMsg: %v", err)
-	}
+
 	if setType == entities.Data && !ep.msg.GetDataRecFlag() {
 		ep.msg.SetDataRecFlag(true)
 	}
 
 	// Send the message right after attaching the record
-	ep.set.FinishSet()
+	set.FinishSet()
+	msgBuffer.Write(set.GetBuffer().Bytes())
 
 	b, err := ep.sendMsg(set.GetNumberOfRecords())
 	if err != nil {
@@ -250,8 +231,7 @@ func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 func (ep *ExportingProcess) sendRefreshedTemplates() error {
 	// Send refreshed template for every template in template map
 	for templateID, tempValue := range ep.templatesMap {
-		tempSet := entities.NewSet(&bytes.Buffer{})
-		tempSet.CreateNewSet(entities.Template, templateID)
+		tempSet := entities.NewSet(entities.Template, templateID)
 		elements := make([]*entities.InfoElementWithValue, 0)
 		for _, element := range tempValue.elements {
 			ie := entities.NewInfoElementWithValue(element, nil)

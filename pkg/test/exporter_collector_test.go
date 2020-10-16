@@ -15,7 +15,6 @@
 package test
 
 import (
-	"bytes"
 	"net"
 	"testing"
 	"time"
@@ -76,8 +75,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 
 		// Create template record with 4 fields
 		templateID := export.NewTemplateID()
-		templateSet := entities.NewSet(&bytes.Buffer{})
-		templateSet.CreateNewSet(entities.Template, templateID)
+		templateSet := entities.NewSet(entities.Template, templateID)
 		elements := make([]*entities.InfoElementWithValue, 0)
 		element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
@@ -115,8 +113,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		}
 		time.Sleep(time.Second)
 		// Create data set with 1 data record using the same template above
-		dataSet := entities.NewSet(&bytes.Buffer{})
-		dataSet.CreateNewSet(entities.Data, templateID)
+		dataSet := entities.NewSet(entities.Data, templateID)
 		elements = make([]*entities.InfoElementWithValue, 0)
 		element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {

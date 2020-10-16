@@ -15,12 +15,12 @@
 package exporter
 
 import (
-	"bytes"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
@@ -67,8 +67,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(&bytes.Buffer{})
-	templateSet.CreateNewSet(entities.Template, templateID)
+	templateSet := entities.NewSet(entities.Template, templateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -137,8 +136,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(&bytes.Buffer{})
-	templateSet.CreateNewSet(entities.Template, templateID)
+	templateSet := entities.NewSet(entities.Template, templateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -229,8 +227,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
 
 	// Create data set with 1 data record
-	dataSet := entities.NewSet(&bytes.Buffer{})
-	dataSet.CreateNewSet(entities.Data, templateID)
+	dataSet := entities.NewSet(entities.Data, templateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -310,8 +307,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
 
 	// Create data set with 1 data record
-	dataSet := entities.NewSet(&bytes.Buffer{})
-	dataSet.CreateNewSet(entities.Data, templateID)
+	dataSet := entities.NewSet(entities.Data, templateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {

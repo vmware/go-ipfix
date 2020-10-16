@@ -19,6 +19,7 @@
 package testing
 
 import (
+	bytes "bytes"
 	gomock "github.com/golang/mock/gomock"
 	entities "github.com/vmware/go-ipfix/pkg/entities"
 	reflect "reflect"
@@ -48,29 +49,17 @@ func (m *MockSet) EXPECT() *MockSetMockRecorder {
 }
 
 // AddRecord mocks base method
-func (m *MockSet) AddRecord(arg0 []*entities.InfoElementWithValue, arg1 uint16, arg2 bool) {
+func (m *MockSet) AddRecord(arg0 []*entities.InfoElementWithValue, arg1 uint16, arg2 bool) error {
 	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "AddRecord", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "AddRecord", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // AddRecord indicates an expected call of AddRecord
 func (mr *MockSetMockRecorder) AddRecord(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), arg0, arg1, arg2)
-}
-
-// CreateNewSet mocks base method
-func (m *MockSet) CreateNewSet(arg0 entities.ContentType, arg1 uint16) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateNewSet", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateNewSet indicates an expected call of CreateNewSet
-func (mr *MockSetMockRecorder) CreateNewSet(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNewSet", reflect.TypeOf((*MockSet)(nil).CreateNewSet), arg0, arg1)
 }
 
 // FinishSet mocks base method
@@ -97,6 +86,20 @@ func (m *MockSet) GetBuffLen() uint16 {
 func (mr *MockSetMockRecorder) GetBuffLen() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBuffLen", reflect.TypeOf((*MockSet)(nil).GetBuffLen))
+}
+
+// GetBuffer mocks base method
+func (m *MockSet) GetBuffer() *bytes.Buffer {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBuffer")
+	ret0, _ := ret[0].(*bytes.Buffer)
+	return ret0
+}
+
+// GetBuffer indicates an expected call of GetBuffer
+func (mr *MockSetMockRecorder) GetBuffer() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBuffer", reflect.TypeOf((*MockSet)(nil).GetBuffer))
 }
 
 // GetNumberOfRecords mocks base method
@@ -139,18 +142,4 @@ func (m *MockSet) GetSetType() entities.ContentType {
 func (mr *MockSetMockRecorder) GetSetType() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSetType", reflect.TypeOf((*MockSet)(nil).GetSetType))
-}
-
-// WriteRecordToSet mocks base method
-func (m *MockSet) WriteRecordToSet(arg0 *[]byte) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "WriteRecordToSet", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// WriteRecordToSet indicates an expected call of WriteRecordToSet
-func (mr *MockSetMockRecorder) WriteRecordToSet(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteRecordToSet", reflect.TypeOf((*MockSet)(nil).WriteRecordToSet), arg0)
 }
