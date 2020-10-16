@@ -121,7 +121,7 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 	msgBuffer := ep.msg.GetMsgBuffer()
 	var bytesSent int
 	// Check if message is exceeding the limit with new record
-	if uint16(msgBuffer.Len()+len(recBytes)) > entities.MaxTcpSocketMsgSize {
+	if uint16(msgBuffer.Len()+ int(ep.set.GetBuffLen())) > entities.MaxTcpSocketMsgSize {
 		ep.set.FinishSet()
 		b, err := ep.sendMsg(set.GetNumberOfRecords())
 		if err != nil {
@@ -132,7 +132,7 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 	if msgBuffer.Len() == 0 {
 		err := ep.createNewMsg()
 		if err != nil {
-			return bytesSent, fmt.Errorf("AddRecordAndSendMsg: error when creating message: %v", err)
+			return bytesSent, fmt.Errorf("AddSetAndSendMsg: error when creating message: %v", err)
 		}
 	}
 	// Check set buffer length and type change to create new set in the message
@@ -225,7 +225,7 @@ func (ep *ExportingProcess) NewTemplateID() uint16 {
 	return ep.templateID
 }
 
-func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElementValue, minDataRecLen uint16) {
+func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElementWithValue, minDataRecLen uint16) {
 	if _, exist := ep.templatesMap[id]; exist {
 		return
 	}
@@ -252,9 +252,9 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 	for templateID, tempValue := range ep.templatesMap {
 		tempSet := entities.NewSet(&bytes.Buffer{})
 		tempSet.CreateNewSet(entities.Template, templateID)
-		elements := make([]*entities.InfoElementValue, 0)
+		elements := make([]*entities.InfoElementWithValue, 0)
 		for _, element := range tempValue.elements {
-			ie := entities.NewInfoElementValue(element, nil)
+			ie := entities.NewInfoElementWithValue(element, nil)
 			elements = append(elements, ie)
 		}
 		tempSet.AddRecord(elements, templateID, false)

@@ -29,10 +29,10 @@ import (
 
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 var validDataPacket = []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 89, 105, 111, 117}
-var templateElements = []*entities.InfoElement{
-	entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4),
-	entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4),
-	entities.NewInfoElement("destinationNodeName", 105, 13, 55829, 65535),
+var elementsWithValue = []*entities.InfoElementWithValue{
+	{entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil},
+	{entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil},
+	{entities.NewInfoElement("destinationNodeName", 105, 13, 55829, 65535), nil},
 }
 
 func init() {
@@ -102,7 +102,7 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), templateElements)
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	}
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), templateElements)
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
@@ -272,7 +272,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	_, err = cp.decodePacket(bytes.NewBuffer(validDataPacket))
 	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
 	// Decode with template
-	cp.addTemplate(uint32(1), uint16(256), templateElements)
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 	message, err := cp.decodePacket(bytes.NewBuffer(validDataPacket))
 	assert.Nil(t, err, "Error should not be logged if corresponding template exists.")
 	assert.Equal(t, uint16(10), message.Version, "Flow record version should be 10.")

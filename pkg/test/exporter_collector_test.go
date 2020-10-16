@@ -78,33 +78,33 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		templateID := export.NewTemplateID()
 		templateSet := entities.NewSet(&bytes.Buffer{})
 		templateSet.CreateNewSet(entities.Template, templateID)
-		elements := make([]*entities.InfoElementValue, 0)
+		elements := make([]*entities.InfoElementWithValue, 0)
 		element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourceIPv4Address")
 		}
-		ie := entities.NewInfoElementValue(element, nil)
+		ie := entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 
 		element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
 		}
-		ie = entities.NewInfoElementValue(element, nil)
+		ie = entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 
 		element, err = registry.GetInfoElement("octetDeltaCount", registry.IANAReversedEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the reverse element of octetDeltaCount")
 		}
-		ie = entities.NewInfoElementValue(element, nil)
+		ie = entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 
 		element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourcePodName")
 		}
-		ie = entities.NewInfoElementValue(element, nil)
+		ie = entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 		templateSet.AddRecord(elements, templateID, false)
 
@@ -117,65 +117,65 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		// Create data set with 1 data record using the same template above
 		dataSet := entities.NewSet(&bytes.Buffer{})
 		dataSet.CreateNewSet(entities.Data, templateID)
-		elements = make([]*entities.InfoElementValue, 0)
+		elements = make([]*entities.InfoElementWithValue, 0)
 		element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourceIPv4Address")
 		}
-		ie = entities.NewInfoElementValue(element, net.ParseIP("1.2.3.4"))
+		ie = entities.NewInfoElementWithValue(element, net.ParseIP("1.2.3.4"))
 		elements = append(elements, ie)
 
 		element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
 		}
-		ie = entities.NewInfoElementValue(element, net.ParseIP("5.6.7.8"))
+		ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
 		elements = append(elements, ie)
 
 		element, err = registry.GetInfoElement("octetDeltaCount", registry.IANAReversedEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the reverse element of octetDeltaCount")
 		}
-		ie = entities.NewInfoElementValue(element, uint64(12345678))
+		ie = entities.NewInfoElementWithValue(element, uint64(12345678))
 		elements = append(elements, ie)
 
 		element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourcePodName")
 		}
-		ie = entities.NewInfoElementValue(element, "pod1")
+		ie = entities.NewInfoElementWithValue(element, "pod1")
 		elements = append(elements, ie)
 
 		dataSet.AddRecord(elements, templateID, false)
 		// for multiple records per set, modify element values and add another record to set
 		if isMultipleRecord {
-			elements := make([]*entities.InfoElementValue, 0)
+			elements := make([]*entities.InfoElementWithValue, 0)
 			element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 			if err != nil {
 				klog.Errorf("Did not find the element with name sourceIPv4Address")
 			}
-			ie := entities.NewInfoElementValue(element, net.ParseIP("4.3.2.1"))
+			ie := entities.NewInfoElementWithValue(element, net.ParseIP("4.3.2.1"))
 			elements = append(elements, ie)
 
 			element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 			if err != nil {
 				klog.Errorf("Did not find the element with name destinationIPv4Address")
 			}
-			ie = entities.NewInfoElementValue(element, net.ParseIP("8.7.6.5"))
+			ie = entities.NewInfoElementWithValue(element, net.ParseIP("8.7.6.5"))
 			elements = append(elements, ie)
 
 			element, err = registry.GetInfoElement("octetDeltaCount", registry.IANAReversedEnterpriseID)
 			if err != nil {
 				klog.Errorf("Did not find the reverse element of octetDeltaCount")
 			}
-			ie = entities.NewInfoElementValue(element, uint64(0))
+			ie = entities.NewInfoElementWithValue(element, uint64(0))
 			elements = append(elements, ie)
 
 			element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
 			if err != nil {
 				klog.Errorf("Did not find the element with name sourcePodName")
 			}
-			ie = entities.NewInfoElementValue(element, "pod2")
+			ie = entities.NewInfoElementWithValue(element, "pod2")
 			elements = append(elements, ie)
 
 			dataSet.AddRecord(elements, templateID, false)

@@ -144,8 +144,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 	if err != nil {
 		return nil, err
 	}
-	elements := make([]*entities.InfoElementValue, 0)
-	template := make([]*entities.InfoElement, 0)
+	elementsWithValue := make([]*entities.InfoElementWithValue, 0)
 	templateSet := entities.NewSet(&bytes.Buffer{})
 	templateSet.CreateNewSet(entities.Template, templateID)
 
@@ -195,12 +194,11 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				return nil, err
 			}
 		}
-		template = append(template, element)
-		ie := entities.NewInfoElementValue(element, nil)
-		elements = append(elements, ie)
+		ie := entities.NewInfoElementWithValue(element, nil)
+		elementsWithValue = append(elementsWithValue, ie)
 	}
-	templateSet.AddRecord(elements, templateID, true)
-	cp.addTemplate(obsDomainID, templateID, template)
+	templateSet.AddRecord(elementsWithValue, templateID, true)
+	cp.addTemplate(obsDomainID, templateID, elementsWithValue)
 	return templateSet, nil
 }
 
@@ -214,7 +212,7 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	dataSet.CreateNewSet(entities.Data, templateID)
 
 	for dataBuffer.Len() > 0 {
-		elements := make([]*entities.InfoElementValue, 0)
+		elements := make([]*entities.InfoElementWithValue, 0)
 		for _, element := range template {
 			var length int
 			if element.Len == entities.VariableLength { // string
@@ -223,7 +221,7 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 				length = int(element.Len)
 			}
 			val := dataBuffer.Next(length)
-			ie := entities.NewInfoElementValue(element, bytes.NewBuffer(val))
+			ie := entities.NewInfoElementWithValue(element, bytes.NewBuffer(val))
 			elements = append(elements, ie)
 		}
 		dataSet.AddRecord(elements, templateID, true)
@@ -231,10 +229,14 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	return dataSet, nil
 }
 
-func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []*entities.InfoElement) {
+func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []*entities.InfoElementWithValue) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
 		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
+	}
+	elements := make([]*entities.InfoElement, 0)
+	for _, elementWithValue := range elementsWithValue {
+		elements = append(elements, elementWithValue.Element)
 	}
 	cp.templatesMap[obsDomainID][templateID] = elements
 	cp.templatesLock.Unlock()

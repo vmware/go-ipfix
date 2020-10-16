@@ -46,12 +46,12 @@ type Set interface {
 	GetSetType() ContentType
 	WriteRecordToSet(recBuffer *[]byte) error
 	FinishSet()
-	AddRecord(elements []*InfoElementValue, templateID uint16, isDecoding bool)
+	AddRecord(elements []*InfoElementWithValue, templateID uint16, isDecoding bool)
 	GetRecords() []Record
 	GetNumberOfRecords() uint32
 }
 
-type baseSet struct {
+type set struct {
 	// Pointer to message buffer
 	buffer  *bytes.Buffer
 	currLen uint16
@@ -60,7 +60,7 @@ type baseSet struct {
 }
 
 func NewSet(buffer *bytes.Buffer) Set {
-	return &baseSet{
+	return &set{
 		buffer:  buffer,
 		currLen: 0,
 		setType: Undefined,
@@ -68,7 +68,7 @@ func NewSet(buffer *bytes.Buffer) Set {
 	}
 }
 
-func (s *baseSet) CreateNewSet(setType ContentType, templateID uint16) error {
+func (s *set) CreateNewSet(setType ContentType, templateID uint16) error {
 	// Create the set header and append it
 	header := make([]byte, 4)
 	if setType == Template {
@@ -90,15 +90,15 @@ func (s *baseSet) CreateNewSet(setType ContentType, templateID uint16) error {
 	return nil
 }
 
-func (s *baseSet) GetBuffLen() uint16 {
+func (s *set) GetBuffLen() uint16 {
 	return s.currLen
 }
 
-func (s *baseSet) GetSetType() ContentType {
+func (s *set) GetSetType() ContentType {
 	return s.setType
 }
 
-func (s *baseSet) WriteRecordToSet(recBuffer *[]byte) error {
+func (s *set) WriteRecordToSet(recBuffer *[]byte) error {
 	_, err := s.buffer.Write(*recBuffer)
 	if err != nil {
 		return fmt.Errorf("error in writing the buffer to set: %v", err)
@@ -108,7 +108,7 @@ func (s *baseSet) WriteRecordToSet(recBuffer *[]byte) error {
 	return nil
 }
 
-func (s *baseSet) FinishSet() {
+func (s *set) FinishSet() {
 	// TODO:Add padding when multiple sets are sent in single IPFIX message
 	// Add length to the message
 	byteSlice := s.buffer.Bytes()
@@ -118,24 +118,29 @@ func (s *baseSet) FinishSet() {
 	s.currLen = 0
 }
 
-func (b *baseSet) AddRecord(elements []*InfoElementValue, templateID uint16, isDecoding bool) {
+func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16, isDecoding bool) {
 	var record Record
-	if b.setType == Data {
+	if s.setType == Data {
 		record = NewDataRecord(templateID)
-	} else if b.setType == Template {
+	} else if s.setType == Template {
 		record = NewTemplateRecord(uint16(len(elements)), templateID)
 	}
 	record.PrepareRecord()
 	for _, element := range elements {
 		record.AddInfoElement(element, isDecoding)
 	}
-	b.records = append(b.records, record)
+	s.records = append(s.records, record)
+	// write record to set when encoding
+	if !isDecoding {
+		recordBytes := record.GetBuffer().Bytes()
+		s.WriteRecordToSet(&recordBytes)
+	}
 }
 
-func (b *baseSet) GetRecords() []Record {
-	return b.records
+func (s *set) GetRecords() []Record {
+	return s.records
 }
 
-func (b *baseSet) GetNumberOfRecords() uint32 {
-	return uint32(len(b.records))
+func (s *set) GetNumberOfRecords() uint32 {
+	return uint32(len(s.records))
 }

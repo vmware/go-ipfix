@@ -48,7 +48,7 @@ func (m *MockSet) EXPECT() *MockSetMockRecorder {
 }
 
 // AddRecord mocks base method
-func (m *MockSet) AddRecord(arg0 []*entities.InfoElementValue, arg1 uint16, arg2 bool) {
+func (m *MockSet) AddRecord(arg0 []*entities.InfoElementWithValue, arg1 uint16, arg2 bool) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "AddRecord", arg0, arg1, arg2)
 }
