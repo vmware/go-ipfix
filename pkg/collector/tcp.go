@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bytes"
+	"crypto/tls"
 	"io"
 	"net"
 	"sync"
@@ -10,13 +11,32 @@ import (
 )
 
 func (cp *CollectingProcess) startTCPServer() {
-	listener, err := net.Listen("tcp", cp.address.String())
-	if err != nil {
-		klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
-		return
+	var listener net.Listener
+	var err error
+	if cp.isEncrypted { // use TLS
+		cer, err := tls.X509KeyPair(cp.serverCert, cp.serverKey)
+		if err != nil {
+			klog.Error(err)
+			return
+		}
+		config := &tls.Config{Certificates: []tls.Certificate{cer}}
+		listener, err = tls.Listen("tcp", cp.address.String(), config)
+		if err != nil {
+			klog.Errorf("Cannot start tls collecting process on %s: %v", cp.address.String(), err)
+			return
+		}
+		cp.updateAddress(listener.Addr())
+		klog.Infof("Start tls collecting process on %s", cp.address.String())
+	} else {
+		listener, err = net.Listen("tcp", cp.address.String())
+		if err != nil {
+			klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
+			return
+		}
+		cp.updateAddress(listener.Addr())
+		klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
 	}
 
-	klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
 	var wg sync.WaitGroup
 	go func() {
 		defer listener.Close()

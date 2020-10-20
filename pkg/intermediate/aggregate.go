@@ -37,23 +37,29 @@ type FlowKey struct {
 	DestinationPort    uint16
 }
 
+type AggregationInput struct {
+	MessageChan     chan *entities.Message
+	WorkerNum       int
+	CorrelateFields []string
+}
+
 type FlowKeyRecordMapCallBack func(key FlowKey, records []entities.Record) error
 
 // InitAggregationProcess takes in message channel (e.g. from collector) as input channel, workerNum(number of workers to process message)
 // and correlateFields (fields to be correlated and filled).
-func InitAggregationProcess(messageChan chan *entities.Message, workerNum int, correlateFields []string) (*AggregationProcess, error) {
-	if messageChan == nil {
-		return nil, fmt.Errorf("Cannot create AggregationProcess process without message channel.")
-	} else if workerNum <= 0 {
-		return nil, fmt.Errorf("Worker number cannot be <= 0.")
+func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error) {
+	if input.MessageChan == nil {
+		return nil, fmt.Errorf("cannot create AggregationProcess process without message channel")
+	} else if input.WorkerNum <= 0 {
+		return nil, fmt.Errorf("worker number cannot be <= 0")
 	}
 	return &AggregationProcess{
 		make(map[FlowKey][]entities.Record),
 		sync.RWMutex{},
-		messageChan,
-		workerNum,
+		input.MessageChan,
+		input.WorkerNum,
 		make([]*worker, 0),
-		correlateFields,
+		input.CorrelateFields,
 		make(chan bool),
 	}, nil
 }

@@ -47,6 +47,20 @@ type CollectingProcess struct {
 	messageChan chan *entities.Message
 	// maps each client to its client handler (required channels)
 	clients map[string]*clientHandler
+	// isEncrypted indicates whether to use TLS/DTLS for communication
+	isEncrypted bool
+	// serverCert and serverKey are for storing encryption info when using TLS/DTLS
+	serverCert []byte
+	serverKey  []byte
+}
+
+type CollectorInput struct {
+	Address       net.Addr
+	MaxBufferSize uint16
+	TemplateTTL   uint32
+	IsEncrypted   bool
+	ServerCert    []byte
+	ServerKey     []byte
 }
 
 type clientHandler struct {
@@ -54,16 +68,19 @@ type clientHandler struct {
 	errChan    chan bool
 }
 
-func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*CollectingProcess, error) {
+func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 	collectProc := &CollectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		mutex:         sync.RWMutex{},
-		templateTTL:   templateTTL,
-		address:       address,
-		maxBufferSize: maxBufferSize,
+		templateTTL:   input.TemplateTTL,
+		address:       input.Address,
+		maxBufferSize: input.MaxBufferSize,
 		stopChan:      make(chan bool),
 		messageChan:   make(chan *entities.Message),
 		clients:       make(map[string]*clientHandler),
+		isEncrypted:   input.IsEncrypted,
+		serverCert:    input.ServerCert,
+		serverKey:     input.ServerKey,
 	}
 	return collectProc, nil
 }
@@ -78,6 +95,12 @@ func (cp *CollectingProcess) Start() {
 
 func (cp *CollectingProcess) Stop() {
 	cp.stopChan <- true
+}
+
+func (cp *CollectingProcess) GetAddress() net.Addr {
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
+	return cp.address
 }
 
 func (cp *CollectingProcess) GetMsgChan() chan *entities.Message {
@@ -146,12 +169,12 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 	if setID == entities.TemplateSetID {
 		set, err = cp.decodeTemplateSet(packetBuffer, obsDomainID)
 		if err != nil {
-			return nil, fmt.Errorf("Error in decoding message: %v", err)
+			return nil, fmt.Errorf("error in decoding message: %v", err)
 		}
 	} else {
 		set, err = cp.decodeDataSet(packetBuffer, obsDomainID, setID)
 		if err != nil {
-			return nil, fmt.Errorf("Error in decoding message: %v", err)
+			return nil, fmt.Errorf("error in decoding message: %v", err)
 		}
 	}
 	message.AddSet(set)
@@ -229,7 +252,7 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	// make sure template exists
 	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
-		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
+		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
 	dataSet := entities.NewSet(entities.Data, templateID, true)
 
@@ -289,7 +312,7 @@ func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) 
 	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {
 		return elements, nil
 	} else {
-		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist.", templateID, obsDomainID)
+		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
 }
 
@@ -297,6 +320,12 @@ func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 	delete(cp.templatesMap[obsDomainID], templateID)
+}
+
+func (cp *CollectingProcess) updateAddress(address net.Addr) {
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
+	cp.address = address
 }
 
 // getMessageLength returns buffer length by decoding the header
@@ -307,7 +336,7 @@ func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 	// that decodes header based on the offset.
 	err := util.Decode(msgBuffer, binary.BigEndian, &version, &msgLen, &exportTime, &sequencNum, &obsDomainID, &setID, &setLen)
 	if err != nil {
-		return 0, fmt.Errorf("Cannot decode message: %v", err)
+		return 0, fmt.Errorf("cannot decode message: %v", err)
 	}
 	return int(msgLen), nil
 }
