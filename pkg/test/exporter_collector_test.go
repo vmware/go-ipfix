@@ -75,7 +75,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 
 		// Create template record with 4 fields
 		templateID := export.NewTemplateID()
-		templateSet := entities.NewSet(entities.Template, templateID)
+		templateSet := entities.NewSet(entities.Template, templateID, false)
 		elements := make([]*entities.InfoElementWithValue, 0)
 		element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
@@ -104,7 +104,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		}
 		ie = entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
-		templateSet.AddRecord(elements, templateID, false)
+		templateSet.AddRecord(elements, templateID)
 
 		// Send template record
 		_, err = export.AddSetAndSendMsg(entities.Template, templateSet)
@@ -113,7 +113,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		}
 		time.Sleep(time.Second)
 		// Create data set with 1 data record using the same template above
-		dataSet := entities.NewSet(entities.Data, templateID)
+		dataSet := entities.NewSet(entities.Data, templateID, false)
 		elements = make([]*entities.InfoElementWithValue, 0)
 		element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
@@ -143,7 +143,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		ie = entities.NewInfoElementWithValue(element, "pod1")
 		elements = append(elements, ie)
 
-		dataSet.AddRecord(elements, templateID, false)
+		dataSet.AddRecord(elements, templateID)
 		// for multiple records per set, modify element values and add another record to set
 		if isMultipleRecord {
 			elements := make([]*entities.InfoElementWithValue, 0)
@@ -175,7 +175,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 			ie = entities.NewInfoElementWithValue(element, "pod2")
 			elements = append(elements, ie)
 
-			dataSet.AddRecord(elements, templateID, false)
+			dataSet.AddRecord(elements, templateID)
 		}
 
 		// Send data set

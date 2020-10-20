@@ -131,7 +131,7 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 		ep.msg.SetDataRecFlag(true)
 	}
 
-	// Send the message right after attaching the record
+	// finish set here will finalize set length and avoid further change to buffer length
 	set.FinishSet()
 	msgBuffer.Write(set.GetBuffer().Bytes())
 
@@ -231,13 +231,13 @@ func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 func (ep *ExportingProcess) sendRefreshedTemplates() error {
 	// Send refreshed template for every template in template map
 	for templateID, tempValue := range ep.templatesMap {
-		tempSet := entities.NewSet(entities.Template, templateID)
+		tempSet := entities.NewSet(entities.Template, templateID, false)
 		elements := make([]*entities.InfoElementWithValue, 0)
 		for _, element := range tempValue.elements {
 			ie := entities.NewInfoElementWithValue(element, nil)
 			elements = append(elements, ie)
 		}
-		tempSet.AddRecord(elements, templateID, false)
+		tempSet.AddRecord(elements, templateID)
 		if _, err := ep.AddSetAndSendMsg(entities.Template, tempSet); err != nil {
 			return err
 		}

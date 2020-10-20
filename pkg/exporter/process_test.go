@@ -67,7 +67,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(entities.Template, templateID)
+	templateSet := entities.NewSet(entities.Template, templateID, false)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -81,7 +81,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	}
 	ie = entities.NewInfoElementWithValue(element, nil)
 	elements = append(elements, ie)
-	templateSet.AddRecord(elements, templateID, false)
+	templateSet.AddRecord(elements, templateID)
 
 	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
 	if err != nil {
@@ -136,7 +136,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(entities.Template, templateID)
+	templateSet := entities.NewSet(entities.Template, templateID, false)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -152,7 +152,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	ie = entities.NewInfoElementWithValue(element, nil)
 	elements = append(elements, ie)
 
-	templateSet.AddRecord(elements, templateID, false)
+	templateSet.AddRecord(elements, templateID)
 
 	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
 	if err != nil {
@@ -227,7 +227,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
 
 	// Create data set with 1 data record
-	dataSet := entities.NewSet(entities.Data, templateID)
+	dataSet := entities.NewSet(entities.Data, templateID, false)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -243,7 +243,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
 	elements = append(elements, ie)
 
-	dataSet.AddRecord(elements, templateID, false)
+	dataSet.AddRecord(elements, templateID)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
@@ -307,7 +307,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
 
 	// Create data set with 1 data record
-	dataSet := entities.NewSet(entities.Data, templateID)
+	dataSet := entities.NewSet(entities.Data, templateID, false)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -323,7 +323,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
 	elements = append(elements, ie)
 
-	dataSet.AddRecord(elements, templateID, false)
+	dataSet.AddRecord(elements, templateID)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
