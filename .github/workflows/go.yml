@@ -31,7 +31,6 @@ jobs:
       uses: codecov/codecov-action@v1
       with:
         file: ./coverage_unit.txt
-        token: ${{secrets.CODECOV_TOKEN}}
 
   test-integration:
     name: Integration test
@@ -53,7 +52,6 @@ jobs:
       uses: codecov/codecov-action@v1
       with:
         file: ./coverage_integration.txt
-        token: ${{secrets.CODECOV_TOKEN}}
 
   codegen:
     name: Check code generation
