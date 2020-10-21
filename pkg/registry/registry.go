@@ -16,6 +16,7 @@ package registry
 
 import (
 	"fmt"
+
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
@@ -76,7 +77,7 @@ func registerInfoElement(ie entities.InfoElement, enterpriseID uint32) error {
 	if _, exist := globalRegistryByName[enterpriseID]; !exist {
 		return fmt.Errorf("Registry with EnterpriseID %d is not supported.", ie.EnterpriseId)
 	} else if _, exist = globalRegistryByName[enterpriseID][ie.Name]; exist {
-		fmt.Errorf("Information element %s in registry with EnterpriseID %d has already been registered", ie.Name, ie.EnterpriseId)
+		return fmt.Errorf("Information element %s in registry with EnterpriseID %d has already been registered", ie.Name, ie.EnterpriseId)
 	}
 	globalRegistryByID[ie.EnterpriseId][ie.ElementId] = &ie
 	globalRegistryByName[ie.EnterpriseId][ie.Name] = &ie

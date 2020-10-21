@@ -16,10 +16,10 @@ jobs:
     runs-on: [ubuntu-18.04]
     steps:
 
-    - name: Set up Go 1.13
+    - name: Set up Go 1.15
       uses: actions/setup-go@v1
       with:
-        go-version: 1.13
+        go-version: 1.15
 
     - name: Check-out code
       uses: actions/checkout@v2
@@ -37,10 +37,10 @@ jobs:
     runs-on: [ubuntu-18.04]
     steps:
 
-    - name: Set up Go 1.13
+    - name: Set up Go 1.15
       uses: actions/setup-go@v1
       with:
-        go-version: 1.13
+        go-version: 1.15
 
     - name: Check-out code
       uses: actions/checkout@v2
@@ -68,3 +68,19 @@ jobs:
 
     - name: Check code generation
       run: ./ci/check_codegen.sh
+
+
+  golangci-lint:
+    name: Golangci-lint
+    runs-on: [ubuntu-18.04]
+    steps:
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.15
+
+      - name: Check-out code
+        uses: actions/checkout@v2
+
+      - name: Run golangci-lint
+        run: make golangci

@@ -31,7 +31,7 @@ func init() {
 
 func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	// Create local server for testing
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", "127.0.0.1:4738")
 	if err != nil {
 		t.Fatalf("Got error when creating a local server: %v", err)
 	}
@@ -51,7 +51,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 		buff := make([]byte, 32)
 		_, err = conn.Read(buff)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		// Compare only template record part. Remove message header and set header.
 		buffCh <- buff[20:]
@@ -117,7 +117,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 			b := make([]byte, 32)
 			nb, err := conn.Read(b)
 			if err != nil {
-				t.Fatal(err)
+				t.Error(err)
 			}
 			numBytes = numBytes + nb
 			bytes = append(bytes, b...)
@@ -175,7 +175,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	// Create local server for testing
-	listener, err := net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", "127.0.0.1:4739")
 	if err != nil {
 		t.Fatalf("Got error when creating a local server: %v", err)
 	}
@@ -195,7 +195,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 		buff := make([]byte, 28)
 		_, err = conn.Read(buff)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		// Compare only data record part. Remove message header and set header.
 		// TODO: Verify message header and set header through hardcoded byte values
@@ -275,7 +275,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 		buff := make([]byte, 28)
 		_, err = conn.Read(buff)
 		if err != nil {
-			t.Fatal(err)
+			t.Error(err)
 		}
 		// Compare only data record part. Remove message header and set header.
 		// TODO: Verify message header and set header through hardcoded byte values

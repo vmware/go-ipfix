@@ -30,9 +30,9 @@ import (
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 var validDataPacket = []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 89, 105, 111, 117}
 var elementsWithValue = []*entities.InfoElementWithValue{
-	{entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil},
-	{entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil},
-	{entities.NewInfoElement("destinationNodeName", 105, 13, 55829, 65535), nil},
+	{Element: &entities.InfoElement{Name: "sourceIPv4Address", ElementId: 8, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
+	{Element: &entities.InfoElement{Name: "destinationIPv4Address", ElementId: 12, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
+	{Element: &entities.InfoElement{Name: "destinationNodeName", ElementId: 105, DataType: 13, EnterpriseId: 55829, Len: 65535}, Value: nil},
 }
 
 func init() {
@@ -52,7 +52,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		time.Sleep(2 * time.Second)
 		conn, err := net.Dial(address.Network(), address.String())
 		if err != nil {
-			t.Fatalf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", address.String())
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
@@ -110,7 +110,7 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		time.Sleep(time.Second)
 		conn, err := net.Dial(address.Network(), address.String())
 		if err != nil {
-			t.Fatalf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", address.String())
 		}
 		defer conn.Close()
 		conn.Write(validDataPacket)
@@ -165,14 +165,14 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 		time.Sleep(time.Second)
 		_, err := net.Dial(address.Network(), address.String())
 		if err != nil {
-			t.Fatalf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", address.String())
 		}
 	}()
 	go func() {
 		time.Sleep(time.Second)
 		_, err := net.Dial(address.Network(), address.String())
 		if err != nil {
-			t.Fatalf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", address.String())
 		}
 		time.Sleep(2 * time.Second)
 		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
@@ -247,12 +247,12 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	assert.Equal(t, uint32(0), elements[0].Element.EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
 	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
-	message, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
+	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
 	assert.NotNil(t, err, "Error should be logged for invalid version")
 	// Malformed record
 	templateRecord = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
-	message, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
+	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
 	assert.NotNil(t, err, "Error should be logged for malformed template record")
 	if _, exist := cp.templatesMap[uint32(1)]; exist {
 		t.Fatal("Template should not be stored for malformed template record")

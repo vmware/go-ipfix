@@ -10,3 +10,7 @@ test-unit:
 
 test-integration:
 	$(GO) test ./pkg/test/... -tags=integration -covermode=atomic -coverprofile=coverage_integration.txt -coverpkg github.com/vmware/go-ipfix/pkg/collector,github.com/vmware/go-ipfix/pkg/exporter
+
+golangci:
+	@curl -sfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOPATH)/bin v1.21.0
+	$(GOPATH)/bin/golangci-lint run -c .golangci.yml
