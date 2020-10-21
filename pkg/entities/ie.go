@@ -253,7 +253,7 @@ func DecodeToIEDataType(dataType IEDataType, val interface{}) (interface{}, erro
 		}
 		return v, nil
 	case Boolean:
-		var v int
+		var v int8
 		err := util.Decode(value, binary.BigEndian, &v)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding val to boolean: %v", err)

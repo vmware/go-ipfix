@@ -96,12 +96,14 @@ func (s *set) GetSetType() ContentType {
 
 func (s *set) FinishSet() {
 	// TODO:Add padding when multiple sets are sent in single IPFIX message
-	// Add length to the message
-	byteSlice := s.buffer.Bytes()
-	setOffset := s.buffer.Len() - int(s.currLen)
-	binary.BigEndian.PutUint16(byteSlice[setOffset+2:setOffset+4], s.currLen)
-	// Reset the length
-	s.currLen = 0
+	if !s.isDecoding {
+		// Add length to the message
+		byteSlice := s.buffer.Bytes()
+		setOffset := s.buffer.Len() - int(s.currLen)
+		binary.BigEndian.PutUint16(byteSlice[setOffset+2:setOffset+4], s.currLen)
+		// Reset the length
+		s.currLen = 0
+	}
 }
 
 func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) error {
