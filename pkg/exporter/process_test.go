@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
@@ -66,29 +67,28 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	tempRec := entities.NewTemplateRecord(2, templateID)
-	tempRec.PrepareRecord()
+	templateSet := entities.NewSet(entities.Template, templateID, false)
+	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil)
+	ie := entities.NewInfoElementWithValue(element, nil)
+	elements = append(elements, ie)
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil)
-	tempRecBuff := tempRec.GetBuffer()
-	tempRecBytes := tempRecBuff.Bytes()
+	ie = entities.NewInfoElementWithValue(element, nil)
+	elements = append(elements, ie)
+	templateSet.AddRecord(elements, templateID)
 
-
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Template, tempRec)
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
 	// 32 is the size of the IPFIX message including all headers
 	assert.Equal(t, 32, bytesSent)
-	assert.Equal(t, tempRecBytes, <-buffCh)
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 	exporter.CloseConnToCollector()
 }
@@ -113,7 +113,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 		bytes := make([]byte, 0)
 		numBytes := 0
-		for start := time.Now(); time.Since(start) < 2* time.Second; {
+		for start := time.Now(); time.Since(start) < 2*time.Second; {
 			b := make([]byte, 32)
 			nb, err := conn.Read(b)
 			if err != nil {
@@ -136,22 +136,25 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	tempRec := entities.NewTemplateRecord(2, templateID)
-	tempRec.PrepareRecord()
+	templateSet := entities.NewSet(entities.Template, templateID, false)
+	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil)
+	ie := entities.NewInfoElementWithValue(element, nil)
+	elements = append(elements, ie)
+
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	tempRec.AddInfoElement(element, nil)
-	tempRecBuff := tempRec.GetBuffer()
-	tempRecBytes := tempRecBuff.Bytes()
+	ie = entities.NewInfoElementWithValue(element, nil)
+	elements = append(elements, ie)
 
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Template, tempRec)
+	templateSet.AddRecord(elements, templateID)
+
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
@@ -162,10 +165,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	bytesAtServer := <-buffCh
 	assert.Equal(t, len(bytesAtServer), 64)
 	assert.Equal(t, bytesAtServer[20:32], bytesAtServer[52:], "both template messages should be same")
-	firstTemplateBytes := bytesAtServer[:32]
 	// 32 is the size of the IPFIX message including all headers
 	assert.Equal(t, 32, bytesSent)
-	assert.Equal(t, tempRecBytes, firstTemplateBytes[20:])
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 
 	exporter.CloseConnToCollector()
@@ -212,35 +213,41 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
 	templateID := exporter.NewTemplateID()
 	// Get the element to update template in exporting process
-	element1, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
-	if err != nil {
-		t.Errorf("Did not find the element with name sourceIPv4Address")
-	}
-	element2, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
-	if err != nil {
-		t.Errorf("Did not find the element with name destinationIPv4Address")
-	}
-	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
-	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2}, 8)
-
-	// Create data record with two fields
-	dataRec := entities.NewDataRecord(templateID)
-	dataRec.PrepareRecord()
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
+	element1 := entities.NewInfoElementWithValue(element, nil)
+	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	element2 := entities.NewInfoElementWithValue(element, nil)
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
+
+	// Create data set with 1 data record
+	dataSet := entities.NewSet(entities.Data, templateID, false)
+	elements := make([]*entities.InfoElementWithValue, 0)
+	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	ie := entities.NewInfoElementWithValue(element, net.ParseIP("1.2.3.4"))
+	elements = append(elements, ie)
 
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
-	dataRecBuff := dataRec.GetBuffer()
+	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
+	elements = append(elements, ie)
+
+	dataSet.AddRecord(elements, templateID)
+	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Data, dataRec)
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Data, dataSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
@@ -286,35 +293,41 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	// [Only for testing] Ensure corresponding template exists in the exporting process before sending data
 	templateID := exporter.NewTemplateID()
 	// Get the element to update template in exporting process
-	element1, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
-	if err != nil {
-		t.Errorf("Did not find the element with name sourceIPv4Address")
-	}
-	element2, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
-	if err != nil {
-		t.Errorf("Did not find the element with name destinationIPv4Address")
-	}
-	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
-	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2}, 8)
-
-
-	// Create data record with two fields
-	dataRec := entities.NewDataRecord(templateID)
-	dataRec.PrepareRecord()
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name sourceIPv4Address")
 	}
-	dataRec.AddInfoElement(element, net.ParseIP("1.2.3.4"))
+	element1 := entities.NewInfoElementWithValue(element, nil)
+	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name destinationIPv4Address")
+	}
+	element2 := entities.NewInfoElementWithValue(element, nil)
+	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
+
+	// Create data set with 1 data record
+	dataSet := entities.NewSet(entities.Data, templateID, false)
+	elements := make([]*entities.InfoElementWithValue, 0)
+	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv4Address")
+	}
+	ie := entities.NewInfoElementWithValue(element, net.ParseIP("1.2.3.4"))
+	elements = append(elements, ie)
 
 	element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
-	dataRecBuff := dataRec.GetBuffer()
+	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
+	elements = append(elements, ie)
+
+	dataSet.AddRecord(elements, templateID)
+	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
-	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Data, dataRec)
+
+	bytesSent, err := exporter.AddSetAndSendMsg(entities.Data, dataSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}

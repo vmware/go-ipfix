@@ -137,15 +137,15 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities
 	return &message, nil
 }
 
-func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (interface{}, error) {
+func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (entities.Set, error) {
 	var templateID uint16
 	var fieldCount uint16
 	err := util.Decode(templateBuffer, binary.BigEndian, &templateID, &fieldCount)
 	if err != nil {
 		return nil, err
 	}
-	elements := make([]*entities.InfoElement, 0)
-	templateSet := entities.NewTemplateSet()
+	elementsWithValue := make([]*entities.InfoElementWithValue, 0)
+	templateSet := entities.NewSet(entities.Template, templateID, true)
 
 	for i := 0; i < int(fieldCount); i++ {
 		var element *entities.InfoElement
@@ -193,40 +193,48 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				return nil, err
 			}
 		}
-		templateSet.AddInfoElement(enterpriseID, elementID)
-		elements = append(elements, element)
+		ie := entities.NewInfoElementWithValue(element, nil)
+		elementsWithValue = append(elementsWithValue, ie)
 	}
-	cp.addTemplate(obsDomainID, templateID, elements)
+	templateSet.AddRecord(elementsWithValue, templateID)
+	cp.addTemplate(obsDomainID, templateID, elementsWithValue)
 	return templateSet, nil
 }
 
-func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (interface{}, error) {
+func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (entities.Set, error) {
 	// make sure template exists
 	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("Template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	dataSet := entities.NewDataSet()
-	for _, element := range template {
-		var length int
-		if element.Len == entities.VariableLength { // string
-			length = getFieldLength(dataBuffer)
-		} else {
-			length = int(element.Len)
+	dataSet := entities.NewSet(entities.Data, templateID, true)
+
+	for dataBuffer.Len() > 0 {
+		elements := make([]*entities.InfoElementWithValue, 0)
+		for _, element := range template {
+			var length int
+			if element.Len == entities.VariableLength { // string
+				length = getFieldLength(dataBuffer)
+			} else {
+				length = int(element.Len)
+			}
+			val := dataBuffer.Next(length)
+			ie := entities.NewInfoElementWithValue(element, bytes.NewBuffer(val))
+			elements = append(elements, ie)
 		}
-		val := dataBuffer.Next(length)
-		err := dataSet.AddInfoElement(element, bytes.NewBuffer(val))
-		if err != nil {
-			return nil, err
-		}
+		dataSet.AddRecord(elements, templateID)
 	}
 	return dataSet, nil
 }
 
-func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elements []*entities.InfoElement) {
+func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []*entities.InfoElementWithValue) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
 		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
+	}
+	elements := make([]*entities.InfoElement, 0)
+	for _, elementWithValue := range elementsWithValue {
+		elements = append(elements, elementWithValue.Element)
 	}
 	cp.templatesMap[obsDomainID][templateID] = elements
 	cp.templatesLock.Unlock()
