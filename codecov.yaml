@@ -1,0 +1,14 @@
+codecov:
+  token: ${{secrets.CODECOV_TOKEN}}
+  require_ci_to_pass: no
+
+comment:
+  layout: "reach,diff,flags,tree"
+  behavior: default
+  require_changes: no
+  require_base: no
+  require_head: no
+  after_n_builds: 1
+
+ignore:
+  - "**/testing/mock_*.go"
