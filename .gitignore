@@ -1,4 +1,5 @@
 pkg/registry/build_registry/build_registry
+.coverage/
 
 .DS_Store
 
