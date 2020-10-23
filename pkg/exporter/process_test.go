@@ -31,7 +31,7 @@ func init() {
 
 func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	// Create local server for testing
-	listener, err := net.Listen("tcp", "127.0.0.1:4738")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when creating a local server: %v", err)
 	}
@@ -175,7 +175,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	// Create local server for testing
-	listener, err := net.Listen("tcp", "127.0.0.1:4739")
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when creating a local server: %v", err)
 	}
