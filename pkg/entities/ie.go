@@ -279,7 +279,6 @@ func DecodeToIEDataType(dataType IEDataType, val interface{}) (interface{}, erro
 	default:
 		return nil, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 	}
-	return nil, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 }
 
 // EncodeToIEDataType is to encode data to specific type to the buff

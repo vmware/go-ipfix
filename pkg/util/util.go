@@ -34,11 +34,11 @@ func Encode(buff io.Writer, byteOrder binary.ByteOrder, inputs ...interface{}) e
 
 // Decode decodes data from io reader to specified interfaces
 /* Example:
-	var num1 uint16
-	var num2 uint32
-	// read the buffer 2 bytes and 4 bytes sequentially
-	// decode and output corresponding uint16 and uint32 number into num1 and num2 respectively
-	err := Decode(buffer, &num1, &num2)
+var num1 uint16
+var num2 uint32
+// read the buffer 2 bytes and 4 bytes sequentially
+// decode and output corresponding uint16 and uint32 number into num1 and num2 respectively
+err := Decode(buffer, &num1, &num2)
 */
 func Decode(buffer io.Reader, byteOrder binary.ByteOrder, outputs ...interface{}) error {
 	var err error

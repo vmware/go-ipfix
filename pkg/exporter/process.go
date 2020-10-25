@@ -99,7 +99,6 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 }
 
 func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set entities.Set) (int, error) {
-	recBytes := make([]byte, 0)
 	for _, record := range set.GetRecords() {
 		if setType == entities.Template {
 			ep.updateTemplate(record.GetTemplateID(), record.GetInfoElements(), record.GetMinDataRecordLen())
@@ -108,9 +107,6 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 			if err != nil {
 				return 0, fmt.Errorf("AddRecordAndSendMsg: error when doing sanity check:%v", err)
 			}
-		}
-		for _, byte := range record.GetBuffer().Bytes() {
-			recBytes = append(recBytes, byte)
 		}
 	}
 
