@@ -30,7 +30,9 @@ jobs:
     - name: Codecov
       uses: codecov/codecov-action@v1
       with:
-        file: ./coverage_unit.txt
+        file: .coverage/coverage_unit.txt
+        flags: unit-tests
+        name: codecov-unit-test
 
   test-integration:
     name: Integration test
@@ -51,7 +53,9 @@ jobs:
     - name: Codecov
       uses: codecov/codecov-action@v1
       with:
-        file: ./coverage_integration.txt
+        file: .coverage/coverage_integration.txt
+        flags: integration-tests
+        name: codecov-integration-test
 
   codegen:
     name: Check code generation
