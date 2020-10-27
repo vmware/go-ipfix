@@ -60,7 +60,7 @@ var InfoElementLength = [...]uint16{
 	1,
 	6,
 	VariableLength,
-	8,
+	4,
 	8,
 	8,
 	8,

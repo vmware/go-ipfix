@@ -30,4 +30,8 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), 55829)
 	registerInfoElement(*entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), 55829)
 	registerInfoElement(*entities.NewInfoElement("destinationServicePortName", 108, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyName", 109, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyNamespace", 110, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyName", 111, 13, 55829, 65535), 55829)
+	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyNamespace", 112, 13, 55829, 65535), 55829)
 }

@@ -179,9 +179,14 @@ func (d *dataRecord) AddInfoElement(element *InfoElement, val interface{}) (uint
 		} else {
 			bytesToAppend[0] = 2
 		}
-	case DateTimeSeconds, DateTimeMilliseconds:
-		// We expect time to be given in int64 as unix time type in go
-		v, ok := val.(int64)
+	case DateTimeSeconds:
+		v, ok := val.(uint32)
+		if !ok {
+			return 0, fmt.Errorf("val argument is not of type int64")
+		}
+		binary.BigEndian.PutUint32(bytesToAppend, uint32(v))
+	case DateTimeMilliseconds:
+		v, ok := val.(uint64)
 		if !ok {
 			return 0, fmt.Errorf("val argument is not of type int64")
 		}
