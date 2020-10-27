@@ -3,9 +3,11 @@ package intermediate
 import (
 	"encoding/binary"
 	"fmt"
+	"net"
 	"sync"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type aggregation struct {
@@ -69,6 +71,7 @@ func (a *aggregation) Stop() {
 
 // AggregateMsgBy5Tuple gets 5-tuple info from records in message and stores in cache
 func (a *aggregation) AggregateMsgBy5Tuple(message *entities.Message) error {
+	addOriginalExporterInfo(message)
 	if message.Set.GetSetType() == entities.Template { // skip template records
 		return nil
 	}
@@ -143,4 +146,48 @@ func getTupleFromRecord(record entities.Record) (Tuple, error) {
 		return Tuple{}, fmt.Errorf("Missing 5-tuple value(s) in the record.")
 	}
 	return Tuple{srcIP, dstIP, proto, srcPort, dstPort}, nil
+}
+
+// addOriginalExporterInfo adds originalExporterIPv4Address and originalObservationDomainId to records in message set
+func addOriginalExporterInfo(message *entities.Message) error {
+	set := message.Set
+	records := set.GetRecords()
+	for _, record := range records {
+		var originalExporterIPv4Address, originalObservationDomainId *entities.InfoElementWithValue
+
+		// Add originalExporterIPv4Address
+		ie, err := registry.GetInfoElement("originalExporterIPv4Address", registry.IANAEnterpriseID)
+		if err != nil {
+			return fmt.Errorf("IANA Registry is not loaded correctly with originalExporterIPv4Address.")
+		}
+		if set.GetSetType() == entities.Template {
+			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, nil)
+		} else if set.GetSetType() == entities.Data {
+			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, net.ParseIP(message.ExportAddress))
+		} else {
+			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
+		}
+		_, err = record.AddInfoElement(originalExporterIPv4Address, false)
+		if err != nil {
+			return err
+		}
+
+		// Add originalObservationDomainId
+		ie, err = registry.GetInfoElement("originalObservationDomainId", registry.IANAEnterpriseID)
+		if err != nil {
+			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId.")
+		}
+		if set.GetSetType() == entities.Template {
+			originalObservationDomainId = entities.NewInfoElementWithValue(ie, nil)
+		} else if set.GetSetType() == entities.Data {
+			originalObservationDomainId = entities.NewInfoElementWithValue(ie, message.ObsDomainID)
+		} else {
+			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
+		}
+		_, err = record.AddInfoElement(originalObservationDomainId, false)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

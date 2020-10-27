@@ -43,6 +43,8 @@ type collectingProcess struct {
 	maxBufferSize uint16
 	// chanel to receive stop information
 	stopChan chan bool
+	// useMsgChan indicates whether to use message channel to output message
+	useMsgChan bool
 	// messageChan is the channel to output message
 	messageChan chan *entities.Message
 	// maps each client to its client handler (required channels)
@@ -56,7 +58,7 @@ type clientHandler struct {
 	errChan    chan bool
 }
 
-func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32, messageChan chan *entities.Message) (*collectingProcess, error) {
+func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32, useMsgChan bool) (*collectingProcess, error) {
 	collectProc := &collectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		templatesLock: sync.RWMutex{},
@@ -64,7 +66,8 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL u
 		address:       address,
 		maxBufferSize: maxBufferSize,
 		stopChan:      make(chan bool),
-		messageChan:   messageChan,
+		useMsgChan:    useMsgChan,
+		messageChan:   make(chan *entities.Message),
 		clients:       make(map[string]*clientHandler),
 	}
 	return collectProc, nil
@@ -83,6 +86,13 @@ func (cp *collectingProcess) Stop() {
 	if cp.messageChan != nil {
 		close(cp.messageChan)
 	}
+}
+
+func (cp *collectingProcess) GetMsgChan() chan *entities.Message {
+	if !cp.useMsgChan {
+		return nil
+	}
+	return cp.messageChan
 }
 
 func (cp *collectingProcess) createClient() *clientHandler {
@@ -135,8 +145,8 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 		}
 		message.Set = set
 	}
-	addOriginalExporterInfo(&message)
-	if cp.messageChan != nil {
+	if cp.useMsgChan {
+		// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
 		cp.messageChan <- &message
 	}
 	return &message, nil
@@ -304,48 +314,4 @@ func getFieldLength(dataBuffer *bytes.Buffer) int {
 	lengthBuff = dataBuffer.Next(2)
 	util.Decode(bytes.NewBuffer(lengthBuff), binary.BigEndian, &lengthTwoBytes)
 	return int(lengthTwoBytes)
-}
-
-// addOriginalExporterInfo adds originalExporterIPv4Address and originalObservationDomainId to records in message set
-func addOriginalExporterInfo(message *entities.Message) error {
-	set := message.Set
-	records := set.GetRecords()
-	for _, record := range records {
-		var originalExporterIPv4Address, originalObservationDomainId *entities.InfoElementWithValue
-
-		// Add originalExporterIPv4Address
-		ie, err := registry.GetInfoElement("originalExporterIPv4Address", registry.IANAEnterpriseID)
-		if err != nil {
-			return fmt.Errorf("IANA Registry is not loaded correctly with originalExporterIPv4Address.")
-		}
-		if set.GetSetType() == entities.Template {
-			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, nil)
-		} else if set.GetSetType() == entities.Data {
-			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, net.ParseIP(message.ExportAddress))
-		} else {
-			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
-		}
-		_, err = record.AddInfoElement(originalExporterIPv4Address, false)
-		if err != nil {
-			return err
-		}
-
-		// Add originalObservationDomainId
-		ie, err = registry.GetInfoElement("originalObservationDomainId", registry.IANAEnterpriseID)
-		if err != nil {
-			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId.")
-		}
-		if set.GetSetType() == entities.Template {
-			originalObservationDomainId = entities.NewInfoElementWithValue(ie, nil)
-		} else if set.GetSetType() == entities.Data {
-			originalObservationDomainId = entities.NewInfoElementWithValue(ie, message.ObsDomainID)
-		} else {
-			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
-		}
-		_, err = record.AddInfoElement(originalObservationDomainId, false)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

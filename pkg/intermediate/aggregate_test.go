@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/registry"
 	"github.com/vmware/go-ipfix/pkg/util"
 )
 
@@ -114,4 +115,22 @@ func TestAggregationProcess(t *testing.T) {
 		167772161, 167772162, 6, 1234, 5678,
 	}
 	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
+}
+
+func TestAddOriginalExporterInfo(t *testing.T) {
+	registry.LoadRegistry()
+	// Test message with template set
+	message := createMsgwithTemplateSet()
+	addOriginalExporterInfo(message)
+	record := message.Set.GetRecords()[0]
+	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[5].Element.Name)
+	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[6].Element.Name)
+	// Test message with data set
+	message = createMsgwithDataSet()
+	addOriginalExporterInfo(message)
+	record = message.Set.GetRecords()[0]
+	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[5].Element.Name)
+	assert.Equal(t, uint32(2130706433), record.GetInfoElements()[5].Value)
+	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[6].Element.Name)
+	assert.Equal(t, uint32(1234), record.GetInfoElements()[6].Value)
 }

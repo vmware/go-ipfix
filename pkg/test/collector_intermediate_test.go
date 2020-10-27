@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
-	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/intermediate"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
@@ -18,14 +17,13 @@ var dataPacket = []byte{0, 10, 0, 33, 95, 140, 234, 81, 0, 0, 0, 0, 0, 0, 0, 1, 
 
 func TestCollectorToIntermediate(t *testing.T) {
 	registry.LoadRegistry()
-	messageChan := make(chan *entities.Message)
 	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
 	if err != nil {
 		t.Error(err)
 	}
 	// Initialize aggregation process and collecting process
-	ap, _ := intermediate.InitAggregationProcess(messageChan, 2)
-	cp, _ := collector.InitCollectingProcess(address, 1024, 0, messageChan)
+	cp, _ := collector.InitCollectingProcess(address, 1024, 0, true)
+	ap, _ := intermediate.InitAggregationProcess(cp.GetMsgChan(), 2)
 
 	go func() {
 		time.Sleep(time.Second)

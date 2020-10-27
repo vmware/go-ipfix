@@ -66,9 +66,8 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	// Load the global registry
 	registry.LoadRegistry()
 	// Initialize collecting process
-	messageChan := make(chan *entities.Message)
 	messages := make([]*entities.Message, 0)
-	cp, _ := collector.InitCollectingProcess(address, 1024, 0, messageChan)
+	cp, _ := collector.InitCollectingProcess(address, 1024, 0, true)
 
 	go func() { // Start exporting process in go routine
 		time.Sleep(2 * time.Second) // wait for collector to be ready
@@ -213,7 +212,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		cp.Stop() // Close collecting process
 	}()
 	go func() {
-		for message := range messageChan {
+		for message := range cp.GetMsgChan() {
 			messages = append(messages, message)
 		}
 	}()
