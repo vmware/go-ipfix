@@ -21,7 +21,7 @@ import (
 
 const (
 	// AntreaEnterpriseID is the enterprise ID for Antrea Information Elements
-	AntreaEnterpriseID uint32 = 55829
+	AntreaEnterpriseID uint32 = 56506
 	// IANAEnterpriseID is the enterprise ID for IANA Information Elements
 	IANAEnterpriseID uint32 = 0
 	// Enterprise ID for reverse Information Elements
