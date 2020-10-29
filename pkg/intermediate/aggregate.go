@@ -83,10 +83,7 @@ func (a *aggregation) AggregateMsgBy5Tuple(message *entities.Message) error {
 		if err != nil {
 			return err
 		}
-		if _, exist := a.tupleRecordMap[tuple]; !exist {
-			a.tupleRecordMap[tuple] = make([]entities.Record, 0)
-		}
-		a.tupleRecordMap[tuple] = append(a.tupleRecordMap[tuple], record)
+		a.correlateRecords(tuple, record)
 	}
 	return nil
 }
@@ -95,6 +92,34 @@ func (a *aggregation) GetTupleRecordMap() map[Tuple][]entities.Record {
 	a.tupleRecordLock.RLock()
 	defer a.tupleRecordLock.RUnlock()
 	return a.tupleRecordMap
+}
+
+// correlateRecords fills records info by correlating incoming and current records
+// only records from source node will be added to tupleRecordMap
+func (a *aggregation) correlateRecords(tuple Tuple, record entities.Record) {
+	if _, exist := a.tupleRecordMap[tuple]; !exist {
+		// if flow key does not exist in the cache, just add record to tupleRecordMap cache
+		a.tupleRecordMap[tuple] = make([]entities.Record, 0)
+		a.tupleRecordMap[tuple] = append(a.tupleRecordMap[tuple], record)
+		return
+	}
+	existingRecords := a.tupleRecordMap[tuple]
+	elements := record.GetInfoElements()
+	for _, existingRecord := range existingRecords {
+		existingElements := existingRecord.GetInfoElements()
+		for i, ieWithValue := range existingElements {
+			if ieWithValue.Value == "" {
+				ieWithValue.Value = elements[i].Value
+			}
+		}
+	}
+	for _, ieWithValue := range elements {
+		if ieWithValue.Element.Name == "sourcePodName" && ieWithValue.Value != "" {
+			// add record to tupleRecordMap when the record is from source node
+			a.tupleRecordMap[tuple] = append(a.tupleRecordMap[tuple], record)
+			return
+		}
+	}
 }
 
 // getTupleFromRecord returns 5-tuple from data record

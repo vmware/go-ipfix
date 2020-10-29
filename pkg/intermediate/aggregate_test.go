@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
@@ -21,7 +22,11 @@ func createMsgwithTemplateSet() *entities.Message {
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), nil)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), nil)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), nil)
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5)
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), nil)
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), nil)
+	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), nil)
+	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), nil)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
 	return &entities.Message{
 		Version:       10,
@@ -34,21 +39,68 @@ func createMsgwithTemplateSet() *entities.Message {
 	}
 }
 
-func createMsgwithDataSet() *entities.Message {
+func createMsgwithDataSet1() *entities.Message {
 	set := entities.NewSet(entities.Data, 256, true)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	srcPort := new(bytes.Buffer)
 	dstPort := new(bytes.Buffer)
 	proto := new(bytes.Buffer)
+	svcPort := new(bytes.Buffer)
+	srcPod := new(bytes.Buffer)
+	dstPod := new(bytes.Buffer)
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
 	util.Encode(proto, binary.BigEndian, uint8(6))
+	util.Encode(svcPort, binary.BigEndian, uint16(4739))
+	srcPod.WriteString("pod1")
+	dstPod.WriteString("")
 	ie1 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), bytes.NewBuffer([]byte{10, 0, 0, 1}))
 	ie2 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), bytes.NewBuffer([]byte{10, 0, 0, 2}))
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5)
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), srcPod)
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), dstPod)
+	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), bytes.NewBuffer([]byte{192, 168, 0, 1}))
+	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), svcPort)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
+	set.AddRecord(elements, 256)
+	return &entities.Message{
+		Version:       10,
+		BufferLength:  32,
+		SeqNumber:     1,
+		ObsDomainID:   uint32(1234),
+		ExportTime:    0,
+		ExportAddress: "127.0.0.1",
+		Set:           set,
+	}
+}
+
+func createMsgwithDataSet2() *entities.Message {
+	set := entities.NewSet(entities.Data, 256, true)
+	elements := make([]*entities.InfoElementWithValue, 0)
+	srcPort := new(bytes.Buffer)
+	dstPort := new(bytes.Buffer)
+	proto := new(bytes.Buffer)
+	svcPort := new(bytes.Buffer)
+	srcPod := new(bytes.Buffer)
+	dstPod := new(bytes.Buffer)
+	util.Encode(srcPort, binary.BigEndian, uint16(1234))
+	util.Encode(dstPort, binary.BigEndian, uint16(5678))
+	util.Encode(proto, binary.BigEndian, uint8(6))
+	util.Encode(svcPort, binary.BigEndian, uint16(4739))
+	srcPod.WriteString("")
+	dstPod.WriteString("pod2")
+	ie1 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), bytes.NewBuffer([]byte{10, 0, 0, 1}))
+	ie2 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), bytes.NewBuffer([]byte{10, 0, 0, 2}))
+	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
+	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
+	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), srcPod)
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), dstPod)
+	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), nil)
+	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), nil)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
 	return &entities.Message{
 		Version:       10,
@@ -85,7 +137,7 @@ func TestAggregateMsgBy5Tuple(t *testing.T) {
 	aggregationProcess.AggregateMsgBy5Tuple(message)
 	assert.Empty(t, aggregationProcess.GetTupleRecordMap())
 	// Data records should be processed and stored with corresponding tuple
-	message = createMsgwithDataSet()
+	message = createMsgwithDataSet1()
 	aggregationProcess.AggregateMsgBy5Tuple(message)
 	assert.NotEmpty(t, aggregationProcess.GetTupleRecordMap())
 	for tuple, records := range aggregationProcess.GetTupleRecordMap() {
@@ -101,7 +153,7 @@ func TestAggregateMsgBy5Tuple(t *testing.T) {
 func TestAggregationProcess(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
-	dataMsg := createMsgwithDataSet()
+	dataMsg := createMsgwithDataSet1()
 	go func() {
 		messageChan <- createMsgwithTemplateSet()
 		time.Sleep(time.Second)
@@ -123,14 +175,34 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	message := createMsgwithTemplateSet()
 	addOriginalExporterInfo(message)
 	record := message.Set.GetRecords()[0]
-	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[5].Element.Name)
-	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[6].Element.Name)
+	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[9].Element.Name)
+	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[10].Element.Name)
 	// Test message with data set
-	message = createMsgwithDataSet()
+	message = createMsgwithDataSet1()
 	addOriginalExporterInfo(message)
 	record = message.Set.GetRecords()[0]
-	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[5].Element.Name)
-	assert.Equal(t, uint32(2130706433), record.GetInfoElements()[5].Value)
-	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[6].Element.Name)
-	assert.Equal(t, uint32(1234), record.GetInfoElements()[6].Value)
+	klog.Info(record.GetInfoElements())
+	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[9].Element.Name)
+	assert.Equal(t, uint32(2130706433), record.GetInfoElements()[9].Value)
+	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[10].Element.Name)
+	assert.Equal(t, uint32(1234), record.GetInfoElements()[10].Value)
+}
+
+func TestCorrelateRecords(t *testing.T) {
+	registry.LoadRegistry()
+	messageChan := make(chan *entities.Message)
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
+	message1 := createMsgwithDataSet1()
+	message2 := createMsgwithDataSet2()
+	aggregationProcess.AggregateMsgBy5Tuple(message1)
+	aggregationProcess.AggregateMsgBy5Tuple(message2)
+	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
+	for _, records := range aggregationProcess.GetTupleRecordMap() {
+		assert.Equal(t, 1, len(records))
+		elements := records[0].GetInfoElements()
+		assert.Equal(t, "pod1", elements[5].Value)
+		assert.Equal(t, "pod2", elements[6].Value)
+		assert.Equal(t, []byte{192, 168, 0, 1}, elements[7].Value)
+		assert.Equal(t, uint16(4739), elements[8].Value)
+	}
 }
