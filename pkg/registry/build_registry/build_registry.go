@@ -54,7 +54,7 @@ func initIANARegistry() {
 		klog.Error("Error in reading license header file")
 	}
 	writer := bufio.NewWriter(output)
-	fmt.Fprintf(writer, string(licenseHeader) + "\n\n")
+	fmt.Fprintf(writer, string(licenseHeader)+"\n\n")
 	fmt.Fprintf(writer,
 		`package registry
 
@@ -76,9 +76,9 @@ func loadIANARegistry() {
 		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], "0")
 		fmt.Fprintf(writer, parameters)
-		writer.WriteString("), " )
+		writer.WriteString("), ")
 		fmt.Fprintf(writer, fmt.Sprint(registry.IANAEnterpriseID))
-		writer.WriteString(")\n" )
+		writer.WriteString(")\n")
 	}
 	writer.WriteString("}\n")
 	writer.Flush()
@@ -105,7 +105,7 @@ func initAntreaRegistry() {
 		klog.Error("Error in reading license header file")
 	}
 	writer := bufio.NewWriter(output)
-	fmt.Fprintf(writer, string(licenseHeader) + "\n\n")
+	fmt.Fprintf(writer, string(licenseHeader)+"\n\n")
 	fmt.Fprintf(writer,
 		`package registry
 
@@ -127,9 +127,9 @@ func loadAntreaRegistry() {
 		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
 		parameters := generateIEString(row[1], row[0], row[2], row[12])
 		fmt.Fprintf(writer, parameters)
-		writer.WriteString("), " )
+		writer.WriteString("), ")
 		fmt.Fprintf(writer, fmt.Sprint(registry.AntreaEnterpriseID))
-		writer.WriteString(")\n" )
+		writer.WriteString(")\n")
 	}
 	writer.WriteString("}\n")
 	writer.Flush()
@@ -167,10 +167,7 @@ func generateIEString(name string, elementid string, datatype string, enterprise
 	elementID, _ := strconv.ParseUint(elementid, 10, 16)
 	enterpriseID, _ := strconv.ParseUint(enterpriseid, 10, 16)
 	dataType := entities.IENameToType(datatype)
-	length := uint16(0)
-	if entities.IsValidDataType(dataType) {
-		length = entities.InfoElementLength[dataType]
-	}
+	length := entities.InfoElementLength[dataType]
 	return fmt.Sprintf("\"%s\", %d, %v, %d, %d", name, uint16(elementID), dataType, uint16(enterpriseID), length)
 }
 
