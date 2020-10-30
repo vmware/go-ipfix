@@ -18,7 +18,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
+	"time"
 )
+
 var uniqueTemplateID uint16 = 256
 
 func TestPrepareRecord(t *testing.T) {
@@ -57,6 +59,8 @@ func TestAddInfoElements(t *testing.T) {
 		NewInfoElement("sourceMacAddress", 56, 12, 0, 6),         // mac address
 		NewInfoElement("sourceIPv4Address", 8, 18, 0, 4),         // IP Address
 		NewInfoElement("interfaceDescription", 83, 13, 0, 65535), // String
+		NewInfoElement("flowStartSeconds", 150, 14, 0, 8),        // dateTimeSeconds
+		NewInfoElement("flowStartMilliseconds", 152, 15, 0, 8),   // dateTimeMilliseconds
 	}
 	macAddress, _ := net.ParseMAC("aa:bb:cc:dd:ee:ff")
 	valData := []interface{}{
@@ -70,6 +74,8 @@ func TestAddInfoElements(t *testing.T) {
 		macAddress,                  // mac address
 		net.ParseIP("1.2.3.4"),      // IP Address
 		"My Interface in IPFIX lib", // String
+		uint32(time.Now().Unix()),   // dateTimeSeconds
+		uint64(time.Now().Unix()),   // dateTimeMilliseconds
 	}
 	addIETests := []struct {
 		record  Record
