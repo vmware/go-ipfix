@@ -209,7 +209,14 @@ func (d DataSet) AddInfoElement(element *InfoElement, val *bytes.Buffer) error {
 		} else {
 			d[element.EnterpriseId][element.ElementId] = false
 		}
-	case DateTimeSeconds, DateTimeMilliseconds:
+	case DateTimeSeconds:
+		var v uint32
+		err := util.Decode(val, &v)
+		if err != nil {
+			return fmt.Errorf("Error in decoding val to uint32: %v", err)
+		}
+		d[element.EnterpriseId][element.ElementId] = v
+	case DateTimeMilliseconds:
 		var v uint64
 		err := util.Decode(val, &v)
 		if err != nil {
