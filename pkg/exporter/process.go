@@ -185,6 +185,7 @@ func (ep *ExportingProcess) sendMsg() (int, error) {
 		ep.seqNumber = ep.seqNumber + 1
 	}
 	// Send msg on the connection
+	klog.Info(byteSlice)
 	bytesSent, err := ep.connToCollector.Write(byteSlice)
 	if err != nil {
 		// Reset the message buffer and return error
