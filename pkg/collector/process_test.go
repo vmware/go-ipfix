@@ -282,7 +282,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	if !ok {
 		t.Error("Message.Set does not store data in correct format")
 	}
-	ipAddress := []byte{1, 2, 3, 4}
+	ipAddress := net.IP([]byte{1, 2, 3, 4})
 	elements := v.GetRecords()[0].GetInfoElements()
 	assert.Equal(t, ipAddress, elements[0].Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
