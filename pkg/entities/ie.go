@@ -263,7 +263,14 @@ func DecodeToIEDataType(dataType IEDataType, val interface{}) (interface{}, erro
 		} else {
 			return false, nil
 		}
-	case DateTimeSeconds, DateTimeMilliseconds:
+	case DateTimeSeconds:
+		var v uint32
+		err := util.Decode(value, binary.BigEndian, &v)
+		if err != nil {
+			return nil, fmt.Errorf("Error in decoding val to uint32: %v", err)
+		}
+		return v, nil
+	case DateTimeMilliseconds:
 		var v uint64
 		err := util.Decode(value, binary.BigEndian, &v)
 		if err != nil {
@@ -367,14 +374,20 @@ func EncodeToIEDataType(dataType IEDataType, val interface{}, buff *bytes.Buffer
 			err := util.Encode(buff, binary.BigEndian, int8(2))
 			return int8(2), err
 		}
-	case DateTimeSeconds, DateTimeMilliseconds:
-		// We expect time to be given in int64 as unix time type in go
-		v, ok := val.(int64)
+	case DateTimeSeconds:
+		v, ok := val.(uint32)
 		if !ok {
-			return nil, fmt.Errorf("val argument is not of type int64")
+			return 0, fmt.Errorf("val argument is not of type uint32")
 		}
-		err := util.Encode(buff, binary.BigEndian, uint64(v))
-		return uint64(v), err
+		err := util.Encode(buff, binary.BigEndian, v)
+		return v, err
+	case DateTimeMilliseconds:
+		v, ok := val.(uint64)
+		if !ok {
+			return 0, fmt.Errorf("val argument is not of type uint64")
+		}
+		err := util.Encode(buff, binary.BigEndian, v)
+		return v, err
 		// Currently only supporting seconds and milliseconds
 	case DateTimeMicroseconds, DateTimeNanoseconds:
 		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
