@@ -47,7 +47,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 		}
 		defer conn.Close()
 		t.Log("Accept the connection from exporter")
-		buff := make([]byte, 32)
+		buff := make([]byte, 36)
 		_, err = conn.Read(buff)
 		if err != nil {
 			t.Fatal(err)
@@ -64,9 +64,9 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", listener.Addr().String())
 
-	// Create template record with two fields
+	// Create template record with 3 fields
 	templateID := exporter.NewTemplateID()
-	tempRec := entities.NewTemplateRecord(2, templateID)
+	tempRec := entities.NewTemplateRecord(3, templateID)
 	tempRec.PrepareRecord()
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -78,16 +78,20 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
 	tempRec.AddInfoElement(element, nil)
+	element, err = registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv6Address")
+	}
+	tempRec.AddInfoElement(element, nil)
 	tempRecBuff := tempRec.GetBuffer()
 	tempRecBytes := tempRecBuff.Bytes()
-
 
 	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Template, tempRec)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
 	// 32 is the size of the IPFIX message including all headers
-	assert.Equal(t, 32, bytesSent)
+	assert.Equal(t, 36, bytesSent)
 	assert.Equal(t, tempRecBytes, <-buffCh)
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 	exporter.CloseConnToCollector()
@@ -113,8 +117,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 		bytes := make([]byte, 0)
 		numBytes := 0
-		for start := time.Now(); time.Since(start) < 2* time.Second; {
-			b := make([]byte, 32)
+		for start := time.Now(); time.Since(start) < 2*time.Second; {
+			b := make([]byte, 36)
 			nb, err := conn.Read(b)
 			if err != nil {
 				t.Fatal(err)
@@ -134,9 +138,9 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
 
-	// Create template record with two fields
+	// Create template record with 3 fields
 	templateID := exporter.NewTemplateID()
-	tempRec := entities.NewTemplateRecord(2, templateID)
+	tempRec := entities.NewTemplateRecord(3, templateID)
 	tempRec.PrepareRecord()
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -148,6 +152,13 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
 	tempRec.AddInfoElement(element, nil)
+
+	element, err = registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv6Address")
+	}
+	tempRec.AddInfoElement(element, nil)
+
 	tempRecBuff := tempRec.GetBuffer()
 	tempRecBytes := tempRecBuff.Bytes()
 
@@ -160,11 +171,11 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	// Expect to receive two template headers one from AddRecordAndSendMsg and other from tempRefresh go routine
 	bytesAtServer := <-buffCh
-	assert.Equal(t, len(bytesAtServer), 64)
-	assert.Equal(t, bytesAtServer[20:32], bytesAtServer[52:], "both template messages should be same")
-	firstTemplateBytes := bytesAtServer[:32]
-	// 32 is the size of the IPFIX message including all headers
-	assert.Equal(t, 32, bytesSent)
+	assert.Equal(t, len(bytesAtServer), 72)
+	assert.Equal(t, bytesAtServer[20:36], bytesAtServer[56:], "both template messages should be same")
+	firstTemplateBytes := bytesAtServer[:36]
+	// 36 is the size of the IPFIX message including all headers
+	assert.Equal(t, 36, bytesSent)
 	assert.Equal(t, tempRecBytes, firstTemplateBytes[20:])
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 
@@ -191,7 +202,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 		}
 		defer conn.Close()
 		t.Log("Accept the connection from exporter")
-		buff := make([]byte, 28)
+		buff := make([]byte, 44)
 		_, err = conn.Read(buff)
 		if err != nil {
 			t.Fatal(err)
@@ -220,8 +231,12 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
-	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2}, 8)
+	element3, err := registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv6Address")
+	}
+	// Hardcoding 24-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2, element3}, 24)
 
 	// Create data record with two fields
 	dataRec := entities.NewDataRecord(templateID)
@@ -237,6 +252,13 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
 	dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
+
+	element, err = registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv6Address")
+	}
+	dataRec.AddInfoElement(element, net.ParseIP("2001:db8::68"))
+
 	dataRecBuff := dataRec.GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
@@ -244,8 +266,8 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
-	// 28 is the size of the IPFIX message including all headers (20 bytes)
-	assert.Equal(t, 28, bytesSent)
+	// 44 is the size of the IPFIX message including all headers (36 bytes)
+	assert.Equal(t, 44, bytesSent)
 	assert.Equal(t, dataRecBytes, <-buffCh)
 	assert.Equal(t, uint32(1), exporter.seqNumber)
 	exporter.CloseConnToCollector()
@@ -265,7 +287,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	// TODO: Move this in to different function with byte size as arg
 	go func() {
 		defer conn.Close()
-		buff := make([]byte, 28)
+		buff := make([]byte, 44)
 		_, err = conn.Read(buff)
 		if err != nil {
 			t.Fatal(err)
@@ -294,9 +316,14 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	if err != nil {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
-	// Hardcoding 8-bytes min data record length for testing purposes instead of creating template record
-	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2}, 8)
 
+	element3, err := registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv6Address")
+	}
+
+	// Hardcoding 24-bytes min data record length for testing purposes instead of creating template record
+	exporter.updateTemplate(templateID, []*entities.InfoElement{element1, element2, element3}, 24)
 
 	// Create data record with two fields
 	dataRec := entities.NewDataRecord(templateID)
@@ -312,14 +339,21 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 		t.Errorf("Did not find the element with name destinationIPv4Address")
 	}
 	dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
+
+	element, err = registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+	if err != nil {
+		t.Errorf("Did not find the element with name sourceIPv6Address")
+	}
+	dataRec.AddInfoElement(element, net.ParseIP("2001:db8::68"))
+
 	dataRecBuff := dataRec.GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 	bytesSent, err := exporter.AddRecordAndSendMsg(entities.Data, dataRec)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
-	// 28 is the size of the IPFIX message including all headers (20 bytes)
-	assert.Equal(t, 28, bytesSent)
+	// 44 is the size of the IPFIX message including all headers (36 bytes)
+	assert.Equal(t, 44, bytesSent)
 	assert.Equal(t, dataRecBytes, <-buffCh)
 	assert.Equal(t, uint32(1), exporter.seqNumber)
 	exporter.CloseConnToCollector()

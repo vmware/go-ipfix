@@ -319,3 +319,59 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	time.Sleep(10 * time.Second)
 	assert.Nil(t, cp.templatesMap[1][256], "Template should be deleted after 5 seconds.")
 }
+
+func TestTCPCollectingProcessWithIPv6Address(t *testing.T) {
+	address, err := net.ResolveTCPAddr("tcp", "[::1]:4740")
+	if err != nil {
+		t.Error(err)
+	}
+	cp, err := InitCollectingProcess(address, 1024, 0)
+	if err != nil {
+		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
+	}
+	go func() {
+		time.Sleep(2 * time.Second)
+		conn, err := net.Dial(address.Network(), address.String())
+		if err != nil {
+			t.Fatalf("Cannot establish connection to %s", address.String())
+		}
+		defer conn.Close()
+		conn.Write(validTemplatePacket)
+	}()
+	go func() {
+		time.Sleep(4 * time.Second)
+		cp.Stop()
+	}()
+	cp.Start()
+	assert.NotNil(t, cp.templatesMap[1], "TCP Collecting Process with IPv6 Address should receive and store the received template.")
+}
+
+func TestUDPCollectingProcessWithIPv6Address(t *testing.T) {
+	address, err := net.ResolveUDPAddr("udp", "[::1]:4741")
+	if err != nil {
+		t.Error(err)
+	}
+	cp, err := InitCollectingProcess(address, 1024, 0)
+	if err != nil {
+		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
+	}
+	go func() {
+		time.Sleep(2 * time.Second)
+		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
+		if err != nil {
+			t.Errorf("UDP Address cannot be resolved.")
+		}
+		conn, err := net.DialUDP("udp", nil, resolveAddr)
+		if err != nil {
+			t.Errorf("UDP Collecting Process does not start correctly.")
+		}
+		defer conn.Close()
+		conn.Write(validTemplatePacket)
+	}()
+	go func() {
+		time.Sleep(4 * time.Second)
+		cp.Stop()
+	}()
+	cp.Start()
+	assert.NotNil(t, cp.templatesMap[1], "UDP Collecting Process with IPv6 Address should receive and store the received template.")
+}

@@ -57,7 +57,8 @@ func TestAddInfoElements(t *testing.T) {
 		NewInfoElement("samplingProbability", 311, 10, 0, 8),     // float64
 		NewInfoElement("dataRecordsReliability", 276, 11, 0, 1),  // boolean
 		NewInfoElement("sourceMacAddress", 56, 12, 0, 6),         // mac address
-		NewInfoElement("sourceIPv4Address", 8, 18, 0, 4),         // IP Address
+		NewInfoElement("sourceIPv4Address", 8, 18, 0, 4),         // IPv4 Address
+		NewInfoElement("sourceIPv6Address", 27, 19, 0, 16),		 // IPv6 Address
 		NewInfoElement("interfaceDescription", 83, 13, 0, 65535), // String
 		NewInfoElement("flowStartSeconds", 150, 14, 0, 8),        // dateTimeSeconds
 		NewInfoElement("flowStartMilliseconds", 152, 15, 0, 8),   // dateTimeMilliseconds
@@ -72,7 +73,8 @@ func TestAddInfoElements(t *testing.T) {
 		0.856,                       // samplingProbability
 		true,                        // dataRecordsReliability
 		macAddress,                  // mac address
-		net.ParseIP("1.2.3.4"),      // IP Address
+		net.ParseIP("1.2.3.4"),      // IPv4 Address
+		net.ParseIP("2001:db8::68"), // IPv6 Address
 		"My Interface in IPFIX lib", // String
 		uint32(time.Now().Unix()),   // dateTimeSeconds
 		uint64(time.Now().Unix()),   // dateTimeMilliseconds

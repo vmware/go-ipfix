@@ -29,7 +29,15 @@ import (
 )
 
 func TestUDPTransport(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
+	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4738")
+	if err != nil {
+		t.Error(err)
+	}
+	testExporterToCollector(address, t)
+}
+
+func TestUDPTransportWithIPv6(t *testing.T) {
+	address, err := net.ResolveUDPAddr("udp", "[::1]:4739")
 	if err != nil {
 		t.Error(err)
 	}
@@ -37,7 +45,15 @@ func TestUDPTransport(t *testing.T) {
 }
 
 func TestTCPTransport(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4739")
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4738")
+	if err != nil {
+		t.Error(err)
+	}
+	testExporterToCollector(address, t)
+}
+
+func TestTCPTransportWithIPv6(t *testing.T) {
+	address, err := net.ResolveTCPAddr("tcp", "[::1]:4739")
 	if err != nil {
 		t.Error(err)
 	}
@@ -57,9 +73,9 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 			klog.Fatalf("Got error when connecting to %s", address.String())
 		}
 
-		// Create template record with 5 fields
+		// Create template record with 6 fields
 		templateID := export.NewTemplateID()
-		tempRec := entities.NewTemplateRecord(5, templateID)
+		tempRec := entities.NewTemplateRecord(6, templateID)
 		tempRec.PrepareRecord()
 		element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
@@ -70,6 +86,12 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 		element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
+		}
+		tempRec.AddInfoElement(element, nil)
+
+		element, err = registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+		if err != nil {
+			klog.Errorf("Did not find the element with name sourceIPv6Address")
 		}
 		tempRec.AddInfoElement(element, nil)
 
@@ -110,6 +132,12 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 			klog.Errorf("Did not find the element with name destinationIPv4Address")
 		}
 		dataRec.AddInfoElement(element, net.ParseIP("5.6.7.8"))
+
+		element, err = registry.GetInfoElement("sourceIPv6Address", registry.IANAEnterpriseID)
+		if err != nil {
+			klog.Errorf("Did not find the element with name sourceIPv6Address")
+		}
+		dataRec.AddInfoElement(element, net.ParseIP("2001:db8::68"))
 
 		element, err = registry.GetInfoElement("octetDeltaCount", registry.IANAReversedEnterpriseID)
 		if err != nil {
@@ -152,7 +180,7 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 	if !ok {
 		t.Error("Template packet is not decoded correctly.")
 	}
-	assert.Equal(t, []uint16{8, 12, 150}, templateSet[registry.IANAEnterpriseID], "TemplateSet does not store template elements (IANA) correctly.")
+	assert.Equal(t, []uint16{8, 12, 27, 150}, templateSet[registry.IANAEnterpriseID], "TemplateSet does not store template elements (IANA) correctly.")
 	assert.Equal(t, []uint16{1}, templateSet[registry.IANAReversedEnterpriseID], "TemplateSet does not store template elements (reverse information element) correctly.")
 	assert.Equal(t, []uint16{101}, templateSet[registry.AntreaEnterpriseID], "TemplateSet does not store template elements (Antrea) correctly.")
 
@@ -161,6 +189,7 @@ func testExporterToCollector(address net.Addr, t *testing.T) {
 		t.Error("Data packet is not decoded correctly.")
 	}
 	assert.Equal(t, []byte{1, 2, 3, 4}, dataSet[registry.IANAEnterpriseID][8], "DataSet does not store elements (IANA) correctly.")
+	assert.Equal(t, []byte{32, 1, 13, 184, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 104}, dataSet[registry.IANAEnterpriseID][27], "DataSet does not store elements (IANA) correctly.")
 	assert.Equal(t, uint32(1257894000), dataSet[registry.IANAEnterpriseID][150], "DataSet does not store elements (IANA) correctly.")
 	assert.Equal(t, uint64(12345678), dataSet[registry.IANAReversedEnterpriseID][1], "DataSet does not store reverse information elements (IANA) correctly.")
 	assert.Equal(t, "pod1", dataSet[registry.AntreaEnterpriseID][101], "DataSet does not store elements (Antrea) correctly.")
