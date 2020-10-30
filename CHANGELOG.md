@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.2.3 10-30-2020
+### Added
+- Support IPv6 cluster IP field in Antrea repo. (#63, @srikartati)
+### Changed
+- Change `DateTimeSeconds` type for information elements to `uint32` following RFC7011. (#59, @zyiou)
+- Change PEN number for Antrea to '56506' (assigned by IANA). (#60, @zyiou)
 ## 0.2.2 09-25-2020
 ### Changed
 - Change reverse information element and const naming. (#45, @zyiou)
