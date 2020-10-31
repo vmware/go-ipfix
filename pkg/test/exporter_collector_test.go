@@ -75,7 +75,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 			klog.Fatalf("Got error when connecting to %s", address.String())
 		}
 
-		// Create template record with 4 fields
+		// Create template record with 5 fields
 		templateID := export.NewTemplateID()
 		templateSet := entities.NewSet(entities.Template, templateID, false)
 		elements := make([]*entities.InfoElementWithValue, 0)
@@ -103,6 +103,13 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the element with name sourcePodName")
+		}
+		ie = entities.NewInfoElementWithValue(element, nil)
+		elements = append(elements, ie)
+
+		element, err = registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
+		if err != nil {
+			klog.Errorf("Did not find the element with name flowStartSeconds")
 		}
 		ie = entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
@@ -145,6 +152,13 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		ie = entities.NewInfoElementWithValue(element, "pod1")
 		elements = append(elements, ie)
 
+		element, err = registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
+		if err != nil {
+			klog.Errorf("Did not find the element with name flowStartSeconds")
+		}
+		ie = entities.NewInfoElementWithValue(element, uint32(1257894000))
+		elements = append(elements, ie)
+
 		dataSet.AddRecord(elements, templateID)
 		// for multiple records per set, modify element values and add another record to set
 		if isMultipleRecord {
@@ -177,6 +191,13 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 			ie = entities.NewInfoElementWithValue(element, "pod2")
 			elements = append(elements, ie)
 
+			element, err = registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
+			if err != nil {
+				klog.Errorf("Did not find the element with name flowStartSeconds")
+			}
+			ie = entities.NewInfoElementWithValue(element, uint32(1257894000))
+			elements = append(elements, ie)
+
 			dataSet.AddRecord(elements, templateID)
 		}
 
@@ -204,19 +225,26 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	}
 	templateElements := templateSet.GetRecords()[0].GetInfoElements()
 	assert.Equal(t, uint32(0), templateElements[0].Element.EnterpriseId, "Template record is not stored correctly.")
+	assert.Equal(t, "sourceIPv4Address", templateElements[0].Element.Name, "Template record is not stored correctly.")
+	assert.Equal(t, "destinationIPv4Address", templateElements[1].Element.Name, "Template record is not stored correctly.")
+	assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[2].Element.EnterpriseId, "Template record is not stored correctly.")
+	assert.Equal(t, registry.AntreaEnterpriseID, templateElements[3].Element.EnterpriseId, "Template record is not stored correctly.")
 
 	dataSet, ok := dataMsg.Set.(entities.Set)
 	if !ok {
 		t.Error("Data packet is not decoded correctly.")
 	}
+
 	dataElements := dataSet.GetRecords()[0].GetInfoElements()
 	assert.Equal(t, []byte{1, 2, 3, 4}, dataElements[0].Value, "DataSet does not store elements (IANA) correctly.")
 	assert.Equal(t, uint64(12345678), dataElements[2].Value, "DataSet does not store reverse information elements (IANA) correctly.")
 	assert.Equal(t, "pod1", dataElements[3].Value, "DataSet does not store elements (Antrea) correctly.")
+	assert.Equal(t, uint32(1257894000), dataElements[4].Value, "DataSet does not store elements (IANA) correctly.")
 	if isMultipleRecord {
 		dataElements := dataSet.GetRecords()[1].GetInfoElements()
 		assert.Equal(t, []byte{4, 3, 2, 1}, dataElements[0].Value, "DataSet does not store multiple records correctly.")
 		assert.Equal(t, uint64(0), dataElements[2].Value, "DataSet does not store multiple records correctly.")
 		assert.Equal(t, "pod2", dataElements[3].Value, "DataSet does not store multiple records correctly.")
+		assert.Equal(t, uint32(1257894000), dataElements[4].Value, "DataSet does not store elements (IANA) correctly.")
 	}
 }

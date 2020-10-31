@@ -1,14 +1,15 @@
 ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,Range,References,Requester,Revision,Date,Enterprise ID,
-100,sourcePodNamespace,string,,current,,,,,,,,55829,https://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
-101,sourcePodName,string,,current,,,,,,,,55829,Picked the enterprise ID that was not reserved yet.
-102,destinationPodNamespace,string,,current,,,,,,,,55829,
-103,destinationPodName,string,,current,,,,,,,,55829,
-104,sourceNodeName,string,,current,,,,,,,,55829,
-105,destinationNodeName,string,,current,,,,,,,,55829,
-106,destinationClusterIP,ipv4Address,,current,,,,,,,,55829,
-107,destinationServicePort,unsigned16,,current,,,,,,,,55829,
-108,destinationServicePortName,string,,current,,,,,,,,55829,
-109,ingressNetworkPolicyName,string,,current,,,,,,,,55829,
-110,ingressNetworkPolicyNamespace,string,,current,,,,,,,,55829,
-111,egressNetworkPolicyName,string,,current,,,,,,,,55829,
-112,egressNetworkPolicyNamespace,string,,current,,,,,,,,55829,
+100,sourcePodNamespace,string,,current,,,,,,,,56506,https://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
+101,sourcePodName,string,,current,,,,,,,,56506,Picked the enterprise ID that was not reserved yet.
+102,destinationPodNamespace,string,,current,,,,,,,,56506,
+103,destinationPodName,string,,current,,,,,,,,56506,
+104,sourceNodeName,string,,current,,,,,,,,56506,
+105,destinationNodeName,string,,current,,,,,,,,56506,
+106,destinationClusterIPv4,ipv4Address,,current,,,,,,,,56506,
+107,destinationClusterIPv6,ipv6Address,,current,,,,,,,,56506,
+108,destinationServicePort,unsigned16,,current,,,,,,,,56506,
+109,destinationServicePortName,string,,current,,,,,,,,56506,
+110,ingressNetworkPolicyName,string,,current,,,,,,,,56506,
+111,ingressNetworkPolicyNamespace,string,,current,,,,,,,,56506,
+112,egressNetworkPolicyName,string,,current,,,,,,,,56506,
+113,egressNetworkPolicyNamespace,string,,current,,,,,,,,56506,
