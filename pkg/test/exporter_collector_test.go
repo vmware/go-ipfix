@@ -93,7 +93,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		ie = entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 
-		element, err = registry.GetInfoElement("octetDeltaCount", registry.IANAReversedEnterpriseID)
+		element, err = registry.GetInfoElement("reverseOctetDeltaCount", registry.IANAReversedEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the reverse element of octetDeltaCount")
 		}
@@ -138,7 +138,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
 		elements = append(elements, ie)
 
-		element, err = registry.GetInfoElement("octetDeltaCount", registry.IANAReversedEnterpriseID)
+		element, err = registry.GetInfoElement("reverseOctetDeltaCount", registry.IANAReversedEnterpriseID)
 		if err != nil {
 			klog.Errorf("Did not find the reverse element of octetDeltaCount")
 		}
@@ -177,7 +177,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 			ie = entities.NewInfoElementWithValue(element, net.ParseIP("8.7.6.5"))
 			elements = append(elements, ie)
 
-			element, err = registry.GetInfoElement("octetDeltaCount", registry.IANAReversedEnterpriseID)
+			element, err = registry.GetInfoElement("reverseOctetDeltaCount", registry.IANAReversedEnterpriseID)
 			if err != nil {
 				klog.Errorf("Did not find the reverse element of octetDeltaCount")
 			}
