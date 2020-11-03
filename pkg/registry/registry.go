@@ -16,6 +16,7 @@ package registry
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
@@ -103,7 +104,8 @@ func getIANAReverseInfoElement(name string) (*entities.InfoElement, error) {
 		err := fmt.Errorf("IANA Registry: The information element %s is not reverse element", name)
 		return ie, err
 	}
-	return entities.NewInfoElement(name, ie.ElementId, ie.DataType, IANAReversedEnterpriseID, ie.Len), nil
+	reverseName := "reverse" + strings.Title(ie.Name)
+	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, IANAReversedEnterpriseID, ie.Len), nil
 }
 
 // Non-reversible Information Elements follow Section 6.1 of RFC5103
