@@ -56,7 +56,7 @@ func TestGetIANAReverseIE(t *testing.T) {
 	assert.NotEqual(t, nil, error, "GetIANAReverseIE should return error when ie is not reversible.")
 	// reverse InfoElement exists
 	reverseIE, error = getIANAReverseInfoElement("deltaFlowCount")
-	assert.Equal(t, "deltaFlowCount", reverseIE.Name, "GetIANAReverseIE does not return correct reverse ie.")
+	assert.Equal(t, "reverseDeltaFlowCount", reverseIE.Name, "GetIANAReverseIE does not return correct reverse ie.")
 	assert.Equal(t, IANAReversedEnterpriseID, reverseIE.EnterpriseId, "GetIANAReverseIE does not return correct reverse ie.")
 }
 
@@ -67,7 +67,7 @@ func TestGetInfoElementFromID(t *testing.T) {
 	assert.NotEqual(t, nil, err, "TestGetInfoElementFromID should return error when ie does not exist.")
 	// InfoElement exists (reverse InfoElement)
 	ie, err = GetInfoElementFromID(1, IANAReversedEnterpriseID)
-	assert.Equal(t, "octetDeltaCount", ie.Name, "TestGetInfoElementFromID does not return correct reverse ie.")
+	assert.Equal(t, "reverseOctetDeltaCount", ie.Name, "TestGetInfoElementFromID does not return correct reverse ie.")
 	assert.Equal(t, IANAReversedEnterpriseID, ie.EnterpriseId, "TestGetInfoElementFromID does not return correct reverse ie.")
 	// InfoElement exists (IANA InfoElement)
 	ie, err = GetInfoElementFromID(1, IANAEnterpriseID)
