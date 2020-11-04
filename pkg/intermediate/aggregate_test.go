@@ -3,6 +3,7 @@ package intermediate
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 	"testing"
 	"time"
 
@@ -141,8 +142,8 @@ func TestAggregateMsgBy5Tuple(t *testing.T) {
 	aggregationProcess.AggregateMsgBy5Tuple(message)
 	assert.NotEmpty(t, aggregationProcess.GetTupleRecordMap())
 	for tuple, records := range aggregationProcess.GetTupleRecordMap() {
-		assert.Equal(t, tuple.SourceAddress, uint32(167772161))
-		assert.Equal(t, tuple.DestinationAddress, uint32(167772162))
+		assert.Equal(t, tuple.SourceAddress, [16]byte{10: 255, 11: 255, 12: 10, 15: 1})
+		assert.Equal(t, tuple.DestinationAddress, [16]byte{10: 255, 11: 255, 12: 10, 15: 2})
 		assert.Equal(t, tuple.SourcePort, uint16(1234))
 		assert.Equal(t, tuple.DestinationPort, uint16(5678))
 		assert.Equal(t, tuple.Protocol, uint8(6))
@@ -164,7 +165,7 @@ func TestAggregationProcess(t *testing.T) {
 	}()
 	aggregationProcess.Start()
 	tuple := Tuple{
-		167772161, 167772162, 6, 1234, 5678,
+		[16]byte{10: 255, 11: 255, 12: 10, 15: 1}, [16]byte{10: 255, 11: 255, 12: 10, 15: 2}, 6, 1234, 5678,
 	}
 	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
 }
@@ -175,34 +176,35 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	message := createMsgwithTemplateSet()
 	addOriginalExporterInfo(message)
 	record := message.Set.GetRecords()[0]
-	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[9].Element.Name)
-	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[10].Element.Name)
+	assert.Equal(t, true, record.ContainsInfoElement("originalExporterIPv4Address"))
+	assert.Equal(t, true, record.ContainsInfoElement("originalObservationDomainId"))
 	// Test message with data set
 	message = createMsgwithDataSet1()
 	addOriginalExporterInfo(message)
 	record = message.Set.GetRecords()[0]
 	klog.Info(record.GetInfoElements())
-	assert.Equal(t, "originalExporterIPv4Address", record.GetInfoElements()[9].Element.Name)
-	assert.Equal(t, uint32(2130706433), record.GetInfoElements()[9].Value)
-	assert.Equal(t, "originalObservationDomainId", record.GetInfoElements()[10].Element.Name)
-	assert.Equal(t, uint32(1234), record.GetInfoElements()[10].Value)
+	assert.Equal(t, true, record.ContainsInfoElement("originalExporterIPv4Address"))
+	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, record.GetInfoElement("originalExporterIPv4Address").Value)
+	assert.Equal(t, true, record.ContainsInfoElement("originalObservationDomainId"))
+	assert.Equal(t, uint32(1234), record.GetInfoElement("originalObservationDomainId").Value)
 }
 
 func TestCorrelateRecords(t *testing.T) {
 	registry.LoadRegistry()
 	messageChan := make(chan *entities.Message)
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
-	message1 := createMsgwithDataSet1()
-	message2 := createMsgwithDataSet2()
-	aggregationProcess.AggregateMsgBy5Tuple(message1)
-	aggregationProcess.AggregateMsgBy5Tuple(message2)
+	record1 := createMsgwithDataSet1().Set.GetRecords()[0]
+	tuple1, _ := getTupleFromRecord(record1)
+	record2 := createMsgwithDataSet2().Set.GetRecords()[0]
+	tuple2, _ := getTupleFromRecord(record2)
+	aggregationProcess.correlateRecords(tuple1, record1)
+	aggregationProcess.correlateRecords(tuple2, record2)
 	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
 	for _, records := range aggregationProcess.GetTupleRecordMap() {
 		assert.Equal(t, 1, len(records))
-		elements := records[0].GetInfoElements()
-		assert.Equal(t, "pod1", elements[5].Value)
-		assert.Equal(t, "pod2", elements[6].Value)
-		assert.Equal(t, []byte{192, 168, 0, 1}, elements[7].Value)
-		assert.Equal(t, uint16(4739), elements[8].Value)
+		assert.Equal(t, "pod1", records[0].GetInfoElement("sourcePodName").Value)
+		assert.Equal(t, "pod2", records[0].GetInfoElement("destinationPodName").Value)
+		assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, records[0].GetInfoElement("destinationClusterIP").Value)
+		assert.Equal(t, uint16(4739), records[0].GetInfoElement("destinationServicePort").Value)
 	}
 }

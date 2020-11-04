@@ -63,6 +63,8 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	cp.Start()
 	assert.NotNil(t, cp.templatesMap[1], "TCP Collecting Process should receive and store the received template.")
+	assert.Equal(t, 1, len(cp.GetMsgList()), "messageList should store the message when useMsgChan is set to false.")
+	assert.Nil(t, cp.GetMsgChan(), "messageChan should be nil when useMsgChan is set to false.")
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
@@ -93,6 +95,8 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	cp.Start()
 	assert.NotNil(t, cp.templatesMap[1], "UDP Collecting Process should receive and store the received template.")
+	assert.Equal(t, 1, len(cp.GetMsgList()), "messageList should store the message when useMsgChan is set to false.")
+	assert.Nil(t, cp.GetMsgChan(), "messageChan should be nil when useMsgChan is set to false.")
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -251,8 +255,9 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	if !ok {
 		t.Error("Template packet is not decoded correctly.")
 	}
-	elements := templateSet.GetRecords()[0].GetInfoElements()
-	assert.Equal(t, uint32(0), elements[0].Element.EnterpriseId, "Template record is not stored correctly.")
+	assert.Equal(t, true, templateSet.GetRecords()[0].ContainsInfoElement("sourceIPv4Address"))
+	sourceIPv4Address := templateSet.GetRecords()[0].GetInfoElement("sourceIPv4Address")
+	assert.Equal(t, uint32(0), sourceIPv4Address.Element.EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
 	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord), address.String())
@@ -291,8 +296,9 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 		t.Error("Message.Set does not store data in correct format")
 	}
 	ipAddress := net.IP([]byte{1, 2, 3, 4})
-	elements := v.GetRecords()[0].GetInfoElements()
-	assert.Equal(t, ipAddress, elements[0].Value, "sourceIPv4Address should be decoded and stored correctly.")
+	assert.Equal(t, true, v.GetRecords()[0].ContainsInfoElement("sourceIPv4Address"))
+	sourceIPv4Address := v.GetRecords()[0].GetInfoElement("sourceIPv4Address")
+	assert.Equal(t, ipAddress, sourceIPv4Address.Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
 	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord), address.String())

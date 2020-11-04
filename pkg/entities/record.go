@@ -38,15 +38,18 @@ type Record interface {
 	GetTemplateID() uint16
 	GetFieldCount() uint16
 	GetInfoElements() []*InfoElementWithValue
+	GetInfoElement(name string) *InfoElementWithValue
+	ContainsInfoElement(name string) bool
 	GetMinDataRecordLen() uint16
 }
 
 type baseRecord struct {
-	buff       bytes.Buffer
-	len        uint16
-	fieldCount uint16
-	templateID uint16
-	elements   []*InfoElementWithValue
+	buff        bytes.Buffer
+	len         uint16
+	fieldCount  uint16
+	templateID  uint16
+	elements    []*InfoElementWithValue
+	elementsMap map[string]*InfoElementWithValue
 	Record
 }
 
@@ -57,11 +60,12 @@ type dataRecord struct {
 func NewDataRecord(id uint16) *dataRecord {
 	return &dataRecord{
 		&baseRecord{
-			buff:       bytes.Buffer{},
-			len:        0,
-			fieldCount: 0,
-			templateID: id,
-			elements:   make([]*InfoElementWithValue, 0),
+			buff:        bytes.Buffer{},
+			len:         0,
+			fieldCount:  0,
+			templateID:  id,
+			elements:    make([]*InfoElementWithValue, 0),
+			elementsMap: make(map[string]*InfoElementWithValue),
 		},
 	}
 }
@@ -76,11 +80,12 @@ type templateRecord struct {
 func NewTemplateRecord(count uint16, id uint16) *templateRecord {
 	return &templateRecord{
 		&baseRecord{
-			buff:       bytes.Buffer{},
-			len:        0,
-			fieldCount: count,
-			templateID: id,
-			elements:   make([]*InfoElementWithValue, 0),
+			buff:        bytes.Buffer{},
+			len:         0,
+			fieldCount:  count,
+			templateID:  id,
+			elements:    make([]*InfoElementWithValue, 0),
+			elementsMap: make(map[string]*InfoElementWithValue),
 		},
 		0,
 	}
@@ -100,6 +105,20 @@ func (b *baseRecord) GetFieldCount() uint16 {
 
 func (d *baseRecord) GetInfoElements() []*InfoElementWithValue {
 	return d.elements
+}
+
+func (d *baseRecord) GetInfoElement(name string) *InfoElementWithValue {
+	if d.ContainsInfoElement(name) {
+		return d.elementsMap[name]
+	}
+	return nil
+}
+
+func (d *baseRecord) ContainsInfoElement(name string) bool {
+	if _, exist := d.elementsMap[name]; exist {
+		return true
+	}
+	return false
 }
 
 func (d *dataRecord) PrepareRecord() (uint16, error) {
@@ -123,6 +142,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bo
 	}
 	ie := NewInfoElementWithValue(element.Element, value)
 	d.elements = append(d.elements, ie)
+	d.elementsMap[element.Element.Name] = ie
 	if err != nil {
 		return 0, err
 	}
@@ -159,6 +179,7 @@ func (t *templateRecord) AddInfoElement(element *InfoElementWithValue, isDecodin
 		}
 	}
 	t.elements = append(t.elements, element)
+	t.elementsMap[element.Element.Name] = element
 	// Keep track of minimum data record length required for sanity check
 	if element.Element.Len == VariableLength {
 		t.minDataRecLength = t.minDataRecLength + 1

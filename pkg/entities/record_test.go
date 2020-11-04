@@ -128,3 +128,35 @@ func TestAddInfoElements(t *testing.T) {
 		}
 	}
 }
+
+func TestContainsInfoElement(t *testing.T) {
+	templateRec := NewTemplateRecord(1, 256)
+	templateRec.elementsMap = make(map[string]*InfoElementWithValue)
+	ie := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
+	templateRec.elementsMap["sourceIPv4Address"] = ie
+	assert.Equal(t, true, templateRec.ContainsInfoElement("sourceIPv4Address"))
+	assert.Equal(t, false, templateRec.ContainsInfoElement("destinationIPv4Address"))
+	dataRec := NewDataRecord(256)
+	dataRec.elementsMap = make(map[string]*InfoElementWithValue)
+	ie = NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
+	dataRec.elementsMap["sourceIPv4Address"] = ie
+	assert.Equal(t, true, dataRec.ContainsInfoElement("sourceIPv4Address"))
+	assert.Equal(t, false, dataRec.ContainsInfoElement("destinationIPv4Address"))
+}
+
+func TestGetInfoElement(t *testing.T) {
+	templateRec := NewTemplateRecord(1, 256)
+	templateRec.elementsMap = make(map[string]*InfoElementWithValue)
+	ie := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
+	templateRec.elementsMap["sourceIPv4Address"] = ie
+	assert.NotNil(t, templateRec.GetInfoElement("sourceIPv4Address"))
+	assert.Nil(t, templateRec.GetInfoElement("destinationIPv4Address"))
+
+	dataRec := NewDataRecord(256)
+	dataRec.elementsMap = make(map[string]*InfoElementWithValue)
+	ie = NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
+	dataRec.elementsMap["sourceIPv4Address"] = ie
+	assert.NotNil(t, dataRec.GetInfoElement("sourceIPv4Address"))
+	assert.Equal(t, net.ParseIP("10.0.0.1"), dataRec.GetInfoElement("sourceIPv4Address").Value)
+	assert.Nil(t, dataRec.GetInfoElement("destinationIPv4Address"))
+}

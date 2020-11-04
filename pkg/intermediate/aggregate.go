@@ -1,7 +1,6 @@
 package intermediate
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
 	"sync"
@@ -15,7 +14,7 @@ type aggregation struct {
 	tupleRecordMap map[Tuple][]entities.Record
 	// tupleRecordLock allows multiple readers or one writer at the same time
 	tupleRecordLock sync.RWMutex
-	// workerPool is for exchanging worker channels to process message
+	// workerPool is for storing worker channels to process message
 	workerPool chan chan *entities.Message
 	// messageChan is the channel to receive message
 	messageChan chan *entities.Message
@@ -26,10 +25,8 @@ type aggregation struct {
 }
 
 type Tuple struct {
-	// SourceAddress is the encoded format of sourceIPv4Address
-	SourceAddress uint32
-	// DestinationAddress is the encoded format of destinationIPv4Address
-	DestinationAddress uint32
+	SourceAddress      [16]byte
+	DestinationAddress [16]byte
 	Protocol           uint8
 	SourcePort         uint16
 	DestinationPort    uint16
@@ -76,8 +73,6 @@ func (a *aggregation) AggregateMsgBy5Tuple(message *entities.Message) error {
 		return nil
 	}
 	records := message.Set.GetRecords()
-	a.tupleRecordLock.Lock()
-	defer a.tupleRecordLock.Unlock()
 	for _, record := range records {
 		tuple, err := getTupleFromRecord(record)
 		if err != nil {
@@ -95,81 +90,143 @@ func (a *aggregation) GetTupleRecordMap() map[Tuple][]entities.Record {
 }
 
 // correlateRecords fills records info by correlating incoming and current records
-// only records from source node will be added to tupleRecordMap
 func (a *aggregation) correlateRecords(tuple Tuple, record entities.Record) {
-	if _, exist := a.tupleRecordMap[tuple]; !exist {
-		// if flow key does not exist in the cache, just add record to tupleRecordMap cache
-		a.tupleRecordMap[tuple] = make([]entities.Record, 0)
-		a.tupleRecordMap[tuple] = append(a.tupleRecordMap[tuple], record)
-		return
+	srcFieldsToFill := []string{
+		"destinationPodName",
+		"destinationPodNamespace",
+		"destinationNodeName",
 	}
-	existingRecords := a.tupleRecordMap[tuple]
-	elements := record.GetInfoElements()
-	for _, existingRecord := range existingRecords {
-		existingElements := existingRecord.GetInfoElements()
-		for i, ieWithValue := range existingElements {
-			if ieWithValue.Value == "" {
-				ieWithValue.Value = elements[i].Value
+	existingRecords := a.GetTupleRecordMap()[tuple]
+	// only fill the information for record from source node
+	if isRecordFromSrc(record) {
+		var isFilled bool
+		for _, existingRec := range existingRecords {
+			for _, field := range srcFieldsToFill {
+				if record.ContainsInfoElement(field) {
+					record.GetInfoElement(field).Value = existingRec.GetInfoElement(field).Value
+					isFilled = true
+				}
+			}
+			if isFilled {
+				break
+			}
+		}
+	} else {
+		for _, existingRec := range existingRecords {
+			if isRecordFromSrc(existingRec) {
+				for _, field := range srcFieldsToFill {
+					if record.ContainsInfoElement(field) {
+						existingRec.GetInfoElement(field).Value = record.GetInfoElement(field).Value
+					}
+				}
 			}
 		}
 	}
-	for _, ieWithValue := range elements {
-		if ieWithValue.Element.Name == "sourcePodName" && ieWithValue.Value != "" {
-			// add record to tupleRecordMap when the record is from source node
-			a.tupleRecordMap[tuple] = append(a.tupleRecordMap[tuple], record)
-			return
+	a.addRecordToMap(tuple, record)
+	a.removeDuplicates(tuple)
+}
+
+func (a *aggregation) removeDuplicates(tuple Tuple) {
+	a.tupleRecordLock.Lock()
+	defer a.tupleRecordLock.Unlock()
+	records := a.tupleRecordMap[tuple]
+	srcRecords := make([]entities.Record, 0)
+	dstRecords := make([]entities.Record, 0)
+	for _, record := range records {
+		if isRecordFromSrc(record) {
+			srcRecords = append(srcRecords, record)
+		} else {
+			dstRecords = append(dstRecords, record)
 		}
 	}
+	if len(srcRecords) != 0 {
+		a.tupleRecordMap[tuple] = srcRecords
+	} else {
+		a.tupleRecordMap[tuple] = dstRecords
+	}
+}
+
+func (a *aggregation) addRecordToMap(tuple Tuple, record entities.Record) {
+	a.tupleRecordLock.Lock()
+	defer a.tupleRecordLock.Unlock()
+	if _, exist := a.tupleRecordMap[tuple]; !exist {
+		a.tupleRecordMap[tuple] = make([]entities.Record, 0)
+	}
+	a.tupleRecordMap[tuple] = append(a.tupleRecordMap[tuple], record)
+}
+
+func isRecordFromSrc(record entities.Record) bool {
+	element := record.GetInfoElement("sourcePodName")
+	if element != nil && element.Value != "" {
+		return true
+	}
+	return false
 }
 
 // getTupleFromRecord returns 5-tuple from data record
 func getTupleFromRecord(record entities.Record) (Tuple, error) {
-	var srcIP, dstIP uint32
+	var srcIP, dstIP [16]byte
 	var srcPort, dstPort uint16
 	var proto uint8
-	// count is for checking whether 5-tuple is fully collected
-	count := 0
-	for _, infoElementWithValue := range record.GetInfoElements() {
-		if infoElementWithValue.Element.Name == "sourceIPv4Address" {
-			addr, ok := infoElementWithValue.Value.([]byte)
-			if !ok {
-				return Tuple{}, fmt.Errorf("sourceIPv4Address is not in correct format.")
-			}
-			srcIP = binary.BigEndian.Uint32(addr)
-			count++
-		} else if infoElementWithValue.Element.Name == "destinationIPv4Address" {
-			addr, ok := infoElementWithValue.Value.([]byte)
-			if !ok {
-				return Tuple{}, fmt.Errorf("destinationIPv4Address is not in correct format.")
-			}
-			dstIP = binary.BigEndian.Uint32(addr)
-			count++
-		} else if infoElementWithValue.Element.Name == "sourceTransportPort" {
-			v, ok := infoElementWithValue.Value.(uint16)
-			if !ok {
-				return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
-			}
-			srcPort = v
-			count++
-		} else if infoElementWithValue.Element.Name == "destinationTransportPort" {
-			v, ok := infoElementWithValue.Value.(uint16)
-			if !ok {
-				return Tuple{}, fmt.Errorf("destinationTransportPort is not in correct format.")
-			}
-			dstPort = v
-			count++
-		} else if infoElementWithValue.Element.Name == "protocolIdentifier" {
-			v, ok := infoElementWithValue.Value.(uint8)
-			if !ok {
-				return Tuple{}, fmt.Errorf("protocolIdentifier is not in correct format.")
-			}
-			proto = v
-			count++
+	// record has complete 5-tuple information (IPv4)
+	if record.ContainsInfoElement("sourceIPv4Address") && record.ContainsInfoElement("destinationIPv4Address") && record.ContainsInfoElement("sourceTransportPort") && record.ContainsInfoElement("destinationTransportPort") && record.ContainsInfoElement("protocolIdentifier") {
+		srcIPAddr, ok := record.GetInfoElement("sourceIPv4Address").Value.(net.IP)
+		if !ok {
+			return Tuple{}, fmt.Errorf("sourceIPv4Address is not in correct format.")
 		}
+		srcIP16Byte := net.IPv4(srcIPAddr[0], srcIPAddr[1], srcIPAddr[2], srcIPAddr[3])
+		copy(srcIP[:], srcIP16Byte)
+		dstIPAddr, ok := record.GetInfoElement("destinationIPv4Address").Value.(net.IP)
+		if !ok {
+			return Tuple{}, fmt.Errorf("destinationIPv4Address is not in correct format.")
+		}
+		dstIP16Byte := net.IPv4(dstIPAddr[0], dstIPAddr[1], dstIPAddr[2], dstIPAddr[3])
+		copy(dstIP[:], dstIP16Byte)
+		srcPortNum, ok := record.GetInfoElement("sourceTransportPort").Value.(uint16)
+		if !ok {
+			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
+		}
+		srcPort = srcPortNum
+		dstPortNum, ok := record.GetInfoElement("destinationTransportPort").Value.(uint16)
+		if !ok {
+			return Tuple{}, fmt.Errorf("destinationTransportPort is not in correct format.")
+		}
+		dstPort = dstPortNum
+		protoNum, ok := record.GetInfoElement("protocolIdentifier").Value.(uint8)
+		if !ok {
+			return Tuple{}, fmt.Errorf("protocolIdentifier is not in correct format.")
+		}
+		proto = protoNum
+	} else if record.ContainsInfoElement("sourceIPv6Address") && record.ContainsInfoElement("destinationIPv6Address") && record.ContainsInfoElement("sourceTransportPort") && record.ContainsInfoElement("destinationTransportPort") && record.ContainsInfoElement("protocolIdentifier") {
+		srcIPAddr, ok := record.GetInfoElement("sourceIPv6Address").Value.([]byte)
+		if !ok {
+			return Tuple{}, fmt.Errorf("sourceIPv4Address is not in correct format.")
+		}
+		copy(srcIP[:], srcIPAddr[:])
+		dstIPAddr, ok := record.GetInfoElement("destinationIPv6Address").Value.([]byte)
+		if !ok {
+			return Tuple{}, fmt.Errorf("destinationIPv4Address is not in correct format.")
+		}
+		copy(dstIP[:], dstIPAddr[:])
+		srcPortNum, ok := record.GetInfoElement("sourceTransportPort").Value.(uint16)
+		if !ok {
+			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
+		}
+		srcPort = srcPortNum
+		dstPortNum, ok := record.GetInfoElement("destinationTransportPort").Value.(uint16)
+		if !ok {
+			return Tuple{}, fmt.Errorf("destinationTransportPort is not in correct format.")
+		}
+		dstPort = dstPortNum
+		protoNum, ok := record.GetInfoElement("protocolIdentifier").Value.(uint8)
+		if !ok {
+			return Tuple{}, fmt.Errorf("protocolIdentifier is not in correct format.")
+		}
+		proto = protoNum
+	} else {
+		return Tuple{}, fmt.Errorf("missing 5-tuple value(s) in the record.")
 	}
-	if count != 5 {
-		return Tuple{}, fmt.Errorf("Missing 5-tuple value(s) in the record.")
-	}
+	// TODO: support 5-tuple IPv6
 	return Tuple{srcIP, dstIP, proto, srcPort, dstPort}, nil
 }
 
