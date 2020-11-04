@@ -236,13 +236,13 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	}
 
 	dataElements := dataSet.GetRecords()[0].GetInfoElements()
-	assert.Equal(t, []byte{1, 2, 3, 4}, dataElements[0].Value, "DataSet does not store elements (IANA) correctly.")
+	assert.Equal(t, net.IP([]byte{1, 2, 3, 4}), dataElements[0].Value, "DataSet does not store elements (IANA) correctly.")
 	assert.Equal(t, uint64(12345678), dataElements[2].Value, "DataSet does not store reverse information elements (IANA) correctly.")
 	assert.Equal(t, "pod1", dataElements[3].Value, "DataSet does not store elements (Antrea) correctly.")
 	assert.Equal(t, uint32(1257894000), dataElements[4].Value, "DataSet does not store elements (IANA) correctly.")
 	if isMultipleRecord {
 		dataElements := dataSet.GetRecords()[1].GetInfoElements()
-		assert.Equal(t, []byte{4, 3, 2, 1}, dataElements[0].Value, "DataSet does not store multiple records correctly.")
+		assert.Equal(t, net.IP([]byte{4, 3, 2, 1}), dataElements[0].Value, "DataSet does not store multiple records correctly.")
 		assert.Equal(t, uint64(0), dataElements[2].Value, "DataSet does not store multiple records correctly.")
 		assert.Equal(t, "pod2", dataElements[3].Value, "DataSet does not store multiple records correctly.")
 		assert.Equal(t, uint32(1257894000), dataElements[4].Value, "DataSet does not store elements (IANA) correctly.")
