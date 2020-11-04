@@ -92,8 +92,8 @@ func createMsgwithDataSet2() *entities.Message {
 	util.Encode(svcPort, binary.BigEndian, uint16(4739))
 	srcPod.WriteString("")
 	dstPod.WriteString("pod2")
-	ie1 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), bytes.NewBuffer([]byte{10, 0, 0, 1}))
-	ie2 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), bytes.NewBuffer([]byte{10, 0, 0, 2}))
+	ie1 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), bytes.NewBuffer(net.IP{10, 0, 0, 1}))
+	ie2 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), bytes.NewBuffer(net.IP{10, 0, 0, 2}))
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
@@ -110,6 +110,37 @@ func createMsgwithDataSet2() *entities.Message {
 		ObsDomainID:   uint32(1234),
 		ExportTime:    0,
 		ExportAddress: "127.0.0.1",
+		Set:           set,
+	}
+}
+
+func createMsgwithDataSetIPv6() *entities.Message {
+	set := entities.NewSet(entities.Data, 257, true)
+	elements := make([]*entities.InfoElementWithValue, 0)
+	srcPort := new(bytes.Buffer)
+	dstPort := new(bytes.Buffer)
+	proto := new(bytes.Buffer)
+	srcAddr := new(bytes.Buffer)
+	dstAddr := new(bytes.Buffer)
+	util.Encode(srcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
+	util.Encode(dstAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
+	util.Encode(srcPort, binary.BigEndian, uint16(1234))
+	util.Encode(dstPort, binary.BigEndian, uint16(5678))
+	util.Encode(proto, binary.BigEndian, uint8(6))
+	ie1 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv6Address", 8, 18, 0, 4), srcAddr)
+	ie2 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv6Address", 12, 18, 0, 4), dstAddr)
+	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
+	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
+	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5)
+	set.AddRecord(elements, 256)
+	return &entities.Message{
+		Version:       10,
+		BufferLength:  32,
+		SeqNumber:     1,
+		ObsDomainID:   uint32(1234),
+		ExportTime:    0,
+		ExportAddress: "::1",
 		Set:           set,
 	}
 }
@@ -141,14 +172,23 @@ func TestAggregateMsgBy5Tuple(t *testing.T) {
 	message = createMsgwithDataSet1()
 	aggregationProcess.AggregateMsgBy5Tuple(message)
 	assert.NotEmpty(t, aggregationProcess.GetTupleRecordMap())
-	for tuple, records := range aggregationProcess.GetTupleRecordMap() {
-		assert.Equal(t, tuple.SourceAddress, [16]byte{10: 255, 11: 255, 12: 10, 15: 1})
-		assert.Equal(t, tuple.DestinationAddress, [16]byte{10: 255, 11: 255, 12: 10, 15: 2})
-		assert.Equal(t, tuple.SourcePort, uint16(1234))
-		assert.Equal(t, tuple.DestinationPort, uint16(5678))
-		assert.Equal(t, tuple.Protocol, uint8(6))
-		assert.Equal(t, message.Set.GetRecords(), records)
-	}
+	tuple := Tuple{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
+	record := aggregationProcess.GetTupleRecordMap()[tuple][0]
+	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
+	assert.NotNil(t, record.GetInfoElement("sourceIPv4Address"))
+	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, record.GetInfoElement("sourceIPv4Address").Value)
+	assert.Equal(t, message.Set.GetRecords()[0], record)
+
+	// Data record with IPv6 addresses should be processed and stored correctly
+	message = createMsgwithDataSetIPv6()
+	aggregationProcess.AggregateMsgBy5Tuple(message)
+	assert.Equal(t, 2, len(aggregationProcess.GetTupleRecordMap()))
+	tuple = Tuple{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
+	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
+	record = aggregationProcess.GetTupleRecordMap()[tuple][0]
+	assert.NotNil(t, record.GetInfoElement("sourceIPv6Address"))
+	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, record.GetInfoElement("sourceIPv6Address").Value)
+	assert.Equal(t, message.Set.GetRecords()[0], record)
 }
 
 func TestAggregationProcess(t *testing.T) {
@@ -165,7 +205,7 @@ func TestAggregationProcess(t *testing.T) {
 	}()
 	aggregationProcess.Start()
 	tuple := Tuple{
-		[16]byte{10: 255, 11: 255, 12: 10, 15: 1}, [16]byte{10: 255, 11: 255, 12: 10, 15: 2}, 6, 1234, 5678,
+		"10.0.0.1", "10.0.0.2", 6, 1234, 5678,
 	}
 	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
 }
@@ -207,4 +247,18 @@ func TestCorrelateRecords(t *testing.T) {
 		assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, records[0].GetInfoElement("destinationClusterIP").Value)
 		assert.Equal(t, uint16(4739), records[0].GetInfoElement("destinationServicePort").Value)
 	}
+}
+
+func TestDeleteTupleFromMap(t *testing.T) {
+	messageChan := make(chan *entities.Message)
+	message := createMsgwithDataSet1()
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
+	tuple1 := Tuple{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
+	tuple2 := Tuple{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
+	aggregationProcess.tupleRecordMap[tuple1] = message.Set.GetRecords()
+	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
+	aggregationProcess.DeleteTupleFromMap(tuple2)
+	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
+	aggregationProcess.DeleteTupleFromMap(tuple1)
+	assert.Empty(t, aggregationProcess.GetTupleRecordMap())
 }

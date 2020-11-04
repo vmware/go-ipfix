@@ -49,7 +49,7 @@ func TestCollectorToIntermediate(t *testing.T) {
 	}()
 	cp.Start()
 	assert.Equal(t, 1, len(ap.GetTupleRecordMap()), "Aggregation process should store the data record to map with corresponding tuple.")
-	tuple := intermediate.Tuple{SourceAddress: [16]byte{10: 255, 11: 255, 12: 1, 13: 2, 14: 3, 15: 4}, DestinationAddress: [16]byte{10: 255, 11: 255, 12: 5, 13: 6, 14: 7, 15: 8}, Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
+	tuple := intermediate.Tuple{SourceAddress: "1.2.3.4", DestinationAddress: "5.6.7.8", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
 	assert.NotNil(t, ap.GetTupleRecordMap()[tuple])
 	assert.Equal(t, 1, len(ap.GetTupleRecordMap()[tuple]), "Aggregation process should correlate data record and only store one record.")
 	record := ap.GetTupleRecordMap()[tuple]

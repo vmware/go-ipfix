@@ -25,8 +25,8 @@ type aggregation struct {
 }
 
 type Tuple struct {
-	SourceAddress      [16]byte
-	DestinationAddress [16]byte
+	SourceAddress      string
+	DestinationAddress string
 	Protocol           uint8
 	SourcePort         uint16
 	DestinationPort    uint16
@@ -87,6 +87,12 @@ func (a *aggregation) GetTupleRecordMap() map[Tuple][]entities.Record {
 	a.tupleRecordLock.RLock()
 	defer a.tupleRecordLock.RUnlock()
 	return a.tupleRecordMap
+}
+
+func (a *aggregation) DeleteTupleFromMap(tuple Tuple) {
+	a.tupleRecordLock.Lock()
+	defer a.tupleRecordLock.Unlock()
+	delete(a.tupleRecordMap, tuple)
 }
 
 // correlateRecords fills records info by correlating incoming and current records
@@ -165,7 +171,7 @@ func isRecordFromSrc(record entities.Record) bool {
 
 // getTupleFromRecord returns 5-tuple from data record
 func getTupleFromRecord(record entities.Record) (Tuple, error) {
-	var srcIP, dstIP [16]byte
+	var srcIP, dstIP string
 	var srcPort, dstPort uint16
 	var proto uint8
 	// record has complete 5-tuple information (IPv4)
@@ -174,14 +180,12 @@ func getTupleFromRecord(record entities.Record) (Tuple, error) {
 		if !ok {
 			return Tuple{}, fmt.Errorf("sourceIPv4Address is not in correct format.")
 		}
-		srcIP16Byte := net.IPv4(srcIPAddr[0], srcIPAddr[1], srcIPAddr[2], srcIPAddr[3])
-		copy(srcIP[:], srcIP16Byte)
+		srcIP = srcIPAddr.String()
 		dstIPAddr, ok := record.GetInfoElement("destinationIPv4Address").Value.(net.IP)
 		if !ok {
 			return Tuple{}, fmt.Errorf("destinationIPv4Address is not in correct format.")
 		}
-		dstIP16Byte := net.IPv4(dstIPAddr[0], dstIPAddr[1], dstIPAddr[2], dstIPAddr[3])
-		copy(dstIP[:], dstIP16Byte)
+		dstIP = dstIPAddr.String()
 		srcPortNum, ok := record.GetInfoElement("sourceTransportPort").Value.(uint16)
 		if !ok {
 			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
@@ -198,16 +202,16 @@ func getTupleFromRecord(record entities.Record) (Tuple, error) {
 		}
 		proto = protoNum
 	} else if record.ContainsInfoElement("sourceIPv6Address") && record.ContainsInfoElement("destinationIPv6Address") && record.ContainsInfoElement("sourceTransportPort") && record.ContainsInfoElement("destinationTransportPort") && record.ContainsInfoElement("protocolIdentifier") {
-		srcIPAddr, ok := record.GetInfoElement("sourceIPv6Address").Value.([]byte)
+		srcIPAddr, ok := record.GetInfoElement("sourceIPv6Address").Value.(net.IP)
 		if !ok {
-			return Tuple{}, fmt.Errorf("sourceIPv4Address is not in correct format.")
+			return Tuple{}, fmt.Errorf("sourceIPv6Address is not in correct format.")
 		}
-		copy(srcIP[:], srcIPAddr[:])
-		dstIPAddr, ok := record.GetInfoElement("destinationIPv6Address").Value.([]byte)
+		srcIP = net.IP(srcIPAddr).String()
+		dstIPAddr, ok := record.GetInfoElement("destinationIPv6Address").Value.(net.IP)
 		if !ok {
-			return Tuple{}, fmt.Errorf("destinationIPv4Address is not in correct format.")
+			return Tuple{}, fmt.Errorf("destinationIPv6Address is not in correct format.")
 		}
-		copy(dstIP[:], dstIPAddr[:])
+		dstIP = net.IP(dstIPAddr).String()
 		srcPortNum, ok := record.GetInfoElement("sourceTransportPort").Value.(uint16)
 		if !ok {
 			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
@@ -226,7 +230,6 @@ func getTupleFromRecord(record entities.Record) (Tuple, error) {
 	} else {
 		return Tuple{}, fmt.Errorf("missing 5-tuple value(s) in the record.")
 	}
-	// TODO: support 5-tuple IPv6
 	return Tuple{srcIP, dstIP, proto, srcPort, dstPort}, nil
 }
 
