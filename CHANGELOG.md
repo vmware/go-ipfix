@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.2.4 11-05-2020
+## Changed
+- Change reverse information element naming (#68, @zyiou)
+## Fixed
+- Remove unnecessary testing log (#67, @zyiou)
 ## 0.2.3 10-30-2020
 ### Added
 - Support IPv6 cluster IP field in Antrea repo. (#63, @srikartati)
