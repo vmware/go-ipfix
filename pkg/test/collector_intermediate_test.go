@@ -18,13 +18,18 @@ var dataPacket2 = []byte{0, 10, 0, 45, 95, 154, 82, 114, 0, 0, 0, 0, 0, 0, 0, 1,
 
 func TestCollectorToIntermediate(t *testing.T) {
 	registry.LoadRegistry()
+	var fields = []string{
+		"destinationPodName",
+		"destinationPodNamespace",
+		"destinationNodeName",
+	}
 	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
 	if err != nil {
 		t.Error(err)
 	}
 	// Initialize aggregation process and collecting process
 	cp, _ := collector.InitCollectingProcess(address, 1024, 0, true)
-	ap, _ := intermediate.InitAggregationProcess(cp.GetMsgChan(), 2)
+	ap, _ := intermediate.InitAggregationProcess(cp.GetMsgChan(), 2, fields)
 
 	go func() {
 		time.Sleep(time.Second)
@@ -55,7 +60,7 @@ func TestCollectorToIntermediate(t *testing.T) {
 	record := ap.GetTupleRecordMap()[tuple]
 	elements := record[0].GetInfoElements()
 	assert.Equal(t, "pod1", elements[5].Value)
-	assert.Equal(t, "pod2", record[0].GetInfoElement("destinationPodName").Value, "Aggregation process should correlate and fill corresponding fields.")
+	assert.Equal(t, "pod2", record[0].GetInfoElementMap()["destinationPodName"].Value, "Aggregation process should correlate and fill corresponding fields.")
 	assert.Equal(t, 11, len(elements), "There should be two more fields for exporter information in the record.")
-	assert.Equal(t, uint32(1), record[0].GetInfoElement("originalObservationDomainId").Value, "originalObservationDomainId should be added correctly in record.")
+	assert.Equal(t, uint32(1), record[0].GetInfoElementMap()["originalObservationDomainId"].Value, "originalObservationDomainId should be added correctly in record.")
 }

@@ -22,6 +22,8 @@ type aggregation struct {
 	workerNum int
 	// workerList is the list of workers
 	workerList []*worker
+	// correlateFields are the fields to be filled in correlating process
+	correlateFields []string
 }
 
 type Tuple struct {
@@ -32,7 +34,7 @@ type Tuple struct {
 	DestinationPort    uint16
 }
 
-func InitAggregationProcess(messageChan chan *entities.Message, workerNum int) (*aggregation, error) {
+func InitAggregationProcess(messageChan chan *entities.Message, workerNum int, correlateFields []string) (*aggregation, error) {
 	if messageChan == nil {
 		return nil, fmt.Errorf("Cannot create aggregation process without message channel.")
 	} else if workerNum <= 0 {
@@ -45,6 +47,7 @@ func InitAggregationProcess(messageChan chan *entities.Message, workerNum int) (
 		messageChan,
 		workerNum,
 		make([]*worker, 0),
+		correlateFields,
 	}, nil
 }
 
@@ -97,19 +100,14 @@ func (a *aggregation) DeleteTupleFromMap(tuple Tuple) {
 
 // correlateRecords fills records info by correlating incoming and current records
 func (a *aggregation) correlateRecords(tuple Tuple, record entities.Record) {
-	srcFieldsToFill := []string{
-		"destinationPodName",
-		"destinationPodNamespace",
-		"destinationNodeName",
-	}
 	existingRecords := a.GetTupleRecordMap()[tuple]
 	// only fill the information for record from source node
 	if isRecordFromSrc(record) {
 		var isFilled bool
 		for _, existingRec := range existingRecords {
-			for _, field := range srcFieldsToFill {
-				if record.ContainsInfoElement(field) {
-					record.GetInfoElement(field).Value = existingRec.GetInfoElement(field).Value
+			for _, field := range a.correlateFields {
+				if containsInfoElement(record.GetInfoElementMap(), field) {
+					record.GetInfoElementMap()[field].Value = existingRec.GetInfoElementMap()[field].Value
 					isFilled = true
 				}
 			}
@@ -120,9 +118,9 @@ func (a *aggregation) correlateRecords(tuple Tuple, record entities.Record) {
 	} else {
 		for _, existingRec := range existingRecords {
 			if isRecordFromSrc(existingRec) {
-				for _, field := range srcFieldsToFill {
-					if record.ContainsInfoElement(field) {
-						existingRec.GetInfoElement(field).Value = record.GetInfoElement(field).Value
+				for _, field := range a.correlateFields {
+					if containsInfoElement(record.GetInfoElementMap(), field) {
+						existingRec.GetInfoElementMap()[field].Value = record.GetInfoElementMap()[field].Value
 					}
 				}
 			}
@@ -162,8 +160,8 @@ func (a *aggregation) addRecordToMap(tuple Tuple, record entities.Record) {
 }
 
 func isRecordFromSrc(record entities.Record) bool {
-	element := record.GetInfoElement("sourcePodName")
-	if element != nil && element.Value != "" {
+	element, exist := record.GetInfoElementMap()["sourcePodName"]
+	if exist && element.Value != "" {
 		return true
 	}
 	return false
@@ -175,54 +173,55 @@ func getTupleFromRecord(record entities.Record) (Tuple, error) {
 	var srcPort, dstPort uint16
 	var proto uint8
 	// record has complete 5-tuple information (IPv4)
-	if record.ContainsInfoElement("sourceIPv4Address") && record.ContainsInfoElement("destinationIPv4Address") && record.ContainsInfoElement("sourceTransportPort") && record.ContainsInfoElement("destinationTransportPort") && record.ContainsInfoElement("protocolIdentifier") {
-		srcIPAddr, ok := record.GetInfoElement("sourceIPv4Address").Value.(net.IP)
+	infoElementMap := record.GetInfoElementMap()
+	if containsInfoElement(infoElementMap, "sourceIPv4Address") && containsInfoElement(infoElementMap, "destinationIPv4Address") && containsInfoElement(infoElementMap, "sourceTransportPort") && containsInfoElement(infoElementMap, "destinationTransportPort") && containsInfoElement(infoElementMap, "protocolIdentifier") {
+		srcIPAddr, ok := infoElementMap["sourceIPv4Address"].Value.(net.IP)
 		if !ok {
 			return Tuple{}, fmt.Errorf("sourceIPv4Address is not in correct format.")
 		}
 		srcIP = srcIPAddr.String()
-		dstIPAddr, ok := record.GetInfoElement("destinationIPv4Address").Value.(net.IP)
+		dstIPAddr, ok := infoElementMap["destinationIPv4Address"].Value.(net.IP)
 		if !ok {
 			return Tuple{}, fmt.Errorf("destinationIPv4Address is not in correct format.")
 		}
 		dstIP = dstIPAddr.String()
-		srcPortNum, ok := record.GetInfoElement("sourceTransportPort").Value.(uint16)
+		srcPortNum, ok := infoElementMap["sourceTransportPort"].Value.(uint16)
 		if !ok {
 			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
 		}
 		srcPort = srcPortNum
-		dstPortNum, ok := record.GetInfoElement("destinationTransportPort").Value.(uint16)
+		dstPortNum, ok := infoElementMap["destinationTransportPort"].Value.(uint16)
 		if !ok {
 			return Tuple{}, fmt.Errorf("destinationTransportPort is not in correct format.")
 		}
 		dstPort = dstPortNum
-		protoNum, ok := record.GetInfoElement("protocolIdentifier").Value.(uint8)
+		protoNum, ok := infoElementMap["protocolIdentifier"].Value.(uint8)
 		if !ok {
 			return Tuple{}, fmt.Errorf("protocolIdentifier is not in correct format.")
 		}
 		proto = protoNum
-	} else if record.ContainsInfoElement("sourceIPv6Address") && record.ContainsInfoElement("destinationIPv6Address") && record.ContainsInfoElement("sourceTransportPort") && record.ContainsInfoElement("destinationTransportPort") && record.ContainsInfoElement("protocolIdentifier") {
-		srcIPAddr, ok := record.GetInfoElement("sourceIPv6Address").Value.(net.IP)
+	} else if containsInfoElement(infoElementMap, "sourceIPv6Address") && containsInfoElement(infoElementMap, "destinationIPv6Address") && containsInfoElement(infoElementMap, "sourceTransportPort") && containsInfoElement(infoElementMap, "destinationTransportPort") && containsInfoElement(infoElementMap, "protocolIdentifier") {
+		srcIPAddr, ok := infoElementMap["sourceIPv6Address"].Value.(net.IP)
 		if !ok {
 			return Tuple{}, fmt.Errorf("sourceIPv6Address is not in correct format.")
 		}
 		srcIP = net.IP(srcIPAddr).String()
-		dstIPAddr, ok := record.GetInfoElement("destinationIPv6Address").Value.(net.IP)
+		dstIPAddr, ok := infoElementMap["destinationIPv6Address"].Value.(net.IP)
 		if !ok {
 			return Tuple{}, fmt.Errorf("destinationIPv6Address is not in correct format.")
 		}
 		dstIP = net.IP(dstIPAddr).String()
-		srcPortNum, ok := record.GetInfoElement("sourceTransportPort").Value.(uint16)
+		srcPortNum, ok := infoElementMap["sourceTransportPort"].Value.(uint16)
 		if !ok {
 			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
 		}
 		srcPort = srcPortNum
-		dstPortNum, ok := record.GetInfoElement("destinationTransportPort").Value.(uint16)
+		dstPortNum, ok := infoElementMap["destinationTransportPort"].Value.(uint16)
 		if !ok {
 			return Tuple{}, fmt.Errorf("destinationTransportPort is not in correct format.")
 		}
 		dstPort = dstPortNum
-		protoNum, ok := record.GetInfoElement("protocolIdentifier").Value.(uint8)
+		protoNum, ok := infoElementMap["protocolIdentifier"].Value.(uint8)
 		if !ok {
 			return Tuple{}, fmt.Errorf("protocolIdentifier is not in correct format.")
 		}
@@ -275,4 +274,11 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		}
 	}
 	return nil
+}
+
+func containsInfoElement(recordMap map[string]*entities.InfoElementWithValue, name string) bool {
+	if _, exist := recordMap[name]; exist {
+		return true
+	}
+	return false
 }

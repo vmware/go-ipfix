@@ -8,12 +8,17 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 	"github.com/vmware/go-ipfix/pkg/util"
 )
+
+var fields = []string{
+	"destinationPodName",
+	"destinationPodNamespace",
+	"destinationNodeName",
+}
 
 func createMsgwithTemplateSet() *entities.Message {
 	set := entities.NewSet(entities.Template, 256, true)
@@ -146,24 +151,24 @@ func createMsgwithDataSetIPv6() *entities.Message {
 }
 
 func TestInitAggregationProcess(t *testing.T) {
-	aggregationProcess, err := InitAggregationProcess(nil, 2)
+	aggregationProcess, err := InitAggregationProcess(nil, 2, fields)
 	assert.NotNil(t, err)
 	assert.Nil(t, aggregationProcess)
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, err = InitAggregationProcess(messageChan, 2)
+	aggregationProcess, err = InitAggregationProcess(messageChan, 2, fields)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, aggregationProcess.workerNum)
 }
 
 func TestGetTupleRecordMap(t *testing.T) {
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	assert.Equal(t, aggregationProcess.tupleRecordMap, aggregationProcess.GetTupleRecordMap())
 }
 
 func TestAggregateMsgBy5Tuple(t *testing.T) {
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	// Template records should be ignored
 	message := createMsgwithTemplateSet()
 	aggregationProcess.AggregateMsgBy5Tuple(message)
@@ -175,8 +180,9 @@ func TestAggregateMsgBy5Tuple(t *testing.T) {
 	tuple := Tuple{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	record := aggregationProcess.GetTupleRecordMap()[tuple][0]
 	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
-	assert.NotNil(t, record.GetInfoElement("sourceIPv4Address"))
-	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, record.GetInfoElement("sourceIPv4Address").Value)
+	ie, exist := record.GetInfoElementMap()["sourceIPv4Address"]
+	assert.Equal(t, true, exist)
+	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ie.Value)
 	assert.Equal(t, message.Set.GetRecords()[0], record)
 
 	// Data record with IPv6 addresses should be processed and stored correctly
@@ -186,14 +192,15 @@ func TestAggregateMsgBy5Tuple(t *testing.T) {
 	tuple = Tuple{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
 	record = aggregationProcess.GetTupleRecordMap()[tuple][0]
-	assert.NotNil(t, record.GetInfoElement("sourceIPv6Address"))
-	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, record.GetInfoElement("sourceIPv6Address").Value)
+	ie, exist = record.GetInfoElementMap()["sourceIPv6Address"]
+	assert.Equal(t, true, exist)
+	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ie.Value)
 	assert.Equal(t, message.Set.GetRecords()[0], record)
 }
 
 func TestAggregationProcess(t *testing.T) {
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	dataMsg := createMsgwithDataSet1()
 	go func() {
 		messageChan <- createMsgwithTemplateSet()
@@ -216,23 +223,22 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	message := createMsgwithTemplateSet()
 	addOriginalExporterInfo(message)
 	record := message.Set.GetRecords()[0]
-	assert.Equal(t, true, record.ContainsInfoElement("originalExporterIPv4Address"))
-	assert.Equal(t, true, record.ContainsInfoElement("originalObservationDomainId"))
+	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalExporterIPv4Address"))
+	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalObservationDomainId"))
 	// Test message with data set
 	message = createMsgwithDataSet1()
 	addOriginalExporterInfo(message)
 	record = message.Set.GetRecords()[0]
-	klog.Info(record.GetInfoElements())
-	assert.Equal(t, true, record.ContainsInfoElement("originalExporterIPv4Address"))
-	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, record.GetInfoElement("originalExporterIPv4Address").Value)
-	assert.Equal(t, true, record.ContainsInfoElement("originalObservationDomainId"))
-	assert.Equal(t, uint32(1234), record.GetInfoElement("originalObservationDomainId").Value)
+	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalExporterIPv4Address"))
+	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, record.GetInfoElementMap()["originalExporterIPv4Address"].Value)
+	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalObservationDomainId"))
+	assert.Equal(t, uint32(1234), record.GetInfoElementMap()["originalObservationDomainId"].Value)
 }
 
 func TestCorrelateRecords(t *testing.T) {
 	registry.LoadRegistry()
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	record1 := createMsgwithDataSet1().Set.GetRecords()[0]
 	tuple1, _ := getTupleFromRecord(record1)
 	record2 := createMsgwithDataSet2().Set.GetRecords()[0]
@@ -242,17 +248,17 @@ func TestCorrelateRecords(t *testing.T) {
 	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
 	for _, records := range aggregationProcess.GetTupleRecordMap() {
 		assert.Equal(t, 1, len(records))
-		assert.Equal(t, "pod1", records[0].GetInfoElement("sourcePodName").Value)
-		assert.Equal(t, "pod2", records[0].GetInfoElement("destinationPodName").Value)
-		assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, records[0].GetInfoElement("destinationClusterIP").Value)
-		assert.Equal(t, uint16(4739), records[0].GetInfoElement("destinationServicePort").Value)
+		assert.Equal(t, "pod1", records[0].GetInfoElementMap()["sourcePodName"].Value)
+		assert.Equal(t, "pod2", records[0].GetInfoElementMap()["destinationPodName"].Value)
+		assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, records[0].GetInfoElementMap()["destinationClusterIP"].Value)
+		assert.Equal(t, uint16(4739), records[0].GetInfoElementMap()["destinationServicePort"].Value)
 	}
 }
 
 func TestDeleteTupleFromMap(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	message := createMsgwithDataSet1()
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2)
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	tuple1 := Tuple{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	tuple2 := Tuple{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	aggregationProcess.tupleRecordMap[tuple1] = message.Set.GetRecords()

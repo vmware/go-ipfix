@@ -38,8 +38,7 @@ type Record interface {
 	GetTemplateID() uint16
 	GetFieldCount() uint16
 	GetInfoElements() []*InfoElementWithValue
-	GetInfoElement(name string) *InfoElementWithValue
-	ContainsInfoElement(name string) bool
+	GetInfoElementMap() map[string]*InfoElementWithValue
 	GetMinDataRecordLen() uint16
 }
 
@@ -48,7 +47,7 @@ type baseRecord struct {
 	len         uint16
 	fieldCount  uint16
 	templateID  uint16
-	elements    []*InfoElementWithValue
+	elementList []*InfoElementWithValue
 	elementsMap map[string]*InfoElementWithValue
 	Record
 }
@@ -64,7 +63,7 @@ func NewDataRecord(id uint16) *dataRecord {
 			len:         0,
 			fieldCount:  0,
 			templateID:  id,
-			elements:    make([]*InfoElementWithValue, 0),
+			elementList: make([]*InfoElementWithValue, 0),
 			elementsMap: make(map[string]*InfoElementWithValue),
 		},
 	}
@@ -84,7 +83,7 @@ func NewTemplateRecord(count uint16, id uint16) *templateRecord {
 			len:         0,
 			fieldCount:  count,
 			templateID:  id,
-			elements:    make([]*InfoElementWithValue, 0),
+			elementList: make([]*InfoElementWithValue, 0),
 			elementsMap: make(map[string]*InfoElementWithValue),
 		},
 		0,
@@ -104,21 +103,11 @@ func (b *baseRecord) GetFieldCount() uint16 {
 }
 
 func (d *baseRecord) GetInfoElements() []*InfoElementWithValue {
-	return d.elements
+	return d.elementList
 }
 
-func (d *baseRecord) GetInfoElement(name string) *InfoElementWithValue {
-	if d.ContainsInfoElement(name) {
-		return d.elementsMap[name]
-	}
-	return nil
-}
-
-func (d *baseRecord) ContainsInfoElement(name string) bool {
-	if _, exist := d.elementsMap[name]; exist {
-		return true
-	}
-	return false
+func (d *baseRecord) GetInfoElementMap() map[string]*InfoElementWithValue {
+	return d.elementsMap
 }
 
 func (d *dataRecord) PrepareRecord() (uint16, error) {
@@ -141,7 +130,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bo
 		return 0, err
 	}
 	ie := NewInfoElementWithValue(element.Element, value)
-	d.elements = append(d.elements, ie)
+	d.elementList = append(d.elementList, ie)
 	d.elementsMap[element.Element.Name] = ie
 	if err != nil {
 		return 0, err
@@ -178,7 +167,7 @@ func (t *templateRecord) AddInfoElement(element *InfoElementWithValue, isDecodin
 			return 0, err
 		}
 	}
-	t.elements = append(t.elements, element)
+	t.elementList = append(t.elementList, element)
 	t.elementsMap[element.Element.Name] = element
 	// Keep track of minimum data record length required for sanity check
 	if element.Element.Len == VariableLength {

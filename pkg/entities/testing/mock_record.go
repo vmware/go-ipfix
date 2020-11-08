@@ -63,20 +63,6 @@ func (mr *MockRecordMockRecorder) AddInfoElement(arg0, arg1 interface{}) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), arg0, arg1)
 }
 
-// ContainsInfoElement mocks base method
-func (m *MockRecord) ContainsInfoElement(arg0 string) bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ContainsInfoElement", arg0)
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// ContainsInfoElement indicates an expected call of ContainsInfoElement
-func (mr *MockRecordMockRecorder) ContainsInfoElement(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ContainsInfoElement", reflect.TypeOf((*MockRecord)(nil).ContainsInfoElement), arg0)
-}
-
 // GetBuffer mocks base method
 func (m *MockRecord) GetBuffer() *bytes.Buffer {
 	m.ctrl.T.Helper()
@@ -105,18 +91,18 @@ func (mr *MockRecordMockRecorder) GetFieldCount() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFieldCount", reflect.TypeOf((*MockRecord)(nil).GetFieldCount))
 }
 
-// GetInfoElement mocks base method
-func (m *MockRecord) GetInfoElement(arg0 string) *entities.InfoElementWithValue {
+// GetInfoElementMap mocks base method
+func (m *MockRecord) GetInfoElementMap() map[string]*entities.InfoElementWithValue {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetInfoElement", arg0)
-	ret0, _ := ret[0].(*entities.InfoElementWithValue)
+	ret := m.ctrl.Call(m, "GetInfoElementMap")
+	ret0, _ := ret[0].(map[string]*entities.InfoElementWithValue)
 	return ret0
 }
 
-// GetInfoElement indicates an expected call of GetInfoElement
-func (mr *MockRecordMockRecorder) GetInfoElement(arg0 interface{}) *gomock.Call {
+// GetInfoElementMap indicates an expected call of GetInfoElementMap
+func (mr *MockRecordMockRecorder) GetInfoElementMap() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElement", reflect.TypeOf((*MockRecord)(nil).GetInfoElement), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElementMap", reflect.TypeOf((*MockRecord)(nil).GetInfoElementMap))
 }
 
 // GetInfoElements mocks base method
