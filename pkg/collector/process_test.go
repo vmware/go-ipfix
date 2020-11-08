@@ -44,10 +44,11 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cp, err := InitCollectingProcess(address, 1024, 0, false)
+	cp, err := InitCollectingProcess(address, 1024, 0, true)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
+	messageCount := 0
 	go func() {
 		time.Sleep(2 * time.Second)
 		conn, err := net.Dial(address.Network(), address.String())
@@ -56,6 +57,11 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
+		time.Sleep(time.Second)
+		msgChan := cp.GetMsgChan()
+		for range msgChan {
+			messageCount++
+		}
 	}()
 	go func() {
 		time.Sleep(4 * time.Second)
@@ -63,8 +69,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	cp.Start()
 	assert.NotNil(t, cp.templatesMap[1], "TCP Collecting Process should receive and store the received template.")
-	assert.Equal(t, 1, len(cp.GetMsgList()), "messageList should store the message when useMsgChan is set to false.")
-	assert.Nil(t, cp.GetMsgChan(), "messageChan should be nil when useMsgChan is set to false.")
+	assert.Equal(t, 1, messageCount, "Messages should be stored correctly.")
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
@@ -72,10 +77,11 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cp, err := InitCollectingProcess(address, 1024, 0, false)
+	cp, err := InitCollectingProcess(address, 1024, 0, true)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
+	messageCount := 0
 	go func() {
 		time.Sleep(2 * time.Second)
 		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
@@ -88,6 +94,11 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
+		time.Sleep(time.Second)
+		msgChan := cp.GetMsgChan()
+		for range msgChan {
+			messageCount++
+		}
 	}()
 	go func() {
 		time.Sleep(4 * time.Second)
@@ -95,8 +106,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	cp.Start()
 	assert.NotNil(t, cp.templatesMap[1], "UDP Collecting Process should receive and store the received template.")
-	assert.Equal(t, 1, len(cp.GetMsgList()), "messageList should store the message when useMsgChan is set to false.")
-	assert.Nil(t, cp.GetMsgChan(), "messageChan should be nil when useMsgChan is set to false.")
+	assert.Equal(t, 1, messageCount, "Messages should be stored correctly.")
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -119,7 +129,9 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validDataPacket)
-		for range cp.GetMsgChan() {
+		time.Sleep(time.Second)
+		msgChan := cp.GetMsgChan()
+		for range msgChan {
 			messageCount++
 		}
 	}()

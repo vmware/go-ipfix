@@ -47,8 +47,6 @@ type collectingProcess struct {
 	useMsgChan bool
 	// messageChan is the channel to output message
 	messageChan chan *entities.Message
-	// messageList is the list to store all messages
-	messageList []*entities.Message
 	// maps each client to its client handler (required channels)
 	clients map[string]*clientHandler
 	// clientsLock allows multiple readers or one writer to access clients map at the same time
@@ -70,7 +68,6 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL u
 		stopChan:      make(chan bool),
 		useMsgChan:    useMsgChan,
 		messageChan:   make(chan *entities.Message),
-		messageList:   make([]*entities.Message, 0),
 		clients:       make(map[string]*clientHandler),
 	}
 	return collectProc, nil
@@ -96,13 +93,6 @@ func (cp *collectingProcess) GetMsgChan() chan *entities.Message {
 		return nil
 	}
 	return cp.messageChan
-}
-
-func (cp *collectingProcess) GetMsgList() []*entities.Message {
-	if cp.useMsgChan {
-		return nil
-	}
-	return cp.messageList
 }
 
 func (cp *collectingProcess) createClient() *clientHandler {
@@ -158,8 +148,6 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 	if cp.useMsgChan {
 		// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
 		cp.messageChan <- &message
-	} else {
-		cp.messageList = append(cp.messageList, &message)
 	}
 	return &message, nil
 }

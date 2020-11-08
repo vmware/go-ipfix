@@ -130,7 +130,7 @@ func run() error {
 		return fmt.Errorf("input given ipfix.transport flag is not supported or valid")
 	}
 	// Initialize collecting process
-	cp, err := collector.InitCollectingProcess(netAddr, 65535, 0)
+	cp, err := collector.InitCollectingProcess(netAddr, 65535, 0, false)
 	if err != nil {
 		return err
 	}
@@ -138,20 +138,10 @@ func run() error {
 	messageReceived := make(chan *entities.Message)
 	go func() {
 		go cp.Start()
-		msgCount := 0
-		// This can be simplified if collector uses a message channel.
-		// Are there any use cases for having list of messages in collector process.
-		for {
-			ipfixMessages := cp.GetMessages()
-			currentLen := len(ipfixMessages)
-			if currentLen > msgCount {
-				for i := msgCount; i < currentLen; i++ {
-					klog.Info("Processing IPFIX message")
-					messageReceived <- ipfixMessages[i]
-					msgCount++
-				}
-			}
-			time.Sleep(5 * time.Millisecond)
+		msgChan := cp.GetMsgChan()
+		for message := range msgChan {
+			klog.Info("Processing IPFIX message")
+			messageReceived <- message
 		}
 	}()
 
