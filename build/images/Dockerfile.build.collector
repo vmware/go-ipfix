@@ -1,0 +1,21 @@
+FROM golang:1.15 as go-ipfix-build
+
+WORKDIR /go-ipfix
+
+COPY go.mod /go-ipfix/go.mod
+
+RUN go mod download
+
+COPY . /go-ipfix
+
+RUN make collector
+
+
+FROM antrea/base-ubuntu:2.14.0
+
+FROM ubuntu:18.04
+
+LABEL maintainer="go-ipfix"
+LABEL description="A Docker image based on Ubuntu 18.04 which contains a IPFIX collector"
+
+COPY --from=go-ipfix-build /go-ipfix/bin/collector /usr/local/bin/
