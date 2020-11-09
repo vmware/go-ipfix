@@ -28,7 +28,7 @@ func TestCollectorToIntermediate(t *testing.T) {
 		t.Error(err)
 	}
 	// Initialize aggregation process and collecting process
-	cp, _ := collector.InitCollectingProcess(address, 1024, 0, true)
+	cp, _ := collector.InitCollectingProcess(address, 1024, 0)
 	ap, _ := intermediate.InitAggregationProcess(cp.GetMsgChan(), 2, fields)
 
 	go func() {
@@ -58,7 +58,7 @@ func TestCollectorToIntermediate(t *testing.T) {
 	assert.NotNil(t, ap.GetTupleRecordMap()[tuple])
 	assert.Equal(t, 1, len(ap.GetTupleRecordMap()[tuple]), "Aggregation process should correlate data record and only store one record.")
 	record := ap.GetTupleRecordMap()[tuple]
-	elements := record[0].GetInfoElements()
+	elements := record[0].GetOrderedElementList()
 	assert.Equal(t, "pod1", elements[5].Value)
 	assert.Equal(t, "pod2", record[0].GetInfoElementMap()["destinationPodName"].Value, "Aggregation process should correlate and fill corresponding fields.")
 	assert.Equal(t, 11, len(elements), "There should be two more fields for exporter information in the record.")

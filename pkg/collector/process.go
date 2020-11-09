@@ -43,8 +43,6 @@ type collectingProcess struct {
 	maxBufferSize uint16
 	// chanel to receive stop information
 	stopChan chan bool
-	// useMsgChan indicates whether to use message channel to output message
-	useMsgChan bool
 	// messageChan is the channel to output message
 	messageChan chan *entities.Message
 	// maps each client to its client handler (required channels)
@@ -58,7 +56,7 @@ type clientHandler struct {
 	errChan    chan bool
 }
 
-func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32, useMsgChan bool) (*collectingProcess, error) {
+func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*collectingProcess, error) {
 	collectProc := &collectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		templatesLock: sync.RWMutex{},
@@ -66,7 +64,6 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL u
 		address:       address,
 		maxBufferSize: maxBufferSize,
 		stopChan:      make(chan bool),
-		useMsgChan:    useMsgChan,
 		messageChan:   make(chan *entities.Message),
 		clients:       make(map[string]*clientHandler),
 	}
@@ -89,9 +86,6 @@ func (cp *collectingProcess) Stop() {
 }
 
 func (cp *collectingProcess) GetMsgChan() chan *entities.Message {
-	if !cp.useMsgChan {
-		return nil
-	}
 	return cp.messageChan
 }
 
@@ -145,10 +139,8 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 		}
 		message.Set = set
 	}
-	if cp.useMsgChan {
-		// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
-		cp.messageChan <- &message
-	}
+	// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
+	cp.messageChan <- &message
 	return &message, nil
 }
 

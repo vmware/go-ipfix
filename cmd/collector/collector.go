@@ -77,7 +77,7 @@ func printIPFIXMessage(msg *entities.Message) {
 		fmt.Fprint(&buf, "TEMPLATE SET:\n")
 		for i, record := range msg.Set.GetRecords() {
 			fmt.Fprintf(&buf, "  TEMPLATE RECORD-%d:\n", i)
-			for _, ie := range record.GetInfoElements() {
+			for _, ie := range record.GetOrderedElementList() {
 				fmt.Fprintf(&buf, "    %s: len=%d (enterprise ID = %d) \n", ie.Element.Name, ie.Element.Len, ie.Element.EnterpriseId)
 			}
 		}
@@ -85,7 +85,7 @@ func printIPFIXMessage(msg *entities.Message) {
 		fmt.Fprint(&buf, "DATA SET:\n")
 		for i, record := range msg.Set.GetRecords() {
 			fmt.Fprintf(&buf, "  DATA RECORD-%d:\n", i)
-			for _, ie := range record.GetInfoElements() {
+			for _, ie := range record.GetOrderedElementList() {
 				fmt.Fprintf(&buf, "    %s: %v \n", ie.Element.Name, ie.Value)
 			}
 		}
@@ -130,7 +130,7 @@ func run() error {
 		return fmt.Errorf("input given ipfix.transport flag is not supported or valid")
 	}
 	// Initialize collecting process
-	cp, err := collector.InitCollectingProcess(netAddr, 65535, 0, false)
+	cp, err := collector.InitCollectingProcess(netAddr, 65535, 0)
 	if err != nil {
 		return err
 	}

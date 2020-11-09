@@ -105,20 +105,6 @@ func (mr *MockRecordMockRecorder) GetInfoElementMap() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElementMap", reflect.TypeOf((*MockRecord)(nil).GetInfoElementMap))
 }
 
-// GetInfoElements mocks base method
-func (m *MockRecord) GetInfoElements() []*entities.InfoElementWithValue {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetInfoElements")
-	ret0, _ := ret[0].([]*entities.InfoElementWithValue)
-	return ret0
-}
-
-// GetInfoElements indicates an expected call of GetInfoElements
-func (mr *MockRecordMockRecorder) GetInfoElements() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElements", reflect.TypeOf((*MockRecord)(nil).GetInfoElements))
-}
-
 // GetMinDataRecordLen mocks base method
 func (m *MockRecord) GetMinDataRecordLen() uint16 {
 	m.ctrl.T.Helper()
@@ -131,6 +117,20 @@ func (m *MockRecord) GetMinDataRecordLen() uint16 {
 func (mr *MockRecordMockRecorder) GetMinDataRecordLen() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinDataRecordLen", reflect.TypeOf((*MockRecord)(nil).GetMinDataRecordLen))
+}
+
+// GetOrderedElementList mocks base method
+func (m *MockRecord) GetOrderedElementList() []*entities.InfoElementWithValue {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderedElementList")
+	ret0, _ := ret[0].([]*entities.InfoElementWithValue)
+	return ret0
+}
+
+// GetOrderedElementList indicates an expected call of GetOrderedElementList
+func (mr *MockRecordMockRecorder) GetOrderedElementList() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderedElementList", reflect.TypeOf((*MockRecord)(nil).GetOrderedElementList))
 }
 
 // GetTemplateID mocks base method

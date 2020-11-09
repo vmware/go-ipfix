@@ -83,7 +83,7 @@ func TestGetRecords(t *testing.T) {
 	elements = append(elements, ie1, ie2)
 	set := NewSet(Template, uint16(256), true)
 	set.AddRecord(elements, 256)
-	assert.Equal(t, 2, len(set.GetRecords()[0].GetInfoElements()))
+	assert.Equal(t, 2, len(set.GetRecords()[0].GetOrderedElementList()))
 }
 
 func TestGetNumberOfRecords(t *testing.T) {

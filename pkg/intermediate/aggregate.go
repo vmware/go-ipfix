@@ -14,11 +14,11 @@ type aggregation struct {
 	tupleRecordMap map[Tuple][]entities.Record
 	// tupleRecordLock allows multiple readers or one writer at the same time
 	tupleRecordLock sync.RWMutex
-	// workerPool is for storing worker channels to process message
+	// workerPool is for storing worker channels to process the messages
 	workerPool chan chan *entities.Message
-	// messageChan is the channel to receive message
+	// messageChan is the channel to receive the message
 	messageChan chan *entities.Message
-	// workerNum is the number of workers to process message
+	// workerNum is the number of workers to process the messages
 	workerNum int
 	// workerList is the list of workers
 	workerList []*worker
