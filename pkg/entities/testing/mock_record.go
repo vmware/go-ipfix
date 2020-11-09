@@ -91,18 +91,18 @@ func (mr *MockRecordMockRecorder) GetFieldCount() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFieldCount", reflect.TypeOf((*MockRecord)(nil).GetFieldCount))
 }
 
-// GetInfoElements mocks base method
-func (m *MockRecord) GetInfoElements() []*entities.InfoElementWithValue {
+// GetInfoElementMap mocks base method
+func (m *MockRecord) GetInfoElementMap() map[string]*entities.InfoElementWithValue {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetInfoElements")
-	ret0, _ := ret[0].([]*entities.InfoElementWithValue)
+	ret := m.ctrl.Call(m, "GetInfoElementMap")
+	ret0, _ := ret[0].(map[string]*entities.InfoElementWithValue)
 	return ret0
 }
 
-// GetInfoElements indicates an expected call of GetInfoElements
-func (mr *MockRecordMockRecorder) GetInfoElements() *gomock.Call {
+// GetInfoElementMap indicates an expected call of GetInfoElementMap
+func (mr *MockRecordMockRecorder) GetInfoElementMap() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElements", reflect.TypeOf((*MockRecord)(nil).GetInfoElements))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElementMap", reflect.TypeOf((*MockRecord)(nil).GetInfoElementMap))
 }
 
 // GetMinDataRecordLen mocks base method
@@ -117,6 +117,20 @@ func (m *MockRecord) GetMinDataRecordLen() uint16 {
 func (mr *MockRecordMockRecorder) GetMinDataRecordLen() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMinDataRecordLen", reflect.TypeOf((*MockRecord)(nil).GetMinDataRecordLen))
+}
+
+// GetOrderedElementList mocks base method
+func (m *MockRecord) GetOrderedElementList() []*entities.InfoElementWithValue {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOrderedElementList")
+	ret0, _ := ret[0].([]*entities.InfoElementWithValue)
+	return ret0
+}
+
+// GetOrderedElementList indicates an expected call of GetOrderedElementList
+func (mr *MockRecordMockRecorder) GetOrderedElementList() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrderedElementList", reflect.TypeOf((*MockRecord)(nil).GetOrderedElementList))
 }
 
 // GetTemplateID mocks base method

@@ -48,6 +48,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
+	messageCount := 0
 	go func() {
 		time.Sleep(2 * time.Second)
 		conn, err := net.Dial(address.Network(), address.String())
@@ -56,6 +57,11 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
+		time.Sleep(time.Second)
+		msgChan := cp.GetMsgChan()
+		for range msgChan {
+			messageCount++
+		}
 	}()
 	go func() {
 		time.Sleep(4 * time.Second)
@@ -63,6 +69,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	cp.Start()
 	assert.NotNil(t, cp.templatesMap[1], "TCP Collecting Process should receive and store the received template.")
+	assert.Equal(t, 1, messageCount, "Messages should be stored correctly.")
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
@@ -74,6 +81,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
+	messageCount := 0
 	go func() {
 		time.Sleep(2 * time.Second)
 		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
@@ -86,6 +94,11 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
+		time.Sleep(time.Second)
+		msgChan := cp.GetMsgChan()
+		for range msgChan {
+			messageCount++
+		}
 	}()
 	go func() {
 		time.Sleep(4 * time.Second)
@@ -93,6 +106,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	cp.Start()
 	assert.NotNil(t, cp.templatesMap[1], "UDP Collecting Process should receive and store the received template.")
+	assert.Equal(t, 1, messageCount, "Messages should be stored correctly.")
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -100,6 +114,7 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	messageCount := 0
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
@@ -114,13 +129,18 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validDataPacket)
+		time.Sleep(time.Second)
+		msgChan := cp.GetMsgChan()
+		for range msgChan {
+			messageCount++
+		}
 	}()
 	go func() {
 		time.Sleep(4 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
-	assert.Equal(t, 1, len(cp.messages), "TCP Collecting Process should receive and store the received data record.")
+	assert.Equal(t, 1, messageCount, "TCP Collecting Process should receive and store the received data record.")
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -128,6 +148,7 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
+	messageCount := 0
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
@@ -146,13 +167,16 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validDataPacket)
+		for range cp.GetMsgChan() {
+			messageCount++
+		}
 	}()
 	go func() {
 		time.Sleep(5 * time.Second)
 		cp.Stop()
 	}()
 	cp.Start()
-	assert.Equal(t, 1, len(cp.messages), "UDP Collecting Process should receive and store the received data record.")
+	assert.Equal(t, 1, messageCount, "UDP Collecting Process should receive and store the received data record.")
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
@@ -199,6 +223,9 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
+		// remove the messages from the message channel
+		for range cp.GetMsgChan() {
+		}
 	}()
 	go func() {
 		time.Sleep(time.Second)
@@ -231,7 +258,12 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 		t.Error(err)
 	}
 	cp.address = address
-	message, err := cp.decodePacket(bytes.NewBuffer(validTemplatePacket))
+	cp.messageChan = make(chan *entities.Message)
+	go func() { // remove the message from the message channel
+		for range cp.GetMsgChan() {
+		}
+	}()
+	message, err := cp.decodePacket(bytes.NewBuffer(validTemplatePacket), address.String())
 	if err != nil {
 		t.Fatalf("Got error in decoding template record: %v", err)
 	}
@@ -243,16 +275,17 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	if !ok {
 		t.Error("Template packet is not decoded correctly.")
 	}
-	elements := templateSet.GetRecords()[0].GetInfoElements()
-	assert.Equal(t, uint32(0), elements[0].Element.EnterpriseId, "Template record is not stored correctly.")
+	sourceIPv4Address, exist := templateSet.GetRecords()[0].GetInfoElementMap()["sourceIPv4Address"]
+	assert.Equal(t, true, exist)
+	assert.Equal(t, uint32(0), sourceIPv4Address.Element.EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
 	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
-	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
+	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord), address.String())
 	assert.NotNil(t, err, "Error should be logged for invalid version")
 	// Malformed record
 	templateRecord = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
-	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord))
+	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord), address.String())
 	assert.NotNil(t, err, "Error should be logged for malformed template record")
 	if _, exist := cp.templatesMap[uint32(1)]; exist {
 		t.Fatal("Template should not be stored for malformed template record")
@@ -268,12 +301,17 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 		t.Error(err)
 	}
 	cp.address = address
+	cp.messageChan = make(chan *entities.Message)
+	go func() { // remove the message from the message channel
+		for range cp.GetMsgChan() {
+		}
+	}()
 	// Decode without template
-	_, err = cp.decodePacket(bytes.NewBuffer(validDataPacket))
+	_, err = cp.decodePacket(bytes.NewBuffer(validDataPacket), address.String())
 	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
 	// Decode with template
 	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
-	message, err := cp.decodePacket(bytes.NewBuffer(validDataPacket))
+	message, err := cp.decodePacket(bytes.NewBuffer(validDataPacket), address.String())
 	assert.Nil(t, err, "Error should not be logged if corresponding template exists.")
 	assert.Equal(t, uint16(10), message.Version, "Flow record version should be 10.")
 	assert.Equal(t, uint32(1), message.ObsDomainID, "Flow record obsDomainID should be 1.")
@@ -283,11 +321,12 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 		t.Error("Message.Set does not store data in correct format")
 	}
 	ipAddress := net.IP([]byte{1, 2, 3, 4})
-	elements := v.GetRecords()[0].GetInfoElements()
-	assert.Equal(t, ipAddress, elements[0].Value, "sourceIPv4Address should be decoded and stored correctly.")
+	sourceIPv4Address, exist := v.GetRecords()[0].GetInfoElementMap()["sourceIPv4Address"]
+	assert.Equal(t, true, exist)
+	assert.Equal(t, ipAddress, sourceIPv4Address.Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
-	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord))
+	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord), address.String())
 	assert.NotNil(t, err, "Error should be logged for malformed data record")
 }
 
@@ -315,6 +354,10 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error in sending data to collector: %v", err)
 		}
+		go func() { // remove the message from the message channel
+			for range cp.GetMsgChan() {
+			}
+		}()
 	}()
 	go func() {
 		time.Sleep(5 * time.Second)
