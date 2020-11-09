@@ -4,11 +4,32 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.3.0 11-06-2020
+Includes all the bug fixes from [0.2.1](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#021-09-23-2020),
+[0.2.2](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#022-09-25-2020),
+[0.2.3](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#023-10-30-2020),
+and [0.2.4](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#024-11-05-2020).
+### Added
+- Added the intermediate process feature for the implementation of IPFIX mediator.
+(#52, @zyiou)
+- Added standalone IPFIX collector. (#71, @stati)
+- Added github workflow for unit tests and code generation. (#39, #44 @stati)
+- Added code coverage for unit tests and integration tests. (#52, #56 @zyiou)
+- Added encoding and decoding support for IPv6 addresses. (#64 @stati)
+### Changed
+- Refactored and changed the entites abstraction, specifically sets and records.
+(#49, @zyiou)
+- Refactored encoding support for IPFIX exporter. (#20, @zyiou)
+- Changed the InfoElement data type to length association from list to the map.
+(#58, @shihhaoli) 
+- Changed the naming convention of reverse information elements. (#70, @zyiou)
+### Fixed
+- Added locks for clients map in the collector process. (#46, @zyiou)
 ## 0.2.4 11-05-2020
-## Changed
-- Change reverse information element naming (#68, @zyiou)
-## Fixed
-- Remove unnecessary testing log (#67, @zyiou)
+### Changed
+- Change reverse information element naming. (#68, @zyiou)
+### Fixed
+- Remove unnecessary testing log. (#67, @zyiou)
 ## 0.2.3 10-30-2020
 ### Added
 - Support IPv6 cluster IP field in Antrea repo. (#63, @srikartati)
