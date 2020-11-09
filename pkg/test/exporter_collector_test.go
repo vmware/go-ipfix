@@ -66,6 +66,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	// Load the global registry
 	registry.LoadRegistry()
 	// Initialize collecting process
+	messages := make([]*entities.Message, 0)
 	cp, _ := collector.InitCollectingProcess(address, 1024, 0)
 
 	go func() { // Start exporting process in go routine
@@ -210,11 +211,15 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		time.Sleep(2 * time.Second)
 		cp.Stop() // Close collecting process
 	}()
-
+	go func() {
+		for message := range cp.GetMsgChan() {
+			messages = append(messages, message)
+		}
+	}()
 	// Start collecting process
 	cp.Start()
-	templateMsg := cp.GetMessages()[0]
-	dataMsg := cp.GetMessages()[1]
+	templateMsg := messages[0]
+	dataMsg := messages[1]
 	assert.Equal(t, uint16(10), templateMsg.Version, "Version of flow record (template) should be 10.")
 	assert.Equal(t, uint32(1), templateMsg.ObsDomainID, "ObsDomainID (template) should be 1.")
 	assert.Equal(t, uint16(10), dataMsg.Version, "Version of flow record (template) should be 10.")
@@ -223,7 +228,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	if !ok {
 		t.Error("Template packet is not decoded correctly.")
 	}
-	templateElements := templateSet.GetRecords()[0].GetInfoElements()
+	templateElements := templateSet.GetRecords()[0].GetOrderedElementList()
 	assert.Equal(t, uint32(0), templateElements[0].Element.EnterpriseId, "Template record is not stored correctly.")
 	assert.Equal(t, "sourceIPv4Address", templateElements[0].Element.Name, "Template record is not stored correctly.")
 	assert.Equal(t, "destinationIPv4Address", templateElements[1].Element.Name, "Template record is not stored correctly.")
@@ -235,13 +240,13 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		t.Error("Data packet is not decoded correctly.")
 	}
 
-	dataElements := dataSet.GetRecords()[0].GetInfoElements()
+	dataElements := dataSet.GetRecords()[0].GetOrderedElementList()
 	assert.Equal(t, net.IP([]byte{1, 2, 3, 4}), dataElements[0].Value, "DataSet does not store elements (IANA) correctly.")
 	assert.Equal(t, uint64(12345678), dataElements[2].Value, "DataSet does not store reverse information elements (IANA) correctly.")
 	assert.Equal(t, "pod1", dataElements[3].Value, "DataSet does not store elements (Antrea) correctly.")
 	assert.Equal(t, uint32(1257894000), dataElements[4].Value, "DataSet does not store elements (IANA) correctly.")
 	if isMultipleRecord {
-		dataElements := dataSet.GetRecords()[1].GetInfoElements()
+		dataElements := dataSet.GetRecords()[1].GetOrderedElementList()
 		assert.Equal(t, net.IP([]byte{4, 3, 2, 1}), dataElements[0].Value, "DataSet does not store multiple records correctly.")
 		assert.Equal(t, uint64(0), dataElements[2].Value, "DataSet does not store multiple records correctly.")
 		assert.Equal(t, "pod2", dataElements[3].Value, "DataSet does not store multiple records correctly.")

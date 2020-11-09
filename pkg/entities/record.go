@@ -37,16 +37,18 @@ type Record interface {
 	GetBuffer() *bytes.Buffer
 	GetTemplateID() uint16
 	GetFieldCount() uint16
-	GetInfoElements() []*InfoElementWithValue
+	GetOrderedElementList() []*InfoElementWithValue
+	GetInfoElementMap() map[string]*InfoElementWithValue
 	GetMinDataRecordLen() uint16
 }
 
 type baseRecord struct {
-	buff       bytes.Buffer
-	len        uint16
-	fieldCount uint16
-	templateID uint16
-	elements   []*InfoElementWithValue
+	buff               bytes.Buffer
+	len                uint16
+	fieldCount         uint16
+	templateID         uint16
+	orderedElementList []*InfoElementWithValue
+	elementsMap        map[string]*InfoElementWithValue
 	Record
 }
 
@@ -57,11 +59,12 @@ type dataRecord struct {
 func NewDataRecord(id uint16) *dataRecord {
 	return &dataRecord{
 		&baseRecord{
-			buff:       bytes.Buffer{},
-			len:        0,
-			fieldCount: 0,
-			templateID: id,
-			elements:   make([]*InfoElementWithValue, 0),
+			buff:               bytes.Buffer{},
+			len:                0,
+			fieldCount:         0,
+			templateID:         id,
+			orderedElementList: make([]*InfoElementWithValue, 0),
+			elementsMap:        make(map[string]*InfoElementWithValue),
 		},
 	}
 }
@@ -76,11 +79,12 @@ type templateRecord struct {
 func NewTemplateRecord(count uint16, id uint16) *templateRecord {
 	return &templateRecord{
 		&baseRecord{
-			buff:       bytes.Buffer{},
-			len:        0,
-			fieldCount: count,
-			templateID: id,
-			elements:   make([]*InfoElementWithValue, 0),
+			buff:               bytes.Buffer{},
+			len:                0,
+			fieldCount:         count,
+			templateID:         id,
+			orderedElementList: make([]*InfoElementWithValue, 0),
+			elementsMap:        make(map[string]*InfoElementWithValue),
 		},
 		0,
 	}
@@ -98,8 +102,12 @@ func (b *baseRecord) GetFieldCount() uint16 {
 	return b.fieldCount
 }
 
-func (d *baseRecord) GetInfoElements() []*InfoElementWithValue {
-	return d.elements
+func (d *baseRecord) GetOrderedElementList() []*InfoElementWithValue {
+	return d.orderedElementList
+}
+
+func (d *baseRecord) GetInfoElementMap() map[string]*InfoElementWithValue {
+	return d.elementsMap
 }
 
 func (d *dataRecord) PrepareRecord() (uint16, error) {
@@ -122,7 +130,8 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bo
 		return 0, err
 	}
 	ie := NewInfoElementWithValue(element.Element, value)
-	d.elements = append(d.elements, ie)
+	d.orderedElementList = append(d.orderedElementList, ie)
+	d.elementsMap[element.Element.Name] = ie
 	if err != nil {
 		return 0, err
 	}
@@ -158,7 +167,8 @@ func (t *templateRecord) AddInfoElement(element *InfoElementWithValue, isDecodin
 			return 0, err
 		}
 	}
-	t.elements = append(t.elements, element)
+	t.orderedElementList = append(t.orderedElementList, element)
+	t.elementsMap[element.Element.Name] = element
 	// Keep track of minimum data record length required for sanity check
 	if element.Element.Len == VariableLength {
 		t.minDataRecLength = t.minDataRecLength + 1

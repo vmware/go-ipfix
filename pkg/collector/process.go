@@ -19,6 +19,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -42,8 +43,8 @@ type collectingProcess struct {
 	maxBufferSize uint16
 	// chanel to receive stop information
 	stopChan chan bool
-	// packet list
-	messages []*entities.Message
+	// messageChan is the channel to output message
+	messageChan chan *entities.Message
 	// maps each client to its client handler (required channels)
 	clients map[string]*clientHandler
 	// clientsLock allows multiple readers or one writer to access clients map at the same time
@@ -63,7 +64,7 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL u
 		address:       address,
 		maxBufferSize: maxBufferSize,
 		stopChan:      make(chan bool),
-		messages:      make([]*entities.Message, 0),
+		messageChan:   make(chan *entities.Message),
 		clients:       make(map[string]*clientHandler),
 	}
 	return collectProc, nil
@@ -79,10 +80,13 @@ func (cp *collectingProcess) Start() {
 
 func (cp *collectingProcess) Stop() {
 	cp.stopChan <- true
+	if cp.messageChan != nil {
+		close(cp.messageChan)
+	}
 }
 
-func (cp *collectingProcess) GetMessages() []*entities.Message {
-	return cp.messages
+func (cp *collectingProcess) GetMsgChan() chan *entities.Message {
+	return cp.messageChan
 }
 
 func (cp *collectingProcess) createClient() *clientHandler {
@@ -110,8 +114,10 @@ func (cp *collectingProcess) getClientCount() int {
 	return len(cp.clients)
 }
 
-func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities.Message, error) {
+func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
 	message := entities.Message{}
+	exportAddr := strings.Split(exportAddress, ":")[0]
+	message.ExportAddress = exportAddr
 	var setID, length uint16
 	err := util.Decode(packetBuffer, binary.BigEndian, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setID, &length)
 	if err != nil {
@@ -133,7 +139,8 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer) (*entities
 		}
 		message.Set = set
 	}
-	cp.messages = append(cp.messages, &message)
+	// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
+	cp.messageChan <- &message
 	return &message, nil
 }
 

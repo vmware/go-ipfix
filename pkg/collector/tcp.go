@@ -68,7 +68,7 @@ func (cp *collectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 				}
 				size = size - length
 				// get the message here
-				message, err := cp.decodePacket(bytes.NewBuffer(buff[0:length]))
+				message, err := cp.decodePacket(bytes.NewBuffer(buff[0:length]), address)
 				if err != nil {
 					klog.Error(err)
 					break out

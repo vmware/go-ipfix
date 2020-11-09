@@ -85,7 +85,7 @@ func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGrou
 					return
 				case packet := <-client.packetChan:
 					// get the message here
-					message, err := cp.decodePacket(packet)
+					message, err := cp.decodePacket(packet, address.String())
 					if err != nil {
 						klog.Error(err)
 						return

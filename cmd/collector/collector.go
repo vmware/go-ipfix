@@ -77,7 +77,7 @@ func printIPFIXMessage(msg *entities.Message) {
 		fmt.Fprint(&buf, "TEMPLATE SET:\n")
 		for i, record := range msg.Set.GetRecords() {
 			fmt.Fprintf(&buf, "  TEMPLATE RECORD-%d:\n", i)
-			for _, ie := range record.GetInfoElements() {
+			for _, ie := range record.GetOrderedElementList() {
 				fmt.Fprintf(&buf, "    %s: len=%d (enterprise ID = %d) \n", ie.Element.Name, ie.Element.Len, ie.Element.EnterpriseId)
 			}
 		}
@@ -85,7 +85,7 @@ func printIPFIXMessage(msg *entities.Message) {
 		fmt.Fprint(&buf, "DATA SET:\n")
 		for i, record := range msg.Set.GetRecords() {
 			fmt.Fprintf(&buf, "  DATA RECORD-%d:\n", i)
-			for _, ie := range record.GetInfoElements() {
+			for _, ie := range record.GetOrderedElementList() {
 				fmt.Fprintf(&buf, "    %s: %v \n", ie.Element.Name, ie.Value)
 			}
 		}
@@ -138,20 +138,10 @@ func run() error {
 	messageReceived := make(chan *entities.Message)
 	go func() {
 		go cp.Start()
-		msgCount := 0
-		// This can be simplified if collector uses a message channel.
-		// Are there any use cases for having list of messages in collector process.
-		for {
-			ipfixMessages := cp.GetMessages()
-			currentLen := len(ipfixMessages)
-			if currentLen > msgCount {
-				for i := msgCount; i < currentLen; i++ {
-					klog.Info("Processing IPFIX message")
-					messageReceived <- ipfixMessages[i]
-					msgCount++
-				}
-			}
-			time.Sleep(5 * time.Millisecond)
+		msgChan := cp.GetMsgChan()
+		for message := range msgChan {
+			klog.Info("Processing IPFIX message")
+			messageReceived <- message
 		}
 	}()
 
