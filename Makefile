@@ -22,3 +22,9 @@ golangci:
 collector:
 	@mkdir -p $(BINDIR)
 	GOOS=linux $(GO) build -o $(BINDIR) github.com/vmware/go-ipfix/cmd/collector/
+
+### Docker images ###
+
+docker-collector:
+	@echo "===> Building antrea/ipfix-collector Docker image <==="
+	docker build --pull -t antrea/ipfix-collector -f build/images/Dockerfile.build.collector .

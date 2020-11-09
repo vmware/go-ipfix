@@ -1,0 +1,22 @@
+name: Build and push a release image
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  build:
+    runs-on: [ubuntu-18.04]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build go-ipfix Docker images and push to Antrea Docker registry
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+          TAG: ${{ github.ref }}
+        run: |
+          make docker-collector
+          echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+          docker tag antrea/ipfix-collector antrea/ipfix-collector:"${TAG:10}"
+          docker push antrea/ipfix-collector:"${TAG:10}"
