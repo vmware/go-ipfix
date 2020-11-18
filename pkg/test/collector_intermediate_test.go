@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
+	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/intermediate"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
@@ -15,6 +16,7 @@ import (
 var templatePacket = []byte{0, 10, 0, 76, 95, 154, 84, 121, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 60, 1, 0, 0, 9, 0, 8, 0, 4, 0, 12, 0, 4, 0, 7, 0, 2, 0, 11, 0, 2, 0, 4, 0, 1, 128, 101, 255, 255, 0, 0, 220, 186, 128, 103, 255, 255, 0, 0, 220, 186, 128, 106, 0, 4, 0, 0, 220, 186, 128, 107, 0, 2, 0, 0, 220, 186}
 var dataPacket1 = []byte{0, 10, 0, 45, 95, 154, 80, 113, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 29, 1, 2, 3, 4, 5, 6, 7, 8, 4, 210, 22, 46, 6, 4, 112, 111, 100, 49, 0, 192, 168, 0, 1, 18, 131}
 var dataPacket2 = []byte{0, 10, 0, 45, 95, 154, 82, 114, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 29, 1, 2, 3, 4, 5, 6, 7, 8, 4, 210, 22, 46, 6, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0}
+var flowKeyRecordMap = make(map[intermediate.FlowKey][]entities.Record)
 
 func TestCollectorToIntermediate(t *testing.T) {
 	registry.LoadRegistry()
@@ -53,14 +55,22 @@ func TestCollectorToIntermediate(t *testing.T) {
 		ap.Stop()
 	}()
 	cp.Start()
-	assert.Equal(t, 1, len(ap.GetTupleRecordMap()), "Aggregation process should store the data record to map with corresponding tuple.")
-	tuple := intermediate.Tuple{SourceAddress: "1.2.3.4", DestinationAddress: "5.6.7.8", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
-	assert.NotNil(t, ap.GetTupleRecordMap()[tuple])
-	assert.Equal(t, 1, len(ap.GetTupleRecordMap()[tuple]), "Aggregation process should correlate data record and only store one record.")
-	record := ap.GetTupleRecordMap()[tuple]
+	ap.ForAllRecordsDo(copyFlowKeyRecordMap)
+	assert.Equal(t, 1, len(flowKeyRecordMap), "Aggregation process should store the data record to map with corresponding flow key.")
+	flowKey := intermediate.FlowKey{SourceAddress: "1.2.3.4", DestinationAddress: "5.6.7.8", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
+	assert.NotNil(t, flowKeyRecordMap[flowKey])
+	assert.Equal(t, 1, len(flowKeyRecordMap[flowKey]), "Aggregation process should correlate data record and only store one record.")
+	record := flowKeyRecordMap[flowKey]
 	elements := record[0].GetOrderedElementList()
 	assert.Equal(t, "pod1", elements[5].Value)
-	assert.Equal(t, "pod2", record[0].GetInfoElementMap()["destinationPodName"].Value, "Aggregation process should correlate and fill corresponding fields.")
+	ieWithValue, _ := record[0].GetInfoElementWithValue("destinationPodName")
+	assert.Equal(t, "pod2", ieWithValue.Value, "Aggregation process should correlate and fill corresponding fields.")
 	assert.Equal(t, 11, len(elements), "There should be two more fields for exporter information in the record.")
-	assert.Equal(t, uint32(1), record[0].GetInfoElementMap()["originalObservationDomainId"].Value, "originalObservationDomainId should be added correctly in record.")
+	ieWithValue, _ = record[0].GetInfoElementWithValue("originalObservationDomainId")
+	assert.Equal(t, uint32(1), ieWithValue.Value, "originalObservationDomainId should be added correctly in record.")
+}
+
+func copyFlowKeyRecordMap(key intermediate.FlowKey, records []entities.Record) error {
+	flowKeyRecordMap[key] = records
+	return nil
 }

@@ -105,7 +105,7 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 		} else if setType == entities.Data {
 			err := ep.dataRecSanityCheck(record)
 			if err != nil {
-				return 0, fmt.Errorf("AddRecordAndSendMsg: error when doing sanity check:%v", err)
+				return 0, fmt.Errorf("AddSetAndSendMsg: error when doing sanity check:%v", err)
 			}
 		}
 	}

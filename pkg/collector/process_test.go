@@ -275,7 +275,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	if !ok {
 		t.Error("Template packet is not decoded correctly.")
 	}
-	sourceIPv4Address, exist := templateSet.GetRecords()[0].GetInfoElementMap()["sourceIPv4Address"]
+	sourceIPv4Address, exist := templateSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, uint32(0), sourceIPv4Address.Element.EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
@@ -321,7 +321,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 		t.Error("Message.Set does not store data in correct format")
 	}
 	ipAddress := net.IP([]byte{1, 2, 3, 4})
-	sourceIPv4Address, exist := v.GetRecords()[0].GetInfoElementMap()["sourceIPv4Address"]
+	sourceIPv4Address, exist := v.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, ipAddress, sourceIPv4Address.Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
