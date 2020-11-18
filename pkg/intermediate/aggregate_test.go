@@ -387,7 +387,8 @@ func TestAggregationProcess(t *testing.T) {
 	flowKey := FlowKey{
 		"10.0.0.1", "10.0.0.2", 6, 1234, 5678,
 	}
-	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
+	aggRecord := aggregationProcess.flowKeyRecordMap[flowKey]
+	assert.Equalf(t, aggRecord.Record, dataMsg.GetSet().GetRecords()[0], "records should be equal")
 }
 
 func TestAddOriginalExporterInfo(t *testing.T) {

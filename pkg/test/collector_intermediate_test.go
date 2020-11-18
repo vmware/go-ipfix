@@ -111,7 +111,7 @@ func TestCollectorToIntermediate(t *testing.T) {
 		AggregatedSourceStatsElements:      antreaSourceStatsElementList,
 		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
 	}
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
+	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4739")
 	if err != nil {
 		t.Error(err)
 	}
@@ -136,9 +136,9 @@ func TestCollectorToIntermediate(t *testing.T) {
 	go cp.Start()
 	waitForCollectorReady(t, cp)
 	go func() {
-		conn, err := net.DialUDP("udp", nil, address)
+		conn, err := net.DialTCP("tcp", nil, address)
 		if err != nil {
-			t.Errorf("UDP Collecting Process does not start correctly.")
+			t.Errorf("TCP Collecting Process does not start correctly.")
 		}
 		defer conn.Close()
 		conn.Write(templatePacket)
@@ -181,6 +181,8 @@ func TestCollectorToIntermediate(t *testing.T) {
 			assert.Equal(t, uint64(200), element.Value)
 		case "packetTotalCountFromDestinationNode":
 			assert.Equal(t, uint64(1000), element.Value)
+		case "packetDeltaCountFromDestinationNode":
+			assert.Equal(t, uint64(500), element.Value)
 		}
 	}
 
