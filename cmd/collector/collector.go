@@ -60,6 +60,25 @@ func initLoggingToFile(fs *pflag.FlagSet) {
 	}
 }
 
+func signalHandler(stopCh chan struct{}) {
+	// We define a channel with buffer of two signals. The first signal that is
+	// received will cause the stopCh channel to be closed, giving the opportunity
+	// to the program to exit gracefully. If a second signal is received before
+	// then, we will force exit with code 1.
+	signalCh := make(chan os.Signal, 2)
+
+	go func() {
+		<-signalCh
+		close(stopCh)
+		<-signalCh
+		klog.Warning("Received second signal, will force exit")
+		logs.FlushLogs()
+		os.Exit(1)
+	}()
+
+	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+}
+
 func addIPFIXFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&IPFIXAddr, "ipfix.addr", "", "IPFIX collector address")
 	fs.Uint16Var(&IPFIXPort, "ipfix.port", 4739, "IPFIX collector port")
@@ -93,23 +112,11 @@ func printIPFIXMessage(msg *entities.Message) {
 	klog.Infof(buf.String())
 }
 
-func signalHandler(stopCh chan struct{}, messageReceived chan *entities.Message) {
-	signalCh := make(chan os.Signal, 1)
-	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
-	for {
-		select {
-		case msg := <-messageReceived:
-			printIPFIXMessage(msg)
-		case <-signalCh:
-			close(stopCh)
-			return
-		}
-	}
-}
-
 func run() error {
 	klog.Info("Starting IPFIX collector")
+
+	stopCh := make(chan struct{})
+	signalHandler(stopCh)
 
 	// Load the IPFIX global registry
 	registry.LoadRegistry()
@@ -134,19 +141,20 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	// Start listening to connections and receiving messages.
-	messageReceived := make(chan *entities.Message)
+	// Start listening to connections and receive messages.
 	go func() {
 		go cp.Start()
 		msgChan := cp.GetMsgChan()
-		for message := range msgChan {
-			klog.Info("Processing IPFIX message")
-			messageReceived <- message
+		for {
+			select {
+			case msg := <-msgChan:
+				klog.V(2).Info("Processing IPFIX message")
+				printIPFIXMessage(msg)
+			case <-stopCh:
+				return
+			}
 		}
 	}()
-
-	stopCh := make(chan struct{})
-	go signalHandler(stopCh, messageReceived)
 
 	<-stopCh
 	// Stop the collector process
