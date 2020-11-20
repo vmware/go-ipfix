@@ -9,7 +9,7 @@ import (
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
-type aggregation struct {
+type AggregationProcess struct {
 	// tupleRecordMap maps each connection with its records
 	tupleRecordMap map[Tuple][]entities.Record
 	// tupleRecordLock allows multiple readers or one writer at the same time
@@ -34,13 +34,13 @@ type Tuple struct {
 	DestinationPort    uint16
 }
 
-func InitAggregationProcess(messageChan chan *entities.Message, workerNum int, correlateFields []string) (*aggregation, error) {
+func InitAggregationProcess(messageChan chan *entities.Message, workerNum int, correlateFields []string) (*AggregationProcess, error) {
 	if messageChan == nil {
 		return nil, fmt.Errorf("Cannot create aggregation process without message channel.")
 	} else if workerNum <= 0 {
 		return nil, fmt.Errorf("Worker number cannot be <= 0.")
 	}
-	return &aggregation{
+	return &AggregationProcess{
 		make(map[Tuple][]entities.Record),
 		sync.RWMutex{},
 		make(chan chan *entities.Message),
@@ -51,7 +51,7 @@ func InitAggregationProcess(messageChan chan *entities.Message, workerNum int, c
 	}, nil
 }
 
-func (a *aggregation) Start() {
+func (a *AggregationProcess) Start() {
 	for i := 0; i < a.workerNum; i++ {
 		w := createWorker(i, a.workerPool, a.AggregateMsgBy5Tuple)
 		w.start()
@@ -63,14 +63,14 @@ func (a *aggregation) Start() {
 	}
 }
 
-func (a *aggregation) Stop() {
+func (a *AggregationProcess) Stop() {
 	for _, worker := range a.workerList {
 		worker.stop()
 	}
 }
 
 // AggregateMsgBy5Tuple gets 5-tuple info from records in message and stores in cache
-func (a *aggregation) AggregateMsgBy5Tuple(message *entities.Message) error {
+func (a *AggregationProcess) AggregateMsgBy5Tuple(message *entities.Message) error {
 	addOriginalExporterInfo(message)
 	if message.Set.GetSetType() == entities.Template { // skip template records
 		return nil
@@ -86,20 +86,20 @@ func (a *aggregation) AggregateMsgBy5Tuple(message *entities.Message) error {
 	return nil
 }
 
-func (a *aggregation) GetTupleRecordMap() map[Tuple][]entities.Record {
+func (a *AggregationProcess) GetTupleRecordMap() map[Tuple][]entities.Record {
 	a.tupleRecordLock.RLock()
 	defer a.tupleRecordLock.RUnlock()
 	return a.tupleRecordMap
 }
 
-func (a *aggregation) DeleteTupleFromMap(tuple Tuple) {
+func (a *AggregationProcess) DeleteTupleFromMap(tuple Tuple) {
 	a.tupleRecordLock.Lock()
 	defer a.tupleRecordLock.Unlock()
 	delete(a.tupleRecordMap, tuple)
 }
 
 // correlateRecords fills records info by correlating incoming and current records
-func (a *aggregation) correlateRecords(tuple Tuple, record entities.Record) {
+func (a *AggregationProcess) correlateRecords(tuple Tuple, record entities.Record) {
 	existingRecords := a.GetTupleRecordMap()[tuple]
 	// only fill the information for record from source node
 	if isRecordFromSrc(record) {
@@ -130,7 +130,7 @@ func (a *aggregation) correlateRecords(tuple Tuple, record entities.Record) {
 	a.removeDuplicates(tuple)
 }
 
-func (a *aggregation) removeDuplicates(tuple Tuple) {
+func (a *AggregationProcess) removeDuplicates(tuple Tuple) {
 	a.tupleRecordLock.Lock()
 	defer a.tupleRecordLock.Unlock()
 	records := a.tupleRecordMap[tuple]
@@ -150,7 +150,7 @@ func (a *aggregation) removeDuplicates(tuple Tuple) {
 	}
 }
 
-func (a *aggregation) addRecordToMap(tuple Tuple, record entities.Record) {
+func (a *AggregationProcess) addRecordToMap(tuple Tuple, record entities.Record) {
 	a.tupleRecordLock.Lock()
 	defer a.tupleRecordLock.Unlock()
 	if _, exist := a.tupleRecordMap[tuple]; !exist {

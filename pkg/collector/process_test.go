@@ -250,7 +250,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 }
 
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
-	cp := collectingProcess{}
+	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
 	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4736")
@@ -293,7 +293,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 }
 
 func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
-	cp := collectingProcess{}
+	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.templatesLock = sync.RWMutex{}
 	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4737")
