@@ -25,7 +25,7 @@ import (
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
-func (cp *collectingProcess) startUDPServer() {
+func (cp *CollectingProcess) startUDPServer() {
 	s, err := net.ResolveUDPAddr("udp", cp.address.String())
 	if err != nil {
 		klog.Error(err)
@@ -66,7 +66,7 @@ func (cp *collectingProcess) startUDPServer() {
 	}
 }
 
-func (cp *collectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGroup) {
+func (cp *CollectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGroup) {
 	if _, exist := cp.clients[address.String()]; !exist {
 		client := cp.createClient()
 		cp.addClient(address.String(), client)

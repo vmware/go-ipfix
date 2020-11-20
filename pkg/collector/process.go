@@ -30,7 +30,7 @@ import (
 	"github.com/vmware/go-ipfix/pkg/util"
 )
 
-type collectingProcess struct {
+type CollectingProcess struct {
 	// for each obsDomainID, there is a map of templates
 	templatesMap map[uint32]map[uint16][]*entities.InfoElement
 	// templatesLock allows multiple readers or one writer at the same time
@@ -56,8 +56,8 @@ type clientHandler struct {
 	errChan    chan bool
 }
 
-func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*collectingProcess, error) {
-	collectProc := &collectingProcess{
+func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*CollectingProcess, error) {
+	collectProc := &CollectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		templatesLock: sync.RWMutex{},
 		templateTTL:   templateTTL,
@@ -70,7 +70,7 @@ func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL u
 	return collectProc, nil
 }
 
-func (cp *collectingProcess) Start() {
+func (cp *CollectingProcess) Start() {
 	if cp.address.Network() == "tcp" {
 		cp.startTCPServer()
 	} else if cp.address.Network() == "udp" {
@@ -78,43 +78,43 @@ func (cp *collectingProcess) Start() {
 	}
 }
 
-func (cp *collectingProcess) Stop() {
+func (cp *CollectingProcess) Stop() {
 	cp.stopChan <- true
 	if cp.messageChan != nil {
 		close(cp.messageChan)
 	}
 }
 
-func (cp *collectingProcess) GetMsgChan() chan *entities.Message {
+func (cp *CollectingProcess) GetMsgChan() chan *entities.Message {
 	return cp.messageChan
 }
 
-func (cp *collectingProcess) createClient() *clientHandler {
+func (cp *CollectingProcess) createClient() *clientHandler {
 	return &clientHandler{
 		packetChan: make(chan *bytes.Buffer),
 		errChan:    make(chan bool),
 	}
 }
 
-func (cp *collectingProcess) addClient(address string, client *clientHandler) {
+func (cp *CollectingProcess) addClient(address string, client *clientHandler) {
 	cp.clientsLock.Lock()
 	defer cp.clientsLock.Unlock()
 	cp.clients[address] = client
 }
 
-func (cp *collectingProcess) deleteClient(name string) {
+func (cp *CollectingProcess) deleteClient(name string) {
 	cp.clientsLock.Lock()
 	defer cp.clientsLock.Unlock()
 	delete(cp.clients, name)
 }
 
-func (cp *collectingProcess) getClientCount() int {
+func (cp *CollectingProcess) getClientCount() int {
 	cp.clientsLock.RLock()
 	defer cp.clientsLock.RUnlock()
 	return len(cp.clients)
 }
 
-func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
+func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
 	message := entities.Message{}
 	exportAddr := strings.Split(exportAddress, ":")[0]
 	message.ExportAddress = exportAddr
@@ -144,7 +144,7 @@ func (cp *collectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 	return &message, nil
 }
 
-func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (entities.Set, error) {
+func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (entities.Set, error) {
 	var templateID uint16
 	var fieldCount uint16
 	err := util.Decode(templateBuffer, binary.BigEndian, &templateID, &fieldCount)
@@ -208,7 +208,7 @@ func (cp *collectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 	return templateSet, nil
 }
 
-func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (entities.Set, error) {
+func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (entities.Set, error) {
 	// make sure template exists
 	template, err := cp.getTemplate(obsDomainID, templateID)
 	if err != nil {
@@ -234,7 +234,7 @@ func (cp *collectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	return dataSet, nil
 }
 
-func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []*entities.InfoElementWithValue) {
+func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []*entities.InfoElementWithValue) {
 	cp.templatesLock.Lock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
 		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
@@ -266,7 +266,7 @@ func (cp *collectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}()
 }
 
-func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
+func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
 	cp.templatesLock.RLock()
 	defer cp.templatesLock.RUnlock()
 	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {
@@ -276,7 +276,7 @@ func (cp *collectingProcess) getTemplate(obsDomainID uint32, templateID uint16) 
 	}
 }
 
-func (cp *collectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) {
+func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) {
 	cp.templatesLock.Lock()
 	defer cp.templatesLock.Unlock()
 	delete(cp.templatesMap[obsDomainID], templateID)
