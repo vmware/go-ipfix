@@ -9,7 +9,7 @@ import (
 	"k8s.io/klog"
 )
 
-func (cp *collectingProcess) startTCPServer() {
+func (cp *CollectingProcess) startTCPServer() {
 	listener, err := net.Listen("tcp", cp.address.String())
 	if err != nil {
 		klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
@@ -40,7 +40,7 @@ func (cp *collectingProcess) startTCPServer() {
 	}
 }
 
-func (cp *collectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) {
+func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) {
 	defer wg.Done()
 	address := conn.RemoteAddr().String()
 	client := cp.createClient()
