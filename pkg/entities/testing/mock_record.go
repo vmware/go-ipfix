@@ -91,18 +91,19 @@ func (mr *MockRecordMockRecorder) GetFieldCount() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFieldCount", reflect.TypeOf((*MockRecord)(nil).GetFieldCount))
 }
 
-// GetInfoElementMap mocks base method
-func (m *MockRecord) GetInfoElementMap() map[string]*entities.InfoElementWithValue {
+// GetInfoElementWithValue mocks base method
+func (m *MockRecord) GetInfoElementWithValue(arg0 string) (*entities.InfoElementWithValue, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetInfoElementMap")
-	ret0, _ := ret[0].(map[string]*entities.InfoElementWithValue)
-	return ret0
+	ret := m.ctrl.Call(m, "GetInfoElementWithValue", arg0)
+	ret0, _ := ret[0].(*entities.InfoElementWithValue)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
 }
 
-// GetInfoElementMap indicates an expected call of GetInfoElementMap
-func (mr *MockRecordMockRecorder) GetInfoElementMap() *gomock.Call {
+// GetInfoElementWithValue indicates an expected call of GetInfoElementWithValue
+func (mr *MockRecordMockRecorder) GetInfoElementWithValue(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElementMap", reflect.TypeOf((*MockRecord)(nil).GetInfoElementMap))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElementWithValue", reflect.TypeOf((*MockRecord)(nil).GetInfoElementWithValue), arg0)
 }
 
 // GetMinDataRecordLen mocks base method
