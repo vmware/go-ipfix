@@ -15,9 +15,9 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 	elements = append(elements, ie1, ie2)
 	set := NewSet(Template, uint16(256), true)
 	set.AddRecord(elements, 256)
-	_, exist := set.GetRecords()[0].GetInfoElementMap()["sourceIPv4Address"]
+	_, exist := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
-	_, exist = set.GetRecords()[0].GetInfoElementMap()["destinationIPv4Address"]
+	_, exist = set.GetRecords()[0].GetInfoElementWithValue("destinationIPv4Address")
 	assert.Equal(t, true, exist)
 	// Test with data set
 	set = NewSet(Data, uint16(256), false)
@@ -26,9 +26,9 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 	ie2 = NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP("10.0.0.2"))
 	elements = append(elements, ie1, ie2)
 	set.AddRecord(elements, 256)
-	infoElementWithValue, _ := set.GetRecords()[0].GetInfoElementMap()["sourceIPv4Address"]
+	infoElementWithValue, _ := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x1}), infoElementWithValue.Value)
-	infoElementWithValue, _ = set.GetRecords()[0].GetInfoElementMap()["destinationIPv4Address"]
+	infoElementWithValue, _ = set.GetRecords()[0].GetInfoElementWithValue("destinationIPv4Address")
 	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x2}), infoElementWithValue.Value)
 }
 
@@ -40,9 +40,9 @@ func TestAddRecordIPv6Addresses(t *testing.T) {
 	elements = append(elements, ie1, ie2)
 	set := NewSet(Template, uint16(256), true)
 	set.AddRecord(elements, 256)
-	_, exist := set.GetRecords()[0].GetInfoElementMap()["sourceIPv6Address"]
+	_, exist := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.Equal(t, true, exist)
-	_, exist = set.GetRecords()[0].GetInfoElementMap()["destinationIPv6Address"]
+	_, exist = set.GetRecords()[0].GetInfoElementWithValue("destinationIPv6Address")
 	assert.Equal(t, true, exist)
 	// Test with data set
 	set = NewSet(Data, uint16(256), false)
@@ -51,9 +51,9 @@ func TestAddRecordIPv6Addresses(t *testing.T) {
 	ie2 = NewInfoElementWithValue(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 	elements = append(elements, ie1, ie2)
 	set.AddRecord(elements, 256)
-	infoElementWithValue, _ := set.GetRecords()[0].GetInfoElementMap()["sourceIPv6Address"]
+	infoElementWithValue, _ := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.Equal(t, net.IP([]byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}), infoElementWithValue.Value)
-	infoElementWithValue, _ = set.GetRecords()[0].GetInfoElementMap()["destinationIPv6Address"]
+	infoElementWithValue, _ = set.GetRecords()[0].GetInfoElementWithValue("destinationIPv6Address")
 	assert.Equal(t, net.IP([]byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfc}), infoElementWithValue.Value)
 }
 

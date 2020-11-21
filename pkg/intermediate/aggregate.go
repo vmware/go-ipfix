@@ -3,19 +3,20 @@ package intermediate
 import (
 	"fmt"
 	"net"
+	"strings"
 	"sync"
+
+	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
 type AggregationProcess struct {
-	// tupleRecordMap maps each connection with its records
-	tupleRecordMap map[Tuple][]entities.Record
-	// tupleRecordLock allows multiple readers or one writer at the same time
-	tupleRecordLock sync.RWMutex
-	// workerPool is for storing worker channels to process the messages
-	workerPool chan chan *entities.Message
+	// flowKeyRecordMap maps each connection (5-tuple) with its records
+	flowKeyRecordMap map[FlowKey][]entities.Record
+	// flowKeyRecordLock allows multiple readers or one writer at the same time
+	flowKeyRecordLock sync.RWMutex
 	// messageChan is the channel to receive the message
 	messageChan chan *entities.Message
 	// workerNum is the number of workers to process the messages
@@ -24,9 +25,11 @@ type AggregationProcess struct {
 	workerList []*worker
 	// correlateFields are the fields to be filled in correlating process
 	correlateFields []string
+	// stopChan is the channel to receive stop message
+	stopChan chan bool
 }
 
-type Tuple struct {
+type FlowKey struct {
 	SourceAddress      string
 	DestinationAddress string
 	Protocol           uint8
@@ -34,80 +37,93 @@ type Tuple struct {
 	DestinationPort    uint16
 }
 
+type FlowKeyRecordMapCallBack func(key FlowKey, records []entities.Record) error
+
+// InitAggregationProcess takes in message channel (e.g. from collector) as input channel, workerNum(number of workers to process message)
+// and correlateFields (fields to be correlated and filled).
 func InitAggregationProcess(messageChan chan *entities.Message, workerNum int, correlateFields []string) (*AggregationProcess, error) {
 	if messageChan == nil {
-		return nil, fmt.Errorf("Cannot create aggregation process without message channel.")
+		return nil, fmt.Errorf("Cannot create AggregationProcess process without message channel.")
 	} else if workerNum <= 0 {
 		return nil, fmt.Errorf("Worker number cannot be <= 0.")
 	}
 	return &AggregationProcess{
-		make(map[Tuple][]entities.Record),
+		make(map[FlowKey][]entities.Record),
 		sync.RWMutex{},
-		make(chan chan *entities.Message),
 		messageChan,
 		workerNum,
 		make([]*worker, 0),
 		correlateFields,
+		make(chan bool),
 	}, nil
 }
 
 func (a *AggregationProcess) Start() {
 	for i := 0; i < a.workerNum; i++ {
-		w := createWorker(i, a.workerPool, a.AggregateMsgBy5Tuple)
+		w := createWorker(i, a.messageChan, a.AggregateMsgByFlowKey)
 		w.start()
 		a.workerList = append(a.workerList, w)
 	}
-	for message := range a.messageChan {
-		channel := <-a.workerPool
-		channel <- message
-	}
+	<-a.stopChan
 }
 
 func (a *AggregationProcess) Stop() {
 	for _, worker := range a.workerList {
 		worker.stop()
 	}
+	a.stopChan <- true
 }
 
-// AggregateMsgBy5Tuple gets 5-tuple info from records in message and stores in cache
-func (a *AggregationProcess) AggregateMsgBy5Tuple(message *entities.Message) error {
+// AggregateMsgByFlowKey gets flow key from records in message and stores in cache
+func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) error {
 	addOriginalExporterInfo(message)
 	if message.Set.GetSetType() == entities.Template { // skip template records
 		return nil
 	}
 	records := message.Set.GetRecords()
 	for _, record := range records {
-		tuple, err := getTupleFromRecord(record)
+		flowKey, err := getFlowKeyFromRecord(record)
 		if err != nil {
 			return err
 		}
-		a.correlateRecords(tuple, record)
+		a.correlateRecords(*flowKey, record)
 	}
 	return nil
 }
 
-func (a *AggregationProcess) GetTupleRecordMap() map[Tuple][]entities.Record {
-	a.tupleRecordLock.RLock()
-	defer a.tupleRecordLock.RUnlock()
-	return a.tupleRecordMap
+// ForAllRecordsDo takes in callback function to process the operations to flowkey->records pairs in the map
+func (a *AggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) error {
+	a.flowKeyRecordLock.RLock()
+	defer a.flowKeyRecordLock.RUnlock()
+	for k, v := range a.flowKeyRecordMap {
+		err := callback(k, v)
+		if err != nil {
+			klog.Errorf("Callback execution failed for flow with key: %v, records: %v, error: %v", k, v, err)
+			return err
+		}
+	}
+	return nil
 }
 
-func (a *AggregationProcess) DeleteTupleFromMap(tuple Tuple) {
-	a.tupleRecordLock.Lock()
-	defer a.tupleRecordLock.Unlock()
-	delete(a.tupleRecordMap, tuple)
+func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) {
+	a.flowKeyRecordLock.Lock()
+	defer a.flowKeyRecordLock.Unlock()
+	delete(a.flowKeyRecordMap, flowKey)
 }
 
 // correlateRecords fills records info by correlating incoming and current records
-func (a *AggregationProcess) correlateRecords(tuple Tuple, record entities.Record) {
-	existingRecords := a.GetTupleRecordMap()[tuple]
+func (a *AggregationProcess) correlateRecords(flowKey FlowKey, record entities.Record) {
+	a.flowKeyRecordLock.Lock()
+	defer a.flowKeyRecordLock.Unlock()
+	existingRecords := a.flowKeyRecordMap[flowKey]
 	// only fill the information for record from source node
 	if isRecordFromSrc(record) {
 		var isFilled bool
 		for _, existingRec := range existingRecords {
 			for _, field := range a.correlateFields {
-				if containsInfoElement(record.GetInfoElementMap(), field) {
-					record.GetInfoElementMap()[field].Value = existingRec.GetInfoElementMap()[field].Value
+				if ieWithValue, exist := record.GetInfoElementWithValue(field); exist {
+					existingIeWithValue, _ := existingRec.GetInfoElementWithValue(field)
+					ieWithValue.Value = existingIeWithValue.Value
 					isFilled = true
 				}
 			}
@@ -119,21 +135,22 @@ func (a *AggregationProcess) correlateRecords(tuple Tuple, record entities.Recor
 		for _, existingRec := range existingRecords {
 			if isRecordFromSrc(existingRec) {
 				for _, field := range a.correlateFields {
-					if containsInfoElement(record.GetInfoElementMap(), field) {
-						existingRec.GetInfoElementMap()[field].Value = record.GetInfoElementMap()[field].Value
+					if ieWithValue, exist := record.GetInfoElementWithValue(field); exist {
+						existingIeWithValue, _ := existingRec.GetInfoElementWithValue(field)
+						existingIeWithValue.Value = ieWithValue.Value
 					}
 				}
 			}
 		}
 	}
-	a.addRecordToMap(tuple, record)
-	a.removeDuplicates(tuple)
+	a.addRecordToMap(flowKey, record)
+	a.removeDuplicates(flowKey)
 }
 
-func (a *AggregationProcess) removeDuplicates(tuple Tuple) {
-	a.tupleRecordLock.Lock()
-	defer a.tupleRecordLock.Unlock()
-	records := a.tupleRecordMap[tuple]
+// removeDuplicates is currently used only in correlateRecords().
+// For other uses, please acquire the flowKeyRecordLock for protection.
+func (a *AggregationProcess) removeDuplicates(flowKey FlowKey) {
+	records := a.flowKeyRecordMap[flowKey]
 	srcRecords := make([]entities.Record, 0)
 	dstRecords := make([]entities.Record, 0)
 	for _, record := range records {
@@ -144,92 +161,108 @@ func (a *AggregationProcess) removeDuplicates(tuple Tuple) {
 		}
 	}
 	if len(srcRecords) != 0 {
-		a.tupleRecordMap[tuple] = srcRecords
+		a.flowKeyRecordMap[flowKey] = srcRecords
 	} else {
-		a.tupleRecordMap[tuple] = dstRecords
+		a.flowKeyRecordMap[flowKey] = dstRecords
 	}
 }
 
-func (a *AggregationProcess) addRecordToMap(tuple Tuple, record entities.Record) {
-	a.tupleRecordLock.Lock()
-	defer a.tupleRecordLock.Unlock()
-	if _, exist := a.tupleRecordMap[tuple]; !exist {
-		a.tupleRecordMap[tuple] = make([]entities.Record, 0)
+// addRecordToMap is currently used only in correlateRecords().
+// For other uses, please acquire the flowKeyRecordLock for protection.
+func (a *AggregationProcess) addRecordToMap(flowKey FlowKey, record entities.Record) {
+	if _, exist := a.flowKeyRecordMap[flowKey]; !exist {
+		a.flowKeyRecordMap[flowKey] = make([]entities.Record, 0)
 	}
-	a.tupleRecordMap[tuple] = append(a.tupleRecordMap[tuple], record)
+	a.flowKeyRecordMap[flowKey] = append(a.flowKeyRecordMap[flowKey], record)
 }
 
 func isRecordFromSrc(record entities.Record) bool {
-	element, exist := record.GetInfoElementMap()["sourcePodName"]
-	if exist && element.Value != "" {
+	ieWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
+	if exist && ieWithValue.Value != "" {
 		return true
 	}
 	return false
 }
 
-// getTupleFromRecord returns 5-tuple from data record
-func getTupleFromRecord(record entities.Record) (Tuple, error) {
-	var srcIP, dstIP string
-	var srcPort, dstPort uint16
-	var proto uint8
-	// record has complete 5-tuple information (IPv4)
-	infoElementMap := record.GetInfoElementMap()
-	if containsInfoElement(infoElementMap, "sourceIPv4Address") && containsInfoElement(infoElementMap, "destinationIPv4Address") && containsInfoElement(infoElementMap, "sourceTransportPort") && containsInfoElement(infoElementMap, "destinationTransportPort") && containsInfoElement(infoElementMap, "protocolIdentifier") {
-		srcIPAddr, ok := infoElementMap["sourceIPv4Address"].Value.(net.IP)
-		if !ok {
-			return Tuple{}, fmt.Errorf("sourceIPv4Address is not in correct format.")
-		}
-		srcIP = srcIPAddr.String()
-		dstIPAddr, ok := infoElementMap["destinationIPv4Address"].Value.(net.IP)
-		if !ok {
-			return Tuple{}, fmt.Errorf("destinationIPv4Address is not in correct format.")
-		}
-		dstIP = dstIPAddr.String()
-		srcPortNum, ok := infoElementMap["sourceTransportPort"].Value.(uint16)
-		if !ok {
-			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
-		}
-		srcPort = srcPortNum
-		dstPortNum, ok := infoElementMap["destinationTransportPort"].Value.(uint16)
-		if !ok {
-			return Tuple{}, fmt.Errorf("destinationTransportPort is not in correct format.")
-		}
-		dstPort = dstPortNum
-		protoNum, ok := infoElementMap["protocolIdentifier"].Value.(uint8)
-		if !ok {
-			return Tuple{}, fmt.Errorf("protocolIdentifier is not in correct format.")
-		}
-		proto = protoNum
-	} else if containsInfoElement(infoElementMap, "sourceIPv6Address") && containsInfoElement(infoElementMap, "destinationIPv6Address") && containsInfoElement(infoElementMap, "sourceTransportPort") && containsInfoElement(infoElementMap, "destinationTransportPort") && containsInfoElement(infoElementMap, "protocolIdentifier") {
-		srcIPAddr, ok := infoElementMap["sourceIPv6Address"].Value.(net.IP)
-		if !ok {
-			return Tuple{}, fmt.Errorf("sourceIPv6Address is not in correct format.")
-		}
-		srcIP = net.IP(srcIPAddr).String()
-		dstIPAddr, ok := infoElementMap["destinationIPv6Address"].Value.(net.IP)
-		if !ok {
-			return Tuple{}, fmt.Errorf("destinationIPv6Address is not in correct format.")
-		}
-		dstIP = net.IP(dstIPAddr).String()
-		srcPortNum, ok := infoElementMap["sourceTransportPort"].Value.(uint16)
-		if !ok {
-			return Tuple{}, fmt.Errorf("sourceTransportPort is not in correct format.")
-		}
-		srcPort = srcPortNum
-		dstPortNum, ok := infoElementMap["destinationTransportPort"].Value.(uint16)
-		if !ok {
-			return Tuple{}, fmt.Errorf("destinationTransportPort is not in correct format.")
-		}
-		dstPort = dstPortNum
-		protoNum, ok := infoElementMap["protocolIdentifier"].Value.(uint8)
-		if !ok {
-			return Tuple{}, fmt.Errorf("protocolIdentifier is not in correct format.")
-		}
-		proto = protoNum
-	} else {
-		return Tuple{}, fmt.Errorf("missing 5-tuple value(s) in the record.")
+// getFlowKeyFromRecord returns 5-tuple from data record
+func getFlowKeyFromRecord(record entities.Record) (*FlowKey, error) {
+	flowKey := &FlowKey{}
+	elementList := []string{
+		"sourceTransportPort",
+		"destinationTransportPort",
+		"protocolIdentifier",
+		"sourceIPv4Address",
+		"destinationIPv4Address",
+		"sourceIPv6Address",
+		"destinationIPv6Address",
 	}
-	return Tuple{srcIP, dstIP, proto, srcPort, dstPort}, nil
+	var isSrcIPv4Filled, isDstIPv4Filled bool
+	for _, name := range elementList {
+		switch name {
+		case "sourceTransportPort", "destinationTransportPort":
+			element, exist := record.GetInfoElementWithValue(name)
+			if !exist {
+				return nil, fmt.Errorf("%s does not exist", name)
+			}
+			port, ok := element.Value.(uint16)
+			if !ok {
+				return nil, fmt.Errorf("%s is not in correct format", name)
+			}
+			if name == "sourceTransportPort" {
+				flowKey.SourcePort = port
+			} else {
+				flowKey.DestinationPort = port
+			}
+		case "sourceIPv4Address", "destinationIPv4Address":
+			element, exist := record.GetInfoElementWithValue(name)
+			if !exist {
+				break
+			}
+			addr, ok := element.Value.(net.IP)
+			if !ok {
+				return nil, fmt.Errorf("%s is not in correct format", name)
+			}
+
+			if strings.Contains(name, "source") {
+				isSrcIPv4Filled = true
+				flowKey.SourceAddress = addr.String()
+			} else {
+				isDstIPv4Filled = true
+				flowKey.DestinationAddress = addr.String()
+			}
+		case "sourceIPv6Address", "destinationIPv6Address":
+			element, exist := record.GetInfoElementWithValue(name)
+			if (isSrcIPv4Filled && strings.Contains(name, "source")) || (isDstIPv4Filled && strings.Contains(name, "destination")) {
+				if exist {
+					klog.Warning("Two ip versions (IPv4 and IPv6) are not supported for flow key.")
+				}
+				break
+			}
+			if !exist {
+				return nil, fmt.Errorf("%s does not exist", name)
+			}
+			addr, ok := element.Value.(net.IP)
+			if !ok {
+				return nil, fmt.Errorf("%s is not in correct format", name)
+			}
+			if strings.Contains(name, "source") {
+				flowKey.SourceAddress = addr.String()
+			} else {
+				flowKey.DestinationAddress = addr.String()
+			}
+		case "protocolIdentifier":
+			element, exist := record.GetInfoElementWithValue(name)
+			if !exist {
+				return nil, fmt.Errorf("%s does not exist", name)
+			}
+			proto, ok := element.Value.(uint8)
+			if !ok {
+				return nil, fmt.Errorf("%s is not in correct format: %v", name, proto)
+			}
+			flowKey.Protocol = proto
+		}
+	}
+	return flowKey, nil
 }
 
 // addOriginalExporterInfo adds originalExporterIPv4Address and originalObservationDomainId to records in message set
@@ -274,11 +307,4 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		}
 	}
 	return nil
-}
-
-func containsInfoElement(recordMap map[string]*entities.InfoElementWithValue, name string) bool {
-	if _, exist := recordMap[name]; exist {
-		return true
-	}
-	return false
 }

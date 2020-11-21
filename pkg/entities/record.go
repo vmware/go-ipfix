@@ -38,7 +38,7 @@ type Record interface {
 	GetTemplateID() uint16
 	GetFieldCount() uint16
 	GetOrderedElementList() []*InfoElementWithValue
-	GetInfoElementMap() map[string]*InfoElementWithValue
+	GetInfoElementWithValue(name string) (*InfoElementWithValue, bool)
 	GetMinDataRecordLen() uint16
 }
 
@@ -106,8 +106,12 @@ func (d *baseRecord) GetOrderedElementList() []*InfoElementWithValue {
 	return d.orderedElementList
 }
 
-func (d *baseRecord) GetInfoElementMap() map[string]*InfoElementWithValue {
-	return d.elementsMap
+func (b *baseRecord) GetInfoElementWithValue(name string) (*InfoElementWithValue, bool) {
+	if element, exist := b.elementsMap[name]; exist {
+		return element, exist
+	} else {
+		return nil, false
+	}
 }
 
 func (d *dataRecord) PrepareRecord() (uint16, error) {
