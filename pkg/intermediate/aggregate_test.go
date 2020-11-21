@@ -163,38 +163,38 @@ func TestInitAggregationProcess(t *testing.T) {
 func TestGetTupleRecordMap(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
-	assert.Equal(t, aggregationProcess.tupleRecordMap, aggregationProcess.GetTupleRecordMap())
+	assert.Equal(t, aggregationProcess.flowKeyRecordMap, aggregationProcess.flowKeyRecordMap)
 }
 
-func TestAggregateMsgBy5Tuple(t *testing.T) {
+func TestAggregateMsgByFlowKey(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	// Template records should be ignored
 	message := createMsgwithTemplateSet()
-	aggregationProcess.AggregateMsgBy5Tuple(message)
-	assert.Empty(t, aggregationProcess.GetTupleRecordMap())
-	// Data records should be processed and stored with corresponding tuple
+	aggregationProcess.AggregateMsgByFlowKey(message)
+	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
+	// Data records should be processed and stored with corresponding flow key
 	message = createMsgwithDataSet1()
-	aggregationProcess.AggregateMsgBy5Tuple(message)
-	assert.NotEmpty(t, aggregationProcess.GetTupleRecordMap())
-	tuple := Tuple{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
-	record := aggregationProcess.GetTupleRecordMap()[tuple][0]
-	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
-	ie, exist := record.GetInfoElementMap()["sourceIPv4Address"]
+	aggregationProcess.AggregateMsgByFlowKey(message)
+	assert.NotEmpty(t, aggregationProcess.flowKeyRecordMap)
+	flowKey := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
+	record := aggregationProcess.flowKeyRecordMap[flowKey][0]
+	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
+	ieWithValue, exist := record.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
-	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ie.Value)
+	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ieWithValue.Value)
 	assert.Equal(t, message.Set.GetRecords()[0], record)
 
 	// Data record with IPv6 addresses should be processed and stored correctly
 	message = createMsgwithDataSetIPv6()
-	aggregationProcess.AggregateMsgBy5Tuple(message)
-	assert.Equal(t, 2, len(aggregationProcess.GetTupleRecordMap()))
-	tuple = Tuple{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
-	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
-	record = aggregationProcess.GetTupleRecordMap()[tuple][0]
-	ie, exist = record.GetInfoElementMap()["sourceIPv6Address"]
+	aggregationProcess.AggregateMsgByFlowKey(message)
+	assert.Equal(t, 2, len(aggregationProcess.flowKeyRecordMap))
+	flowKey = FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
+	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
+	record = aggregationProcess.flowKeyRecordMap[flowKey][0]
+	ieWithValue, exist = record.GetInfoElementWithValue("sourceIPv6Address")
 	assert.Equal(t, true, exist)
-	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ie.Value)
+	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ieWithValue.Value)
 	assert.Equal(t, message.Set.GetRecords()[0], record)
 }
 
@@ -210,11 +210,13 @@ func TestAggregationProcess(t *testing.T) {
 		close(messageChan)
 		aggregationProcess.Stop()
 	}()
+	// the Start() function is blocking until above goroutine with Stop() finishes
+	// Proper usage of aggregation process is to have Start() in a goroutine with external channel
 	aggregationProcess.Start()
-	tuple := Tuple{
+	flowKey := FlowKey{
 		"10.0.0.1", "10.0.0.2", 6, 1234, 5678,
 	}
-	assert.NotNil(t, aggregationProcess.GetTupleRecordMap()[tuple])
+	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
 }
 
 func TestAddOriginalExporterInfo(t *testing.T) {
@@ -223,16 +225,20 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	message := createMsgwithTemplateSet()
 	addOriginalExporterInfo(message)
 	record := message.Set.GetRecords()[0]
-	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalExporterIPv4Address"))
-	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalObservationDomainId"))
+	_, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
+	assert.Equal(t, true, exist)
+	_, exist = record.GetInfoElementWithValue("originalObservationDomainId")
+	assert.Equal(t, true, exist)
 	// Test message with data set
 	message = createMsgwithDataSet1()
 	addOriginalExporterInfo(message)
 	record = message.Set.GetRecords()[0]
-	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalExporterIPv4Address"))
-	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, record.GetInfoElementMap()["originalExporterIPv4Address"].Value)
-	assert.Equal(t, true, containsInfoElement(record.GetInfoElementMap(), "originalObservationDomainId"))
-	assert.Equal(t, uint32(1234), record.GetInfoElementMap()["originalObservationDomainId"].Value)
+	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
+	assert.Equal(t, true, exist)
+	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, ieWithValue.Value)
+	ieWithValue, exist = record.GetInfoElementWithValue("originalObservationDomainId")
+	assert.Equal(t, true, exist)
+	assert.Equal(t, uint32(1234), ieWithValue.Value)
 }
 
 func TestCorrelateRecords(t *testing.T) {
@@ -240,18 +246,22 @@ func TestCorrelateRecords(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	record1 := createMsgwithDataSet1().Set.GetRecords()[0]
-	tuple1, _ := getTupleFromRecord(record1)
+	flowKey1, _ := getFlowKeyFromRecord(record1)
 	record2 := createMsgwithDataSet2().Set.GetRecords()[0]
-	tuple2, _ := getTupleFromRecord(record2)
-	aggregationProcess.correlateRecords(tuple1, record1)
-	aggregationProcess.correlateRecords(tuple2, record2)
-	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
-	for _, records := range aggregationProcess.GetTupleRecordMap() {
+	flowKey2, _ := getFlowKeyFromRecord(record2)
+	aggregationProcess.correlateRecords(*flowKey1, record1)
+	aggregationProcess.correlateRecords(*flowKey2, record2)
+	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	for _, records := range aggregationProcess.flowKeyRecordMap {
 		assert.Equal(t, 1, len(records))
-		assert.Equal(t, "pod1", records[0].GetInfoElementMap()["sourcePodName"].Value)
-		assert.Equal(t, "pod2", records[0].GetInfoElementMap()["destinationPodName"].Value)
-		assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, records[0].GetInfoElementMap()["destinationClusterIP"].Value)
-		assert.Equal(t, uint16(4739), records[0].GetInfoElementMap()["destinationServicePort"].Value)
+		ieWithValue, _ := records[0].GetInfoElementWithValue("sourcePodName")
+		assert.Equal(t, "pod1", ieWithValue.Value)
+		ieWithValue, _ = records[0].GetInfoElementWithValue("destinationPodName")
+		assert.Equal(t, "pod2", ieWithValue.Value)
+		ieWithValue, _ = records[0].GetInfoElementWithValue("destinationClusterIP")
+		assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, ieWithValue.Value)
+		ieWithValue, _ = records[0].GetInfoElementWithValue("destinationServicePort")
+		assert.Equal(t, uint16(4739), ieWithValue.Value)
 	}
 }
 
@@ -259,12 +269,12 @@ func TestDeleteTupleFromMap(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	message := createMsgwithDataSet1()
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
-	tuple1 := Tuple{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
-	tuple2 := Tuple{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
-	aggregationProcess.tupleRecordMap[tuple1] = message.Set.GetRecords()
-	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
-	aggregationProcess.DeleteTupleFromMap(tuple2)
-	assert.Equal(t, 1, len(aggregationProcess.GetTupleRecordMap()))
-	aggregationProcess.DeleteTupleFromMap(tuple1)
-	assert.Empty(t, aggregationProcess.GetTupleRecordMap())
+	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
+	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
+	aggregationProcess.flowKeyRecordMap[flowKey1] = message.Set.GetRecords()
+	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	aggregationProcess.DeleteFlowKeyFromMap(flowKey2)
+	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	aggregationProcess.DeleteFlowKeyFromMap(flowKey1)
+	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 }
