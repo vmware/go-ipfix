@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.3.1 11-21-2020
+### Changed
+- Simplified standalone collector code. (#83, @stati)
+- Improved intermediate process. (#81, @zyiou)
+- Exposed collecting process and aggregation process as public struct. (#84, @zyiou)
+### Fixed
+- Modified versions of some packages in go.mod to keep it consistent with Antrea, the main user of go-ipfix library. (#82, @zyiou)
 ## 0.3.0 11-06-2020
 Includes all the bug fixes from [0.2.1](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#021-09-23-2020),
 [0.2.2](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#022-09-25-2020),
