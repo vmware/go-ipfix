@@ -219,15 +219,10 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	// Start collecting process
 	cp.Start()
 	templateMsg := messages[0]
-	dataMsg := messages[1]
-	assert.Equal(t, uint16(10), templateMsg.Version, "Version of flow record (template) should be 10.")
-	assert.Equal(t, uint32(1), templateMsg.ObsDomainID, "ObsDomainID (template) should be 1.")
-	assert.Equal(t, uint16(10), dataMsg.Version, "Version of flow record (template) should be 10.")
-	assert.Equal(t, uint32(1), dataMsg.ObsDomainID, "ObsDomainID (template) should be 1.")
-	templateSet, ok := templateMsg.Set.(entities.Set)
-	if !ok {
-		t.Error("Template packet is not decoded correctly.")
-	}
+
+	assert.Equal(t, uint16(10), templateMsg.GetVersion(), "Version of flow record (template) should be 10.")
+	assert.Equal(t, uint32(1), templateMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
+	templateSet := templateMsg.GetSet()
 	templateElements := templateSet.GetRecords()[0].GetOrderedElementList()
 	assert.Equal(t, uint32(0), templateElements[0].Element.EnterpriseId, "Template record is not stored correctly.")
 	assert.Equal(t, "sourceIPv4Address", templateElements[0].Element.Name, "Template record is not stored correctly.")
@@ -235,11 +230,10 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[2].Element.EnterpriseId, "Template record is not stored correctly.")
 	assert.Equal(t, registry.AntreaEnterpriseID, templateElements[3].Element.EnterpriseId, "Template record is not stored correctly.")
 
-	dataSet, ok := dataMsg.Set.(entities.Set)
-	if !ok {
-		t.Error("Data packet is not decoded correctly.")
-	}
-
+	dataMsg := messages[1]
+	assert.Equal(t, uint16(10), dataMsg.GetVersion(), "Version of flow record (template) should be 10.")
+	assert.Equal(t, uint32(1), dataMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
+	dataSet := dataMsg.GetSet()
 	dataElements := dataSet.GetRecords()[0].GetOrderedElementList()
 	assert.Equal(t, net.IP([]byte{1, 2, 3, 4}), dataElements[0].Value, "DataSet does not store elements (IANA) correctly.")
 	assert.Equal(t, uint64(12345678), dataElements[2].Value, "DataSet does not store reverse information elements (IANA) correctly.")

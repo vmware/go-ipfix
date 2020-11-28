@@ -95,7 +95,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	// Create local server for testing
-	udpAddr, err := net.ResolveUDPAddr("udp", ":0")
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when resolving UDP address: %v", err)
 	}
@@ -260,7 +260,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 
 func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	// Create local server for testing
-	udpAddr, err := net.ResolveUDPAddr("udp", ":0")
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when resolving UDP address: %v", err)
 	}
@@ -268,12 +268,13 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	t.Log("Created local server on random available port for testing")
 
 	buffCh := make(chan []byte)
+
 	// Create go routine for local server
 	// TODO: Move this in to different function with byte size as arg
 	go func() {
 		defer conn.Close()
 		buff := make([]byte, 28)
-		_, err = conn.Read(buff)
+		_, err := conn.Read(buff)
 		if err != nil {
 			t.Error(err)
 		}

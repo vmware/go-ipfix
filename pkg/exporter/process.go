@@ -15,9 +15,9 @@
 package exporter
 
 import (
-	"encoding/binary"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"k8s.io/klog"
@@ -36,16 +36,17 @@ type templateValue struct {
 //    creating different instances of exporting process. Need to be tested
 // 2. Only one observation point per observation domain is supported,
 //    so observation point ID not defined.
-// 3. Supports only TCP session; SCTP and UDP is not supported.
+// 3. Supports only TCP and UDP; one session at a time. SCTP is not supported.
 // TODO:UDP needs to send MTU size packets as per RFC7011
 type ExportingProcess struct {
 	connToCollector net.Conn
 	obsDomainID     uint32
 	seqNumber       uint32
 	templateID      uint16
-	msg             *entities.MsgBuffer
+	message         *entities.Message
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
+	mutex           sync.Mutex
 }
 
 // InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID) and tempRefTimeout
@@ -58,14 +59,14 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 		klog.Errorf("Cannot the create the connection to configured ExportingProcess %s: %v", collectorAddr.String(), err)
 		return nil, err
 	}
-	msgBuffer := entities.NewMsgBuffer()
+	message := entities.NewMessage(false)
 
 	expProc := &ExportingProcess{
 		connToCollector: conn,
 		obsDomainID:     obsID,
 		seqNumber:       0,
 		templateID:      startTemplateID,
-		msg:             msgBuffer,
+		message:         message,
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
 	}
@@ -99,6 +100,7 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 }
 
 func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set entities.Set) (int, error) {
+	// Iterate over all records in the set.
 	for _, record := range set.GetRecords() {
 		if setType == entities.Template {
 			ep.updateTemplate(record.GetTemplateID(), record.GetOrderedElementList(), record.GetMinDataRecordLen())
@@ -110,75 +112,35 @@ func (ep *ExportingProcess) AddSetAndSendMsg(setType entities.ContentType, set e
 		}
 	}
 
-	msgBuffer := ep.msg.GetMsgBuffer()
-	var bytesSent int
+	bytesSent := 0
 	// Check if message is exceeding the limit with new set
-	if uint16(msgBuffer.Len()+int(set.GetBuffLen())) > entities.MaxTcpSocketMsgSize {
-		return bytesSent, fmt.Errorf("AddSetAndSendMsg: set size exceeds max socket size.")
+	// TODO: Change the limit for UDP transport. This is only valid for TCP transport.
+	if uint16(ep.message.GetMsgBufferLen()+int(set.GetBuffLen())) > entities.MaxTcpSocketMsgSize {
+		return bytesSent, fmt.Errorf("set size exceeds max socket size")
 	}
-	if msgBuffer.Len() == 0 {
-		err := ep.createNewMsg()
+	if ep.message.GetMsgBufferLen() == 0 {
+		// Create the header and write to message
+		_, err := ep.message.CreateHeader()
 		if err != nil {
-			return bytesSent, fmt.Errorf("AddSetAndSendMsg: error when creating message: %v", err)
+			return bytesSent, fmt.Errorf("error when creating header: %v", err)
 		}
+		// IPFIX version number is 10.
+		// https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-version-numbers
+		ep.message.SetVersion(10)
+		ep.message.SetObsDomainID(ep.obsDomainID)
 	}
 
-	if setType == entities.Data && !ep.msg.GetDataRecFlag() {
-		ep.msg.SetDataRecFlag(true)
+	// Update the length in set header before sending.
+	set.UpdateLenInHeader()
+	_, err := ep.message.WriteToMsgBuffer(set.GetBuffer().Bytes())
+	if err != nil {
+		return 0, err
 	}
-
-	// finish set here will finalize set length and avoid further change to buffer length
-	set.FinishSet()
-	msgBuffer.Write(set.GetBuffer().Bytes())
-
-	b, err := ep.sendMsg(set.GetNumberOfRecords())
+	b, err := ep.sendMsg(set)
 	if err != nil {
 		return bytesSent, err
 	}
 	bytesSent = bytesSent + b
-
-	return bytesSent, nil
-}
-
-func (ep *ExportingProcess) createNewMsg() error {
-	// Create the header and write to message
-	header := make([]byte, 16)
-	// IPFIX version number is 10.
-	// https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-version-numbers
-	binary.BigEndian.PutUint16(header[0:2], 10)
-	binary.BigEndian.PutUint32(header[12:], ep.obsDomainID)
-	// Write the header to msg buffer
-	msgBuffer := ep.msg.GetMsgBuffer()
-	_, err := msgBuffer.Write(header)
-	if err != nil {
-		return fmt.Errorf("createNewMsg: %v", err)
-	}
-	return nil
-}
-
-func (ep *ExportingProcess) sendMsg(numOfRecords uint32) (int, error) {
-	// Update length, time and sequence number
-	msgBuffer := ep.msg.GetMsgBuffer()
-	byteSlice := msgBuffer.Bytes()
-	binary.BigEndian.PutUint16(byteSlice[2:4], uint16(msgBuffer.Len()))
-	binary.BigEndian.PutUint32(byteSlice[4:8], uint32(time.Now().Unix()))
-	binary.BigEndian.PutUint32(byteSlice[8:12], ep.seqNumber)
-	if ep.msg.GetDataRecFlag() {
-		ep.seqNumber = ep.seqNumber + numOfRecords
-	}
-	// Send msg on the connection
-	bytesSent, err := ep.connToCollector.Write(byteSlice)
-	if err != nil {
-		// Reset the message buffer and return error
-		msgBuffer.Reset()
-		ep.msg.SetDataRecFlag(false)
-		return bytesSent, fmt.Errorf("error when sending message on controller connection: %v", err)
-	} else if bytesSent == 0 && len(byteSlice) != 0 {
-		return 0, fmt.Errorf("sent 0 bytes; message is of length: %d", len(byteSlice))
-	}
-	// Reset the message buffer
-	msgBuffer.Reset()
-	ep.msg.SetDataRecFlag(false)
 
 	return bytesSent, nil
 }
@@ -202,7 +164,33 @@ func (ep *ExportingProcess) NewTemplateID() uint16 {
 	return ep.templateID
 }
 
+func (ep *ExportingProcess) sendMsg(set entities.Set) (int, error) {
+	// Update length, time and sequence number in the message header.
+	ep.message.SetMessageLen(uint16(ep.message.GetMsgBufferLen()))
+	ep.message.SetExportTime(uint32(time.Now().Unix()))
+	if set.GetSetType() == entities.Data {
+		ep.seqNumber = ep.seqNumber + set.GetNumberOfRecords()
+	}
+	ep.message.SetSequenceNum(ep.seqNumber)
+
+	// Send the message on the exporter connection.
+	bytesSent, err := ep.connToCollector.Write(ep.message.GetMsgBuffer().Bytes())
+	if err != nil {
+		ep.message.ResetMsgBuffer()
+		return bytesSent, fmt.Errorf("error when sending message on the connection: %v", err)
+	} else if bytesSent != int(ep.message.GetMessageLen()) {
+		ep.message.ResetMsgBuffer()
+		return bytesSent, fmt.Errorf("could not send the complete message on the connection")
+	}
+	// Reset the message buffer
+	ep.message.ResetMsgBuffer()
+	return bytesSent, nil
+}
+
 func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElementWithValue, minDataRecLen uint16) {
+	ep.mutex.Lock()
+	defer ep.mutex.Unlock()
+
 	if _, exist := ep.templatesMap[id]; exist {
 		return
 	}
@@ -217,6 +205,9 @@ func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoE
 }
 
 func (ep *ExportingProcess) deleteTemplate(id uint16) error {
+	ep.mutex.Lock()
+	defer ep.mutex.Unlock()
+
 	if _, exist := ep.templatesMap[id]; !exist {
 		return fmt.Errorf("process: template %d does not exist in exporting process", id)
 	}
@@ -226,6 +217,8 @@ func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 
 func (ep *ExportingProcess) sendRefreshedTemplates() error {
 	// Send refreshed template for every template in template map
+	templateSets := make([]entities.Set, 0)
+	ep.mutex.Lock()
 	for templateID, tempValue := range ep.templatesMap {
 		tempSet := entities.NewSet(entities.Template, templateID, false)
 		elements := make([]*entities.InfoElementWithValue, 0)
@@ -234,7 +227,12 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 			elements = append(elements, ie)
 		}
 		tempSet.AddRecord(elements, templateID)
-		if _, err := ep.AddSetAndSendMsg(entities.Template, tempSet); err != nil {
+		templateSets = append(templateSets, tempSet)
+	}
+	ep.mutex.Unlock()
+
+	for _, templateSet := range templateSets {
+		if _, err := ep.AddSetAndSendMsg(entities.Template, templateSet); err != nil {
 			return err
 		}
 	}
@@ -243,6 +241,10 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 
 func (ep *ExportingProcess) dataRecSanityCheck(rec entities.Record) error {
 	templateID := rec.GetTemplateID()
+
+	ep.mutex.Lock()
+	defer ep.mutex.Unlock()
+
 	if _, exist := ep.templatesMap[templateID]; !exist {
 		return fmt.Errorf("process: templateID %d does not exist in exporting process", templateID)
 	}

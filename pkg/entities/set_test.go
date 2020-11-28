@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"encoding/binary"
 	"net"
 	"testing"
 
@@ -96,18 +97,20 @@ func TestGetNumberOfRecords(t *testing.T) {
 	assert.Equal(t, uint32(1), set.GetNumberOfRecords())
 }
 
-func TestFinishSet(t *testing.T) {
+func TestSet_UpdateLenInHeader(t *testing.T) {
 	elements := make([]*InfoElementWithValue, 0)
 	ie1 := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
 	ie2 := NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
 	elements = append(elements, ie1, ie2)
-	set1 := NewSet(Template, uint16(256), true)
-	set2 := NewSet(Template, uint16(257), false)
-	set2.AddRecord(elements, 256)
-	assert.Equal(t, uint16(0), set1.GetBuffLen())
-	assert.Equal(t, uint16(16), set2.GetBuffLen())
-	set1.FinishSet()
-	set2.FinishSet()
-	assert.Equal(t, uint16(0), set1.GetBuffLen())
-	assert.Equal(t, uint16(0), set2.GetBuffLen())
+	setForDecoding := NewSet(Template, uint16(256), true)
+	setForEncoding := NewSet(Template, uint16(257), false)
+	setForEncoding.AddRecord(elements, 256)
+	assert.Equal(t, uint16(0), setForDecoding.GetBuffLen())
+	assert.Equal(t, uint16(16), setForEncoding.GetBuffLen())
+	setForDecoding.UpdateLenInHeader()
+	setForEncoding.UpdateLenInHeader()
+	// Nothing should be written in setForDecoding
+	assert.Equal(t, uint16(0), setForDecoding.GetBuffLen())
+	// Check the bytes in the header for set length
+	assert.Equal(t, setForEncoding.GetBuffLen(), binary.BigEndian.Uint16(setForEncoding.GetBuffer().Bytes()[2:4]))
 }

@@ -267,14 +267,12 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error in decoding template record: %v", err)
 	}
-	assert.Equal(t, uint16(10), message.Version, "Flow record version should be 10.")
-	assert.Equal(t, uint32(1), message.ObsDomainID, "Flow record obsDomainID should be 1.")
-	assert.NotNil(t, message.Set, "Template record should be stored in message flowset")
-	assert.NotNil(t, cp.templatesMap[message.ObsDomainID], "Template should be stored in template map")
-	templateSet, ok := message.Set.(entities.Set)
-	if !ok {
-		t.Error("Template packet is not decoded correctly.")
-	}
+	assert.Equal(t, uint16(10), message.GetVersion(), "Flow record version should be 10.")
+	assert.Equal(t, uint32(1), message.GetObsDomainID(), "Flow record obsDomainID should be 1.")
+	assert.NotNil(t, cp.templatesMap[message.GetObsDomainID()], "Template should be stored in template map")
+
+	templateSet := message.GetSet()
+	assert.NotNil(t, templateSet, "Template record should be stored in message flowset")
 	sourceIPv4Address, exist := templateSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, uint32(0), sourceIPv4Address.Element.EnterpriseId, "Template record is not stored correctly.")
@@ -313,15 +311,13 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 	message, err := cp.decodePacket(bytes.NewBuffer(validDataPacket), address.String())
 	assert.Nil(t, err, "Error should not be logged if corresponding template exists.")
-	assert.Equal(t, uint16(10), message.Version, "Flow record version should be 10.")
-	assert.Equal(t, uint32(1), message.ObsDomainID, "Flow record obsDomainID should be 1.")
-	assert.NotNil(t, message.Set, "Data set should be stored in message set")
-	v, ok := message.Set.(entities.Set)
-	if !ok {
-		t.Error("Message.Set does not store data in correct format")
-	}
+	assert.Equal(t, uint16(10), message.GetVersion(), "Flow record version should be 10.")
+	assert.Equal(t, uint32(1), message.GetObsDomainID(), "Flow record obsDomainID should be 1.")
+
+	set := message.GetSet()
+	assert.NotNil(t, set, "Data set should be stored in message set")
 	ipAddress := net.IP([]byte{1, 2, 3, 4})
-	sourceIPv4Address, exist := v.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
+	sourceIPv4Address, exist := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, ipAddress, sourceIPv4Address.Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
