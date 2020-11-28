@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
@@ -48,28 +49,22 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
-	messageCount := 0
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, address)
+
 	go func() {
-		time.Sleep(2 * time.Second)
 		conn, err := net.Dial(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("Cannot establish connection to %s", address.String())
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
-		time.Sleep(time.Second)
-		msgChan := cp.GetMsgChan()
-		for range msgChan {
-			messageCount++
-		}
 	}()
-	go func() {
-		time.Sleep(4 * time.Second)
-		cp.Stop()
-	}()
-	cp.Start()
-	assert.NotNil(t, cp.templatesMap[1], "TCP Collecting Process should receive and store the received template.")
-	assert.Equal(t, 1, messageCount, "Messages should be stored correctly.")
+	<-cp.GetMsgChan()
+	cp.Stop()
+	template, _ := cp.getTemplate(1, 256)
+	assert.NotNil(t, template, "TCP Collecting Process should receive and store the received template.")
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
@@ -81,9 +76,11 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
-	messageCount := 0
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, address)
+
 	go func() {
-		time.Sleep(2 * time.Second)
 		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
@@ -94,19 +91,12 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
-		time.Sleep(time.Second)
-		msgChan := cp.GetMsgChan()
-		for range msgChan {
-			messageCount++
-		}
 	}()
-	go func() {
-		time.Sleep(4 * time.Second)
-		cp.Stop()
-	}()
-	cp.Start()
-	assert.NotNil(t, cp.templatesMap[1], "UDP Collecting Process should receive and store the received template.")
-	assert.Equal(t, 1, messageCount, "Messages should be stored correctly.")
+	<-cp.GetMsgChan()
+	cp.Stop()
+	template, _ := cp.getTemplate(1, 256)
+	assert.NotNil(t, template, "UDP Collecting Process should receive and store the received template.")
+
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -114,33 +104,28 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	messageCount := 0
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
+
+	go cp.Start()
+
+	// wait until collector is ready
+	waitForCollectorReady(t, address)
+
 	go func() {
-		time.Sleep(time.Second)
 		conn, err := net.Dial(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("Cannot establish connection to %s", address.String())
 		}
 		defer conn.Close()
 		conn.Write(validDataPacket)
-		time.Sleep(time.Second)
-		msgChan := cp.GetMsgChan()
-		for range msgChan {
-			messageCount++
-		}
 	}()
-	go func() {
-		time.Sleep(4 * time.Second)
-		cp.Stop()
-	}()
-	cp.Start()
-	assert.Equal(t, 1, messageCount, "TCP Collecting Process should receive and store the received data record.")
+	<-cp.GetMsgChan()
+	cp.Stop()
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -148,15 +133,18 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	messageCount := 0
 	cp, err := InitCollectingProcess(address, 1024, 0)
 	// Add the templates before sending data record
 	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
+
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, address)
+
 	go func() {
-		time.Sleep(time.Second)
 		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
@@ -167,16 +155,9 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validDataPacket)
-		for range cp.GetMsgChan() {
-			messageCount++
-		}
 	}()
-	go func() {
-		time.Sleep(5 * time.Second)
-		cp.Stop()
-	}()
-	cp.Start()
-	assert.Equal(t, 1, messageCount, "UDP Collecting Process should receive and store the received data record.")
+	<-cp.GetMsgChan()
+	cp.Stop()
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
@@ -186,20 +167,22 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 	}
 	cp, _ := InitCollectingProcess(address, 1024, 0)
 	go func() {
-		time.Sleep(time.Second)
+		// wait until collector is ready
+		waitForCollectorReady(t, address)
 		_, err := net.Dial(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("Cannot establish connection to %s", address.String())
 		}
 	}()
 	go func() {
-		time.Sleep(time.Second)
+		// wait until collector is ready
+		waitForCollectorReady(t, address)
 		_, err := net.Dial(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("Cannot establish connection to %s", address.String())
 		}
-		time.Sleep(2 * time.Second)
-		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
+		time.Sleep(time.Millisecond)
+		assert.Equal(t, 4, cp.getClientCount(), "There should be 4 tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
@@ -211,8 +194,10 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		t.Error(err)
 	}
 	cp, _ := InitCollectingProcess(address, 1024, 0)
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, address)
 	go func() {
-		time.Sleep(time.Second)
 		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
@@ -223,12 +208,8 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
-		// remove the messages from the message channel
-		for range cp.GetMsgChan() {
-		}
 	}()
 	go func() {
-		time.Sleep(time.Second)
 		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
@@ -239,20 +220,19 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
-		time.Sleep(time.Second)
-		assert.Equal(t, 2, len(cp.clients), "There should be two tcp clients.")
+		time.Sleep(time.Millisecond)
+		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
 	}()
-	go func() {
-		time.Sleep(6 * time.Second)
-		cp.Stop()
-	}()
-	cp.Start()
+	// there should be two messages received
+	<-cp.GetMsgChan()
+	<-cp.GetMsgChan()
+	cp.Stop()
 }
 
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
-	cp.templatesLock = sync.RWMutex{}
+	cp.mutex = sync.RWMutex{}
 	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4736")
 	if err != nil {
 		t.Error(err)
@@ -293,7 +273,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
-	cp.templatesLock = sync.RWMutex{}
+	cp.mutex = sync.RWMutex{}
 	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4737")
 	if err != nil {
 		t.Error(err)
@@ -331,12 +311,14 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cp, err := InitCollectingProcess(address, 1024, 5)
+	cp, err := InitCollectingProcess(address, 1024, 1)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, address)
 	go func() {
-		time.Sleep(2 * time.Second)
 		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
@@ -350,17 +332,26 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 		if err != nil {
 			t.Errorf("Error in sending data to collector: %v", err)
 		}
-		go func() { // remove the message from the message channel
-			for range cp.GetMsgChan() {
-			}
-		}()
 	}()
-	go func() {
-		time.Sleep(5 * time.Second)
-		cp.Stop()
-	}()
-	cp.Start()
-	assert.NotNil(t, cp.templatesMap[1][256], "Template should be stored in the template map.")
-	time.Sleep(10 * time.Second)
-	assert.Nil(t, cp.templatesMap[1][256], "Template should be deleted after 5 seconds.")
+	<-cp.GetMsgChan()
+	cp.Stop()
+	template, err := cp.getTemplate(1, 256)
+	assert.NotNil(t, template, "Template should be stored in the template map.")
+	assert.Nil(t, err, "Template should be stored in the template map.")
+	time.Sleep(2 * time.Second)
+	template, err = cp.getTemplate(1, 256)
+	assert.Nil(t, template, "Template should be deleted after 5 seconds.")
+	assert.NotNil(t, err, "Template should be deleted after 5 seconds.")
+}
+
+func waitForCollectorReady(t *testing.T, address net.Addr) {
+	checkConn := func() (bool, error) {
+		if _, err := net.Dial(address.Network(), address.String()); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
+		t.Errorf("Cannot establish connection to %s", address.String())
+	}
 }
