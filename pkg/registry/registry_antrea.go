@@ -35,4 +35,10 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyNamespace", 111, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyName", 112, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyNamespace", 113, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyUID", 114, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyType", 115, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 2, 56506, 2), 56506)
+	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyUID", 117, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyType", 118, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyRulePriority", 119, 2, 56506, 2), 56506)
 }

@@ -5,6 +5,8 @@ BINDIR          ?= $(CURDIR)/bin
 codegen:
 	GO111MODULE=on $(GO) get github.com/golang/mock/mockgen@v1.4.3
 	PATH=$$PATH:$(GOPATH)/bin $(GO) generate ./...
+	# Make sure the IPFIX registries are up-to-date
+	GO111MODULE=on $(GO) run pkg/registry/build_registry/build_registry.go
 
 .coverage:
 	mkdir -p ./.coverage
