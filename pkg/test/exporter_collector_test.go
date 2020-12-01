@@ -117,7 +117,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		templateSet.AddRecord(elements, templateID)
 
 		// Send template record
-		_, err = export.AddSetAndSendMsg(entities.Template, templateSet)
+		_, err = export.SendSet(templateSet)
 		if err != nil {
 			klog.Fatalf("Got error when sending record: %v", err)
 		}
@@ -203,7 +203,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		}
 
 		// Send data set
-		_, err = export.AddSetAndSendMsg(entities.Data, dataSet)
+		_, err = export.SendSet(dataSet)
 		if err != nil {
 			klog.Fatalf("Got error when sending record: %v", err)
 		}

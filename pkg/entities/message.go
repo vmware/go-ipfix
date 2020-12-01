@@ -17,13 +17,15 @@ package entities
 import (
 	"bytes"
 	"encoding/binary"
-	"sync"
 )
 
 const (
 	MaxTcpSocketMsgSize uint16 = 65535
 )
 
+// Message represents IPFIX message.
+// TODO: Currently, it supports only one set. This will be extended to support multiple
+// sets.
 type Message struct {
 	buffer        *bytes.Buffer
 	version       uint16
@@ -34,7 +36,6 @@ type Message struct {
 	exportAddress string
 	isDecoding    bool
 	set           Set
-	mutex         sync.Mutex
 }
 
 func NewMessage(isDecoding bool) *Message {
@@ -45,16 +46,10 @@ func NewMessage(isDecoding bool) *Message {
 }
 
 func (m *Message) GetVersion() uint16 {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.version
 }
 
 func (m *Message) SetVersion(version uint16) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.version = version
 	if !m.isDecoding {
 		binary.BigEndian.PutUint16(m.buffer.Bytes()[0:2], version)
@@ -62,16 +57,10 @@ func (m *Message) SetVersion(version uint16) {
 }
 
 func (m *Message) GetMessageLen() uint16 {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.length
 }
 
 func (m *Message) SetMessageLen(len uint16) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.length = len
 	if !m.isDecoding {
 		binary.BigEndian.PutUint16(m.buffer.Bytes()[2:4], len)
@@ -79,16 +68,10 @@ func (m *Message) SetMessageLen(len uint16) {
 }
 
 func (m *Message) GetSequenceNum() uint32 {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.seqNumber
 }
 
 func (m *Message) SetSequenceNum(seqNum uint32) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.seqNumber = seqNum
 	if !m.isDecoding {
 		binary.BigEndian.PutUint32(m.buffer.Bytes()[8:12], seqNum)
@@ -96,16 +79,10 @@ func (m *Message) SetSequenceNum(seqNum uint32) {
 }
 
 func (m *Message) GetObsDomainID() uint32 {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.obsDomainID
 }
 
 func (m *Message) SetObsDomainID(obsDomainID uint32) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.obsDomainID = obsDomainID
 	if !m.isDecoding {
 		binary.BigEndian.PutUint32(m.buffer.Bytes()[12:], obsDomainID)
@@ -113,16 +90,10 @@ func (m *Message) SetObsDomainID(obsDomainID uint32) {
 }
 
 func (m *Message) GetExportTime() uint32 {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.exportTime
 }
 
 func (m *Message) SetExportTime(exportTime uint32) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.exportTime = exportTime
 	if !m.isDecoding {
 		binary.BigEndian.PutUint32(m.buffer.Bytes()[4:8], exportTime)
@@ -130,30 +101,18 @@ func (m *Message) SetExportTime(exportTime uint32) {
 }
 
 func (m *Message) GetExportAddress() string {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.exportAddress
 }
 
 func (m *Message) SetExportAddress(ipAddr string) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.exportAddress = ipAddr
 }
 
 func (m *Message) GetSet() Set {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.set
 }
 
 func (m *Message) AddSet(set Set) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.set = set
 }
 
@@ -162,16 +121,10 @@ func (m *Message) GetMsgBuffer() *bytes.Buffer {
 }
 
 func (m *Message) GetMsgBufferLen() int {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.buffer.Len()
 }
 
 func (m *Message) WriteToMsgBuffer(bytesToWrite []byte) (int, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	return m.buffer.Write(bytesToWrite)
 }
 
@@ -181,8 +134,5 @@ func (m *Message) CreateHeader() (int, error) {
 }
 
 func (m *Message) ResetMsgBuffer() {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
 	m.buffer.Reset()
 }
