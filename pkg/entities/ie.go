@@ -70,7 +70,7 @@ var InfoElementLength = map[IEDataType]uint16{
 	Boolean:              1,
 	MacAddress:           6,
 	String:               VariableLength,
-	DateTimeSeconds:      8,
+	DateTimeSeconds:      4,
 	DateTimeMilliseconds: 8,
 	DateTimeMicroseconds: 8,
 	DateTimeNanoseconds:  8,
