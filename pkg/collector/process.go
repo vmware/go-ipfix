@@ -115,33 +115,41 @@ func (cp *CollectingProcess) getClientCount() int {
 }
 
 func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
-	message := entities.Message{}
-	exportAddr := strings.Split(exportAddress, ":")[0]
-	message.ExportAddress = exportAddr
-	var setID, length uint16
-	err := util.Decode(packetBuffer, binary.BigEndian, &message.Version, &message.BufferLength, &message.ExportTime, &message.SeqNumber, &message.ObsDomainID, &setID, &length)
+	var version, msgLen, setID, setLen uint16
+	var exportTime, sequencNum, obsDomainID uint32
+	err := util.Decode(packetBuffer, binary.BigEndian, &version, &msgLen, &exportTime, &sequencNum, &obsDomainID, &setID, &setLen)
 	if err != nil {
 		return nil, err
 	}
-	if message.Version != uint16(10) {
-		return nil, fmt.Errorf("Collector only supports IPFIX (v10). Invalid version %d received.", message.Version)
+	if version != uint16(10) {
+		return nil, fmt.Errorf("collector only supports IPFIX (v10); invalid version %d received", version)
 	}
+
+	message := entities.NewMessage(true)
+	message.SetVersion(version)
+	message.SetMessageLen(msgLen)
+	message.SetExportTime(exportTime)
+	message.SetSequenceNum(sequencNum)
+	message.SetObsDomainID(obsDomainID)
+	message.SetExportAddress(strings.Split(exportAddress, ":")[0])
+
+	var set entities.Set
 	if setID == entities.TemplateSetID {
-		set, err := cp.decodeTemplateSet(packetBuffer, message.ObsDomainID)
+		set, err = cp.decodeTemplateSet(packetBuffer, obsDomainID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
-		message.Set = set
 	} else {
-		set, err := cp.decodeDataSet(packetBuffer, message.ObsDomainID, setID)
+		set, err = cp.decodeDataSet(packetBuffer, obsDomainID, setID)
 		if err != nil {
 			return nil, fmt.Errorf("Error in decoding message: %v", err)
 		}
-		message.Set = set
 	}
+	message.AddSet(set)
+
 	// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
-	cp.messageChan <- &message
-	return &message, nil
+	cp.messageChan <- message
+	return message, nil
 }
 
 func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (entities.Set, error) {
@@ -284,13 +292,15 @@ func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 
 // getMessageLength returns buffer length by decoding the header
 func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
-	packet := entities.Message{}
-	var id, length uint16
-	err := util.Decode(msgBuffer, binary.BigEndian, &packet.Version, &packet.BufferLength, &packet.ExportTime, &packet.SeqNumber, &packet.ObsDomainID, &id, &length)
+	var version, msgLen, setID, setLen uint16
+	var exportTime, sequencNum, obsDomainID uint32
+	// We do not really need to decode whole header. Support an utility function
+	// that decodes header based on the offset.
+	err := util.Decode(msgBuffer, binary.BigEndian, &version, &msgLen, &exportTime, &sequencNum, &obsDomainID, &setID, &setLen)
 	if err != nil {
 		return 0, fmt.Errorf("Cannot decode message: %v", err)
 	}
-	return int(packet.BufferLength), nil
+	return int(msgLen), nil
 }
 
 // getFieldLength returns string field length for data record

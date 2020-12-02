@@ -76,11 +76,14 @@ func (a *AggregationProcess) Stop() {
 
 // AggregateMsgByFlowKey gets flow key from records in message and stores in cache
 func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) error {
-	addOriginalExporterInfo(message)
-	if message.Set.GetSetType() == entities.Template { // skip template records
+	if err := addOriginalExporterInfo(message); err != nil {
+		return err
+	}
+	set := message.GetSet()
+	if set.GetSetType() == entities.Template { // skip template records
 		return nil
 	}
-	records := message.Set.GetRecords()
+	records := set.GetRecords()
 	for _, record := range records {
 		flowKey, err := getFlowKeyFromRecord(record)
 		if err != nil {
@@ -265,26 +268,37 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, error) {
 	return flowKey, nil
 }
 
-// addOriginalExporterInfo adds originalExporterIPv4Address and originalObservationDomainId to records in message set
+// addOriginalExporterInfo adds originalExporterIP and originalObservationDomainId to records in message set
 func addOriginalExporterInfo(message *entities.Message) error {
-	set := message.Set
+	isIPv4 := false
+	exporterIP := net.ParseIP(message.GetExportAddress())
+	if exporterIP.To4() != nil {
+		isIPv4 = true
+	}
+	set := message.GetSet()
 	records := set.GetRecords()
 	for _, record := range records {
-		var originalExporterIPv4Address, originalObservationDomainId *entities.InfoElementWithValue
-
-		// Add originalExporterIPv4Address
-		ie, err := registry.GetInfoElement("originalExporterIPv4Address", registry.IANAEnterpriseID)
-		if err != nil {
-			return fmt.Errorf("IANA Registry is not loaded correctly with originalExporterIPv4Address.")
-		}
-		if set.GetSetType() == entities.Template {
-			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, nil)
-		} else if set.GetSetType() == entities.Data {
-			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, net.ParseIP(message.ExportAddress))
+		var originalExporterIP, originalObservationDomainId *entities.InfoElementWithValue
+		var ie *entities.InfoElement
+		var err error
+		// Add originalExporterIP. Supports both IPv4 and IPv6.
+		if isIPv4 {
+			ie, err = registry.GetInfoElement("originalExporterIPv4Address", registry.IANAEnterpriseID)
 		} else {
-			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
+			ie, err = registry.GetInfoElement("originalExporterIPv6Address", registry.IANAEnterpriseID)
 		}
-		_, err = record.AddInfoElement(originalExporterIPv4Address, false)
+		if err != nil {
+			return err
+		}
+
+		if set.GetSetType() == entities.Template {
+			originalExporterIP = entities.NewInfoElementWithValue(ie, nil)
+		} else if set.GetSetType() == entities.Data {
+			originalExporterIP = entities.NewInfoElementWithValue(ie, net.ParseIP(message.GetExportAddress()))
+		} else {
+			return fmt.Errorf("set type %d is not supported", set.GetSetType())
+		}
+		_, err = record.AddInfoElement(originalExporterIP, false)
 		if err != nil {
 			return err
 		}
@@ -292,14 +306,14 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		// Add originalObservationDomainId
 		ie, err = registry.GetInfoElement("originalObservationDomainId", registry.IANAEnterpriseID)
 		if err != nil {
-			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId.")
+			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId")
 		}
 		if set.GetSetType() == entities.Template {
 			originalObservationDomainId = entities.NewInfoElementWithValue(ie, nil)
 		} else if set.GetSetType() == entities.Data {
-			originalObservationDomainId = entities.NewInfoElementWithValue(ie, message.ObsDomainID)
+			originalObservationDomainId = entities.NewInfoElementWithValue(ie, message.GetObsDomainID())
 		} else {
-			return fmt.Errorf("Set type %d is not supported.", set.GetSetType())
+			return fmt.Errorf("set type %d is not supported", set.GetSetType())
 		}
 		_, err = record.AddInfoElement(originalObservationDomainId, false)
 		if err != nil {

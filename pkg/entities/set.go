@@ -44,7 +44,7 @@ type Set interface {
 	GetBuffLen() uint16
 	GetBuffer() *bytes.Buffer
 	GetSetType() ContentType
-	FinishSet()
+	UpdateLenInHeader()
 	AddRecord(elements []*InfoElementWithValue, templateID uint16) error
 	GetRecords() []Record
 	GetNumberOfRecords() uint32
@@ -53,37 +53,27 @@ type Set interface {
 type set struct {
 	// Pointer to message buffer
 	buffer     *bytes.Buffer
-	currLen    uint16
 	setType    ContentType
 	records    []Record
 	isDecoding bool
 }
 
 func NewSet(setType ContentType, templateID uint16, isDecoding bool) Set {
-	buffer := &bytes.Buffer{}
-	if !isDecoding { // Create the set header and append it when encoding
-		header := make([]byte, 4)
-		if setType == Template {
-			binary.BigEndian.PutUint16(header[0:2], TemplateSetID)
-		} else if setType == Data {
-			// Supporting only one templateID per exporting process
-			// TODO: Add support to multiple template IDs
-			binary.BigEndian.PutUint16(header[0:2], templateID)
-		}
-		// Write the set header to msg buffer
-		buffer.Write(header)
-	}
-	return &set{
-		buffer:     buffer,
-		currLen:    uint16(buffer.Len()),
+	set := &set{
+		buffer:     &bytes.Buffer{},
 		setType:    setType,
 		records:    make([]Record, 0),
 		isDecoding: isDecoding,
 	}
+	if !isDecoding {
+		// Create the set header and append it when encoding
+		set.createHeader(setType, templateID)
+	}
+	return set
 }
 
 func (s *set) GetBuffLen() uint16 {
-	return s.currLen
+	return uint16(s.buffer.Len())
 }
 
 func (s *set) GetBuffer() *bytes.Buffer {
@@ -94,15 +84,11 @@ func (s *set) GetSetType() ContentType {
 	return s.setType
 }
 
-func (s *set) FinishSet() {
-	// TODO:Add padding when multiple sets are sent in single IPFIX message
+func (s *set) UpdateLenInHeader() {
+	// TODO:Add padding to the length when multiple sets are sent in IPFIX message
 	if !s.isDecoding {
-		// Add length to the message
-		byteSlice := s.buffer.Bytes()
-		setOffset := s.buffer.Len() - int(s.currLen)
-		binary.BigEndian.PutUint16(byteSlice[setOffset+2:setOffset+4], s.currLen)
-		// Reset the length
-		s.currLen = 0
+		// Add length to the set header
+		binary.BigEndian.PutUint16(s.buffer.Bytes()[2:4], uint16(s.buffer.Len()))
 	}
 }
 
@@ -125,8 +111,6 @@ func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) err
 		if err != nil {
 			return fmt.Errorf("error in writing the buffer to set: %v", err)
 		}
-		// Update the length of set
-		s.currLen = s.currLen + uint16(len(recordBytes))
 	}
 	return nil
 }
@@ -137,4 +121,15 @@ func (s *set) GetRecords() []Record {
 
 func (s *set) GetNumberOfRecords() uint32 {
 	return uint32(len(s.records))
+}
+
+func (s *set) createHeader(setType ContentType, templateID uint16) {
+	header := make([]byte, 4)
+	if setType == Template {
+		binary.BigEndian.PutUint16(header[0:2], TemplateSetID)
+	} else if setType == Data {
+		binary.BigEndian.PutUint16(header[0:2], templateID)
+	}
+	// TODO: Handle this error in a future PR.
+	s.buffer.Write(header)
 }
