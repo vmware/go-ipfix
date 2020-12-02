@@ -71,10 +71,10 @@ func TestGetBuffer(t *testing.T) {
 }
 
 func TestGetBuffLen(t *testing.T) {
-	assert.Equal(t, uint16(0), NewSet(Template, uint16(256), true).GetBuffLen())
-	assert.Equal(t, uint16(4), NewSet(Template, uint16(257), false).GetBuffLen())
-	assert.Equal(t, uint16(0), NewSet(Data, uint16(258), true).GetBuffLen())
-	assert.Equal(t, uint16(4), NewSet(Data, uint16(259), false).GetBuffLen())
+	assert.Equal(t, 0, NewSet(Template, uint16(256), true).GetBuffLen())
+	assert.Equal(t, 4, NewSet(Template, uint16(257), false).GetBuffLen())
+	assert.Equal(t, 0, NewSet(Data, uint16(258), true).GetBuffLen())
+	assert.Equal(t, 4, NewSet(Data, uint16(259), false).GetBuffLen())
 }
 
 func TestGetRecords(t *testing.T) {
@@ -105,12 +105,12 @@ func TestSet_UpdateLenInHeader(t *testing.T) {
 	setForDecoding := NewSet(Template, uint16(256), true)
 	setForEncoding := NewSet(Template, uint16(257), false)
 	setForEncoding.AddRecord(elements, 256)
-	assert.Equal(t, uint16(0), setForDecoding.GetBuffLen())
-	assert.Equal(t, uint16(16), setForEncoding.GetBuffLen())
+	assert.Equal(t, 0, setForDecoding.GetBuffLen())
+	assert.Equal(t, 16, setForEncoding.GetBuffLen())
 	setForDecoding.UpdateLenInHeader()
 	setForEncoding.UpdateLenInHeader()
 	// Nothing should be written in setForDecoding
-	assert.Equal(t, uint16(0), setForDecoding.GetBuffLen())
+	assert.Equal(t, 0, setForDecoding.GetBuffLen())
 	// Check the bytes in the header for set length
-	assert.Equal(t, setForEncoding.GetBuffLen(), binary.BigEndian.Uint16(setForEncoding.GetBuffer().Bytes()[2:4]))
+	assert.Equal(t, uint16(setForEncoding.GetBuffLen()), binary.BigEndian.Uint16(setForEncoding.GetBuffer().Bytes()[2:4]))
 }

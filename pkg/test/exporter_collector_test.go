@@ -74,7 +74,7 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 	go cp.Start()
 	go func() { // Start exporting process in go routine
 		waitForCollectorReady(t, address)
-		export, err := exporter.InitExportingProcess(address, 1, 0)
+		export, err := exporter.InitExportingProcess(address, 1, 0, 0)
 		if err != nil {
 			klog.Fatalf("Got error when connecting to %s", address.String())
 		}

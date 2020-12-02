@@ -92,7 +92,7 @@ func waitForCollectorReady(t *testing.T, address net.Addr) {
 		}
 		return true, nil
 	}
-	if err := wait.Poll(100 * time.Millisecond, 500 * time.Millisecond, checkConn); err != nil {
+	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
 		t.Errorf("Cannot establish connection to %s", address.String())
 	}
 }
@@ -106,7 +106,7 @@ func waitForAggrationFinished(t *testing.T, ap *intermediate.AggregationProcess)
 			return false, fmt.Errorf("aggregation process does not process and store data correctly")
 		}
 	}
-	if err := wait.Poll(100 * time.Millisecond, 500 * time.Millisecond, checkConn); err != nil {
+	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
 		t.Error(err)
 	}
 }
