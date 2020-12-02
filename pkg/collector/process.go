@@ -33,8 +33,8 @@ import (
 type CollectingProcess struct {
 	// for each obsDomainID, there is a map of templates
 	templatesMap map[uint32]map[uint16][]*entities.InfoElement
-	// templatesLock allows multiple readers or one writer at the same time
-	templatesLock sync.RWMutex
+	// mutex allows multiple readers or one writer at the same time
+	mutex sync.RWMutex
 	// template lifetime
 	templateTTL uint32
 	// server information
@@ -47,8 +47,6 @@ type CollectingProcess struct {
 	messageChan chan *entities.Message
 	// maps each client to its client handler (required channels)
 	clients map[string]*clientHandler
-	// clientsLock allows multiple readers or one writer to access clients map at the same time
-	clientsLock sync.RWMutex
 }
 
 type clientHandler struct {
@@ -59,7 +57,7 @@ type clientHandler struct {
 func InitCollectingProcess(address net.Addr, maxBufferSize uint16, templateTTL uint32) (*CollectingProcess, error) {
 	collectProc := &CollectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
-		templatesLock: sync.RWMutex{},
+		mutex:         sync.RWMutex{},
 		templateTTL:   templateTTL,
 		address:       address,
 		maxBufferSize: maxBufferSize,
@@ -80,13 +78,16 @@ func (cp *CollectingProcess) Start() {
 
 func (cp *CollectingProcess) Stop() {
 	cp.stopChan <- true
-	if cp.messageChan != nil {
-		close(cp.messageChan)
-	}
 }
 
 func (cp *CollectingProcess) GetMsgChan() chan *entities.Message {
 	return cp.messageChan
+}
+
+func (cp *CollectingProcess) CloseMsgChan() {
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
+	close(cp.messageChan)
 }
 
 func (cp *CollectingProcess) createClient() *clientHandler {
@@ -97,21 +98,29 @@ func (cp *CollectingProcess) createClient() *clientHandler {
 }
 
 func (cp *CollectingProcess) addClient(address string, client *clientHandler) {
-	cp.clientsLock.Lock()
-	defer cp.clientsLock.Unlock()
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 	cp.clients[address] = client
 }
 
 func (cp *CollectingProcess) deleteClient(name string) {
-	cp.clientsLock.Lock()
-	defer cp.clientsLock.Unlock()
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 	delete(cp.clients, name)
 }
 
 func (cp *CollectingProcess) getClientCount() int {
-	cp.clientsLock.RLock()
-	defer cp.clientsLock.RUnlock()
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
 	return len(cp.clients)
+}
+
+func (cp *CollectingProcess) closeAllClients() {
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
+	for _, client := range cp.clients {
+		client.errChan <- true
+	}
 }
 
 func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
@@ -243,7 +252,8 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 }
 
 func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []*entities.InfoElementWithValue) {
-	cp.templatesLock.Lock()
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
 		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
 	}
@@ -252,7 +262,6 @@ func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 		elements = append(elements, elementWithValue.Element)
 	}
 	cp.templatesMap[obsDomainID][templateID] = elements
-	cp.templatesLock.Unlock()
 	// template lifetime management
 	if cp.address.Network() == "tcp" {
 		return
@@ -275,8 +284,8 @@ func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 }
 
 func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
-	cp.templatesLock.RLock()
-	defer cp.templatesLock.RUnlock()
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
 	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {
 		return elements, nil
 	} else {
@@ -285,8 +294,8 @@ func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) 
 }
 
 func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) {
-	cp.templatesLock.Lock()
-	defer cp.templatesLock.Unlock()
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
 	delete(cp.templatesMap[obsDomainID], templateID)
 }
 

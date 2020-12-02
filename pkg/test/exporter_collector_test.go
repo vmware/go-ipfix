@@ -19,7 +19,6 @@ package test
 import (
 	"net"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"k8s.io/klog"
@@ -29,6 +28,11 @@ import (
 	"github.com/vmware/go-ipfix/pkg/exporter"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
+
+func init() {
+	// Load the global registry
+	registry.LoadRegistry()
+}
 
 func TestSingleRecordUDPTransport(t *testing.T) {
 	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
@@ -63,14 +67,13 @@ func TestMultipleRecordTCPTransport(t *testing.T) {
 }
 
 func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing.T) {
-	// Load the global registry
-	registry.LoadRegistry()
 	// Initialize collecting process
 	messages := make([]*entities.Message, 0)
 	cp, _ := collector.InitCollectingProcess(address, 1024, 0)
-
+	// Start collecting process
+	go cp.Start()
 	go func() { // Start exporting process in go routine
-		time.Sleep(2 * time.Second) // wait for collector to be ready
+		waitForCollectorReady(t, address)
 		export, err := exporter.InitExportingProcess(address, 1, 0)
 		if err != nil {
 			klog.Fatalf("Got error when connecting to %s", address.String())
@@ -121,7 +124,6 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 		if err != nil {
 			klog.Fatalf("Got error when sending record: %v", err)
 		}
-		time.Sleep(time.Second)
 		// Create data set with 1 data record using the same template above
 		dataSet := entities.NewSet(entities.Data, templateID, false)
 		elements = make([]*entities.InfoElementWithValue, 0)
@@ -208,16 +210,15 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, t *testing
 			klog.Fatalf("Got error when sending record: %v", err)
 		}
 		export.CloseConnToCollector() // Close exporting process
-		time.Sleep(2 * time.Second)
-		cp.Stop() // Close collecting process
 	}()
-	go func() {
-		for message := range cp.GetMsgChan() {
-			messages = append(messages, message)
+
+	for message := range cp.GetMsgChan() {
+		messages = append(messages, message)
+		if len(messages) == 2 {
+			cp.CloseMsgChan()
 		}
-	}()
-	// Start collecting process
-	cp.Start()
+	}
+	cp.Stop() // Close collecting process
 	templateMsg := messages[0]
 
 	assert.Equal(t, uint16(10), templateMsg.GetVersion(), "Version of flow record (template) should be 10.")

@@ -55,15 +55,10 @@ func (cp *CollectingProcess) startUDPServer() {
 			cp.clients[address.String()].packetChan <- bytes.NewBuffer(buff[0:size])
 		}
 	}()
-	select {
-	case <-cp.stopChan:
-		// stop all the workers before closing collector
-		for _, client := range cp.clients {
-			client.errChan <- true
-		}
-		wg.Wait()
-		return
-	}
+	<-cp.stopChan
+	// stop all the workers before closing collector
+	cp.closeAllClients()
+	wg.Wait()
 }
 
 func (cp *CollectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGroup) {
@@ -81,7 +76,7 @@ func (cp *CollectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGrou
 					return
 				case <-ticker.C: // set timeout for udp connection
 					klog.Errorf("UDP connection from %s timed out.", address.String())
-					cp.deleteClient(address.Network())
+					cp.deleteClient(address.String())
 					return
 				case packet := <-client.packetChan:
 					// get the message here

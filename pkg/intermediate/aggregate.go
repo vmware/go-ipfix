@@ -15,8 +15,8 @@ import (
 type AggregationProcess struct {
 	// flowKeyRecordMap maps each connection (5-tuple) with its records
 	flowKeyRecordMap map[FlowKey][]entities.Record
-	// flowKeyRecordLock allows multiple readers or one writer at the same time
-	flowKeyRecordLock sync.RWMutex
+	// mutex allows multiple readers or one writer at the same time
+	mutex sync.RWMutex
 	// messageChan is the channel to receive the message
 	messageChan chan *entities.Message
 	// workerNum is the number of workers to process the messages
@@ -59,18 +59,22 @@ func InitAggregationProcess(messageChan chan *entities.Message, workerNum int, c
 }
 
 func (a *AggregationProcess) Start() {
+	a.mutex.Lock()
 	for i := 0; i < a.workerNum; i++ {
 		w := createWorker(i, a.messageChan, a.AggregateMsgByFlowKey)
 		w.start()
 		a.workerList = append(a.workerList, w)
 	}
+	a.mutex.Unlock()
 	<-a.stopChan
 }
 
 func (a *AggregationProcess) Stop() {
+	a.mutex.Lock()
 	for _, worker := range a.workerList {
 		worker.stop()
 	}
+	a.mutex.Unlock()
 	a.stopChan <- true
 }
 
@@ -96,8 +100,8 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 
 // ForAllRecordsDo takes in callback function to process the operations to flowkey->records pairs in the map
 func (a *AggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) error {
-	a.flowKeyRecordLock.RLock()
-	defer a.flowKeyRecordLock.RUnlock()
+	a.mutex.RLock()
+	defer a.mutex.RUnlock()
 	for k, v := range a.flowKeyRecordMap {
 		err := callback(k, v)
 		if err != nil {
@@ -109,15 +113,15 @@ func (a *AggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) 
 }
 
 func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) {
-	a.flowKeyRecordLock.Lock()
-	defer a.flowKeyRecordLock.Unlock()
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	delete(a.flowKeyRecordMap, flowKey)
 }
 
 // correlateRecords fills records info by correlating incoming and current records
 func (a *AggregationProcess) correlateRecords(flowKey FlowKey, record entities.Record) {
-	a.flowKeyRecordLock.Lock()
-	defer a.flowKeyRecordLock.Unlock()
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	existingRecords := a.flowKeyRecordMap[flowKey]
 	// only fill the information for record from source node
 	if isRecordFromSrc(record) {

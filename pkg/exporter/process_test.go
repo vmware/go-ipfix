@@ -263,7 +263,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error when resolving UDP address: %v", err)
 	}
-	conn, err := net.ListenUDP("udp", udpAddr)
+	conn, _ := net.ListenUDP("udp", udpAddr)
 	t.Log("Created local server on random available port for testing")
 
 	buffCh := make(chan []byte)

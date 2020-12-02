@@ -30,14 +30,10 @@ func (cp *CollectingProcess) startTCPServer() {
 			go cp.handleTCPClient(conn, &wg)
 		}
 	}()
-	if <-cp.stopChan {
-		// close all connections
-		for _, client := range cp.clients {
-			client.errChan <- true
-		}
-		wg.Wait()
-		return
-	}
+	<-cp.stopChan
+	// close all connections
+	cp.closeAllClients()
+	wg.Wait()
 }
 
 func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) {
@@ -78,8 +74,6 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 			}
 		}
 	}()
-	if <-client.errChan {
-		cp.deleteClient(address)
-		return
-	}
+	<-client.errChan
+	cp.deleteClient(address)
 }
