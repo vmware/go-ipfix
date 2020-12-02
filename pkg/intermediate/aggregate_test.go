@@ -20,6 +20,10 @@ var fields = []string{
 	"destinationNodeName",
 }
 
+func init() {
+	registry.LoadRegistry()
+}
+
 func createMsgwithTemplateSet() *entities.Message {
 	set := entities.NewSet(entities.Template, 256, true)
 	elements := make([]*entities.InfoElementWithValue, 0)
@@ -34,15 +38,17 @@ func createMsgwithTemplateSet() *entities.Message {
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), nil)
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
-	return &entities.Message{
-		Version:       10,
-		BufferLength:  40,
-		SeqNumber:     1,
-		ObsDomainID:   5678,
-		ExportTime:    0,
-		ExportAddress: "127.0.0.1",
-		Set:           set,
-	}
+
+	message := entities.NewMessage(true)
+	message.SetVersion(10)
+	message.SetMessageLen(40)
+	message.SetSequenceNum(1)
+	message.SetObsDomainID(5678)
+	message.SetExportTime(0)
+	message.SetExportAddress("127.0.0.1")
+	message.AddSet(set)
+
+	return message
 }
 
 func createMsgwithDataSet1() *entities.Message {
@@ -71,15 +77,17 @@ func createMsgwithDataSet1() *entities.Message {
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), svcPort)
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
-	return &entities.Message{
-		Version:       10,
-		BufferLength:  32,
-		SeqNumber:     1,
-		ObsDomainID:   uint32(1234),
-		ExportTime:    0,
-		ExportAddress: "127.0.0.1",
-		Set:           set,
-	}
+
+	message := entities.NewMessage(true)
+	message.SetVersion(10)
+	message.SetMessageLen(32)
+	message.SetSequenceNum(1)
+	message.SetObsDomainID(1234)
+	message.SetExportTime(0)
+	message.SetExportAddress("127.0.0.1")
+	message.AddSet(set)
+
+	return message
 }
 
 func createMsgwithDataSet2() *entities.Message {
@@ -108,15 +116,17 @@ func createMsgwithDataSet2() *entities.Message {
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), nil)
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
-	return &entities.Message{
-		Version:       10,
-		BufferLength:  32,
-		SeqNumber:     1,
-		ObsDomainID:   uint32(1234),
-		ExportTime:    0,
-		ExportAddress: "127.0.0.1",
-		Set:           set,
-	}
+
+	message := entities.NewMessage(true)
+	message.SetVersion(10)
+	message.SetMessageLen(32)
+	message.SetSequenceNum(1)
+	message.SetObsDomainID(1234)
+	message.SetExportTime(0)
+	message.SetExportAddress("127.0.0.1")
+	message.AddSet(set)
+
+	return message
 }
 
 func createMsgwithDataSetIPv6() *entities.Message {
@@ -139,15 +149,17 @@ func createMsgwithDataSetIPv6() *entities.Message {
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5)
 	set.AddRecord(elements, 256)
-	return &entities.Message{
-		Version:       10,
-		BufferLength:  32,
-		SeqNumber:     1,
-		ObsDomainID:   uint32(1234),
-		ExportTime:    0,
-		ExportAddress: "::1",
-		Set:           set,
-	}
+
+	message := entities.NewMessage(true)
+	message.SetVersion(10)
+	message.SetMessageLen(32)
+	message.SetSequenceNum(1)
+	message.SetObsDomainID(1234)
+	message.SetExportTime(0)
+	message.SetExportAddress("::1")
+	message.AddSet(set)
+
+	return message
 }
 
 func TestInitAggregationProcess(t *testing.T) {
@@ -171,23 +183,26 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	// Template records should be ignored
 	message := createMsgwithTemplateSet()
-	aggregationProcess.AggregateMsgByFlowKey(message)
+	err := aggregationProcess.AggregateMsgByFlowKey(message)
+	assert.NoError(t, err)
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 	// Data records should be processed and stored with corresponding flow key
 	message = createMsgwithDataSet1()
-	aggregationProcess.AggregateMsgByFlowKey(message)
-	assert.NotEmpty(t, aggregationProcess.flowKeyRecordMap)
+	err = aggregationProcess.AggregateMsgByFlowKey(message)
+	assert.NoError(t, err)
+	assert.NotZero(t, len(aggregationProcess.flowKeyRecordMap))
 	flowKey := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	record := aggregationProcess.flowKeyRecordMap[flowKey][0]
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
 	ieWithValue, exist := record.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ieWithValue.Value)
-	assert.Equal(t, message.Set.GetRecords()[0], record)
+	assert.Equal(t, message.GetSet().GetRecords()[0], record)
 
 	// Data record with IPv6 addresses should be processed and stored correctly
 	message = createMsgwithDataSetIPv6()
-	aggregationProcess.AggregateMsgByFlowKey(message)
+	err = aggregationProcess.AggregateMsgByFlowKey(message)
+	assert.NoError(t, err)
 	assert.Equal(t, 2, len(aggregationProcess.flowKeyRecordMap))
 	flowKey = FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
@@ -195,7 +210,7 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	ieWithValue, exist = record.GetInfoElementWithValue("sourceIPv6Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ieWithValue.Value)
-	assert.Equal(t, message.Set.GetRecords()[0], record)
+	assert.Equal(t, message.GetSet().GetRecords()[0], record)
 }
 
 func TestAggregationProcess(t *testing.T) {
@@ -223,16 +238,18 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	registry.LoadRegistry()
 	// Test message with template set
 	message := createMsgwithTemplateSet()
-	addOriginalExporterInfo(message)
-	record := message.Set.GetRecords()[0]
+	err := addOriginalExporterInfo(message)
+	assert.NoError(t, err)
+	record := message.GetSet().GetRecords()[0]
 	_, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
 	assert.Equal(t, true, exist)
 	_, exist = record.GetInfoElementWithValue("originalObservationDomainId")
 	assert.Equal(t, true, exist)
 	// Test message with data set
 	message = createMsgwithDataSet1()
-	addOriginalExporterInfo(message)
-	record = message.Set.GetRecords()[0]
+	err = addOriginalExporterInfo(message)
+	assert.NoError(t, err)
+	record = message.GetSet().GetRecords()[0]
 	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, ieWithValue.Value)
@@ -245,9 +262,9 @@ func TestCorrelateRecords(t *testing.T) {
 	registry.LoadRegistry()
 	messageChan := make(chan *entities.Message)
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
-	record1 := createMsgwithDataSet1().Set.GetRecords()[0]
+	record1 := createMsgwithDataSet1().GetSet().GetRecords()[0]
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	record2 := createMsgwithDataSet2().Set.GetRecords()[0]
+	record2 := createMsgwithDataSet2().GetSet().GetRecords()[0]
 	flowKey2, _ := getFlowKeyFromRecord(record2)
 	aggregationProcess.correlateRecords(*flowKey1, record1)
 	aggregationProcess.correlateRecords(*flowKey2, record2)
@@ -271,7 +288,7 @@ func TestDeleteTupleFromMap(t *testing.T) {
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
-	aggregationProcess.flowKeyRecordMap[flowKey1] = message.Set.GetRecords()
+	aggregationProcess.flowKeyRecordMap[flowKey1] = message.GetSet().GetRecords()
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
 	aggregationProcess.DeleteFlowKeyFromMap(flowKey2)
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))

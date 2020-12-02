@@ -83,7 +83,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	elements = append(elements, ie)
 	templateSet.AddRecord(elements, templateID)
 
-	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
+	bytesSent, err := exporter.SendSet(templateSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
@@ -95,7 +95,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	// Create local server for testing
-	udpAddr, err := net.ResolveUDPAddr("udp", ":0")
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when resolving UDP address: %v", err)
 	}
@@ -113,7 +113,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 		bytes := make([]byte, 0)
 		numBytes := 0
-		for start := time.Now(); time.Since(start) < 2*time.Second; {
+		// Wait for template refresh timeout to receive both messages.
+		for start := time.Now(); time.Since(start) < 1*time.Second; {
 			b := make([]byte, 32)
 			nb, err := conn.Read(b)
 			if err != nil {
@@ -128,7 +129,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 2)
+	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 1)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
 	}
@@ -154,14 +155,12 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	templateSet.AddRecord(elements, templateID)
 
-	bytesSent, err := exporter.AddSetAndSendMsg(entities.Template, templateSet)
+	bytesSent, err := exporter.SendSet(templateSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
-	// Sleep for 2s for template refresh routine to get executed
-	time.Sleep(2 * time.Second)
-
-	// Expect to receive two template headers one from AddRecordAndSendMsg and other from tempRefresh go routine
+	// Expect to receive two template headers one that was sent initially and other
+	// from tempRefresh go routine.
 	bytesAtServer := <-buffCh
 	assert.Equal(t, len(bytesAtServer), 64)
 	assert.Equal(t, bytesAtServer[20:32], bytesAtServer[52:], "both template messages should be same")
@@ -247,7 +246,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
-	bytesSent, err := exporter.AddSetAndSendMsg(entities.Data, dataSet)
+	bytesSent, err := exporter.SendSet(dataSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
@@ -260,7 +259,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 
 func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	// Create local server for testing
-	udpAddr, err := net.ResolveUDPAddr("udp", ":0")
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when resolving UDP address: %v", err)
 	}
@@ -268,12 +267,13 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	t.Log("Created local server on random available port for testing")
 
 	buffCh := make(chan []byte)
+
 	// Create go routine for local server
 	// TODO: Move this in to different function with byte size as arg
 	go func() {
 		defer conn.Close()
 		buff := make([]byte, 28)
-		_, err = conn.Read(buff)
+		_, err := conn.Read(buff)
 		if err != nil {
 			t.Error(err)
 		}
@@ -327,7 +327,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 	dataRecBytes := dataRecBuff.Bytes()
 
-	bytesSent, err := exporter.AddSetAndSendMsg(entities.Data, dataSet)
+	bytesSent, err := exporter.SendSet(dataSet)
 	if err != nil {
 		t.Fatalf("Got error when sending record: %v", err)
 	}
