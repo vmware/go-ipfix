@@ -59,7 +59,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(listener.Addr(), 1, 0)
+	exporter, err := InitExportingProcess(listener.Addr(), 1, 0, 0)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", listener.Addr().String(), err)
 	}
@@ -129,7 +129,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 1)
+	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 1, 0)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
 	}
@@ -203,7 +203,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(listener.Addr(), 1, 0)
+	exporter, err := InitExportingProcess(listener.Addr(), 1, 0, 0)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", listener.Addr().String(), err)
 	}
@@ -247,13 +247,22 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	dataRecBytes := dataRecBuff.Bytes()
 
 	bytesSent, err := exporter.SendSet(dataSet)
-	if err != nil {
-		t.Fatalf("Got error when sending record: %v", err)
-	}
+	assert.NoError(t, err)
 	// 28 is the size of the IPFIX message including all headers (20 bytes)
 	assert.Equal(t, 28, bytesSent)
 	assert.Equal(t, dataRecBytes, <-buffCh)
 	assert.Equal(t, uint32(1), exporter.seqNumber)
+
+	// Create data set with multiple data records to test invalid message length
+	// logic for TCP transport.
+	dataSet = entities.NewSet(entities.Data, templateID, false)
+	for i := 0; i < 10000; i++ {
+		err := dataSet.AddRecord(elements, templateID)
+		assert.NoError(t, err)
+	}
+	bytesSent, err = exporter.SendSet(dataSet)
+	assert.Error(t, err)
+
 	exporter.CloseConnToCollector()
 }
 
@@ -284,7 +293,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	}()
 
 	// Create exporter using local server info
-	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 0)
+	exporter, err := InitExportingProcess(conn.LocalAddr(), 1, 0, 0)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
 	}
@@ -328,12 +337,20 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	dataRecBytes := dataRecBuff.Bytes()
 
 	bytesSent, err := exporter.SendSet(dataSet)
-	if err != nil {
-		t.Fatalf("Got error when sending record: %v", err)
-	}
+	assert.NoError(t, err)
 	// 28 is the size of the IPFIX message including all headers (20 bytes)
 	assert.Equal(t, 28, bytesSent)
 	assert.Equal(t, dataRecBytes, <-buffCh)
 	assert.Equal(t, uint32(1), exporter.seqNumber)
+
+	// Create data set with multiple data records to test invalid message length
+	// logic for UDP transport.
+	dataSet = entities.NewSet(entities.Data, templateID, false)
+	for i := 0; i < 100; i++ {
+		dataSet.AddRecord(elements, templateID)
+	}
+	bytesSent, err = exporter.SendSet(dataSet)
+	assert.Error(t, err)
+
 	exporter.CloseConnToCollector()
 }

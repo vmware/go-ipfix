@@ -63,10 +63,10 @@ func (mr *MockSetMockRecorder) AddRecord(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // GetBuffLen mocks base method
-func (m *MockSet) GetBuffLen() uint16 {
+func (m *MockSet) GetBuffLen() int {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBuffLen")
-	ret0, _ := ret[0].(uint16)
+	ret0, _ := ret[0].(int)
 	return ret0
 }
 

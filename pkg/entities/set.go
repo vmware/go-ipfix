@@ -41,7 +41,7 @@ const (
 )
 
 type Set interface {
-	GetBuffLen() uint16
+	GetBuffLen() int
 	GetBuffer() *bytes.Buffer
 	GetSetType() ContentType
 	UpdateLenInHeader()
@@ -72,8 +72,8 @@ func NewSet(setType ContentType, templateID uint16, isDecoding bool) Set {
 	return set
 }
 
-func (s *set) GetBuffLen() uint16 {
-	return uint16(s.buffer.Len())
+func (s *set) GetBuffLen() int {
+	return s.buffer.Len()
 }
 
 func (s *set) GetBuffer() *bytes.Buffer {
@@ -107,9 +107,12 @@ func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) err
 	// write record to set when encoding
 	if !s.isDecoding {
 		recordBytes := record.GetBuffer().Bytes()
-		_, err := s.buffer.Write(recordBytes)
+		bytesWritten, err := s.buffer.Write(recordBytes)
 		if err != nil {
 			return fmt.Errorf("error in writing the buffer to set: %v", err)
+		}
+		if bytesWritten != len(recordBytes) {
+			return fmt.Errorf("bytes written length is not expected")
 		}
 	}
 	return nil

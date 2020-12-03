@@ -43,16 +43,22 @@ type ExportingProcess struct {
 	obsDomainID     uint32
 	seqNumber       uint32
 	templateID      uint16
+	pathMTU         int
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
 	mutex           sync.Mutex
 }
 
-// InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID) and tempRefTimeout
-// (template refresh timeout). tempRefTimeout is applicable only for collectors listening over UDP; unit is seconds. For TCP, you can
-// pass any value. For UDP, if 0 is passed, consider 1800s as default.
-// TODO: Get obsID, tempRefTimeout as args which can be of dynamic size supporting both TCP and UDP.
-func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout uint32) (*ExportingProcess, error) {
+// InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID)
+// and tempRefTimeout(template refresh timeout). tempRefTimeout is applicable only
+// for collectors listening over UDP; unit is seconds. For TCP, you can pass any
+// value. For UDP, if 0 is passed, consider 1800s as default.
+//
+// PathMTU is recommended for UDP transport. If not given a valid value, i.e., either
+// 0 or a value more than 1500, we consider a default value of 512B as per RFC7011.
+// PathMTU is optional for TCP as we use max socket buffer size of 65535. It can
+// be provided as 0.
+func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout uint32, pathMTU int) (*ExportingProcess, error) {
 	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 	if err != nil {
 		klog.Errorf("Cannot the create the connection to configured ExportingProcess %s: %v", collectorAddr.String(), err)
@@ -64,12 +70,16 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 		obsDomainID:     obsID,
 		seqNumber:       0,
 		templateID:      startTemplateID,
+		pathMTU:         pathMTU,
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
 	}
 
-	// Template refresh logic is only for UDP transport.
+	// Template refresh logic and pathMTU check is only required for UDP transport.
 	if collectorAddr.Network() == "udp" {
+		if expProc.pathMTU == 0 || expProc.pathMTU > entities.MaxUDPMsgSize {
+			expProc.pathMTU = entities.DefaultUDPMsgSize
+		}
 		if tempRefTimeout == 0 {
 			// Default value
 			tempRefTimeout = entities.TemplateRefreshTimeOut
@@ -109,6 +119,7 @@ func (ep *ExportingProcess) SendSet(set entities.Set) (int, error) {
 			}
 		}
 	}
+
 	// Update the length in set header before sending the message.
 	set.UpdateLenInHeader()
 	bytesSent, err := ep.createAndSendMsg(set)
@@ -149,11 +160,17 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 		return 0, fmt.Errorf("error when creating header: %v", err)
 	}
 
-	// Check if message is exceeding the limit with new set
-	msgLen := uint16(msg.GetMsgBufferLen()) + set.GetBuffLen()
-	// TODO: Change the limit for UDP transport. This is only valid for TCP transport.
-	if msgLen > entities.MaxTcpSocketMsgSize {
-		return 0, fmt.Errorf("set size exceeds max socket size")
+	// Check if message is exceeding the limit after adding the set. Include message
+	// header length too.
+	msgLen := msg.GetMsgBufferLen() + set.GetBuffLen()
+	if ep.connToCollector.LocalAddr().Network() == "tcp" {
+		if msgLen > entities.MaxTcpSocketMsgSize {
+			return 0, fmt.Errorf("TCP transport: message size exceeds max socket buffer size")
+		}
+	} else {
+		if msgLen > ep.pathMTU {
+			return 0, fmt.Errorf("UDP transport: message size exceeds max pathMTU (set as %v)", ep.pathMTU)
+		}
 	}
 
 	// Set the fields in the message header.
@@ -161,7 +178,7 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 	// https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-version-numbers
 	msg.SetVersion(10)
 	msg.SetObsDomainID(ep.obsDomainID)
-	msg.SetMessageLen(msgLen)
+	msg.SetMessageLen(uint16(msgLen))
 	msg.SetExportTime(uint32(time.Now().Unix()))
 	if set.GetSetType() == entities.Data {
 		ep.seqNumber = ep.seqNumber + set.GetNumberOfRecords()
