@@ -15,9 +15,14 @@ import (
 )
 
 var fields = []string{
+	"sourcePodName",
+	"sourcePodNamespace",
+	"sourceNodeName",
 	"destinationPodName",
 	"destinationPodNamespace",
 	"destinationNodeName",
+	"destinationClusterIPv4",
+	"destinationClusterServicePort",
 }
 
 func init() {
@@ -34,7 +39,7 @@ func createMsgwithTemplateSet() *entities.Message {
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), nil)
 	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), nil)
 	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), nil)
-	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), nil)
+	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, 55829, 4), nil)
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), nil)
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
@@ -73,7 +78,7 @@ func createMsgwithDataSet1() *entities.Message {
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
 	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), srcPod)
 	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), dstPod)
-	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), bytes.NewBuffer([]byte{192, 168, 0, 1}))
+	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, 55829, 4), bytes.NewBuffer([]byte{192, 168, 0, 1}))
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), svcPort)
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
@@ -112,8 +117,8 @@ func createMsgwithDataSet2() *entities.Message {
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
 	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), srcPod)
 	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), dstPod)
-	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIP", 106, 18, 55829, 4), nil)
-	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), nil)
+	ie8 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, 55829, 4), net.IP{0, 0, 0, 0})
+	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), 0)
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
 	set.AddRecord(elements, 256)
 
@@ -212,12 +217,12 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotZero(t, len(aggregationProcess.flowKeyRecordMap))
 	flowKey := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
-	record := aggregationProcess.flowKeyRecordMap[flowKey][0]
+	aggRecord := aggregationProcess.flowKeyRecordMap[flowKey]
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
-	ieWithValue, exist := record.GetInfoElementWithValue("sourceIPv4Address")
+	ieWithValue, exist := aggRecord.Record.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ieWithValue.Value)
-	assert.Equal(t, message.GetSet().GetRecords()[0], record)
+	assert.Equal(t, message.GetSet().GetRecords()[0], aggRecord.Record)
 
 	// Data record with IPv6 addresses should be processed and stored correctly
 	message = createMsgwithDataSetIPv6()
@@ -226,11 +231,11 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	assert.Equal(t, 2, len(aggregationProcess.flowKeyRecordMap))
 	flowKey = FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
-	record = aggregationProcess.flowKeyRecordMap[flowKey][0]
-	ieWithValue, exist = record.GetInfoElementWithValue("sourceIPv6Address")
+	aggRecord = aggregationProcess.flowKeyRecordMap[flowKey]
+	ieWithValue, exist = aggRecord.Record.GetInfoElementWithValue("sourceIPv6Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ieWithValue.Value)
-	assert.Equal(t, message.GetSet().GetRecords()[0], record)
+	assert.Equal(t, message.GetSet().GetRecords()[0], aggRecord.Record)
 }
 
 func TestAggregationProcess(t *testing.T) {
@@ -295,18 +300,17 @@ func TestCorrelateRecords(t *testing.T) {
 	flowKey1, _ := getFlowKeyFromRecord(record1)
 	record2 := createMsgwithDataSet2().GetSet().GetRecords()[0]
 	flowKey2, _ := getFlowKeyFromRecord(record2)
-	aggregationProcess.correlateRecords(*flowKey1, record1)
-	aggregationProcess.correlateRecords(*flowKey2, record2)
+	aggregationProcess.aggregateRecord(*flowKey1, record1)
+	aggregationProcess.aggregateRecord(*flowKey2, record2)
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
-	for _, records := range aggregationProcess.flowKeyRecordMap {
-		assert.Equal(t, 1, len(records))
-		ieWithValue, _ := records[0].GetInfoElementWithValue("sourcePodName")
+	for _, aggRecord := range aggregationProcess.flowKeyRecordMap {
+		ieWithValue, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
 		assert.Equal(t, "pod1", ieWithValue.Value)
-		ieWithValue, _ = records[0].GetInfoElementWithValue("destinationPodName")
+		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
 		assert.Equal(t, "pod2", ieWithValue.Value)
-		ieWithValue, _ = records[0].GetInfoElementWithValue("destinationClusterIP")
+		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
 		assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, ieWithValue.Value)
-		ieWithValue, _ = records[0].GetInfoElementWithValue("destinationServicePort")
+		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 		assert.Equal(t, uint16(4739), ieWithValue.Value)
 	}
 }
@@ -322,7 +326,12 @@ func TestDeleteTupleFromMap(t *testing.T) {
 	aggregationProcess, _ := InitAggregationProcess(input)
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
-	aggregationProcess.flowKeyRecordMap[flowKey1] = message.GetSet().GetRecords()
+	aggFlowRecord := AggregationFlowRecord{
+		message.GetSet().GetRecords()[0],
+		true,
+		true,
+	}
+	aggregationProcess.flowKeyRecordMap[flowKey1] = aggFlowRecord
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
 	aggregationProcess.DeleteFlowKeyFromMap(flowKey2)
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))

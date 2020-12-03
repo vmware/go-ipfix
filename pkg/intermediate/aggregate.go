@@ -14,7 +14,7 @@ import (
 
 type AggregationProcess struct {
 	// flowKeyRecordMap maps each connection (5-tuple) with its records
-	flowKeyRecordMap map[FlowKey][]entities.Record
+	flowKeyRecordMap map[FlowKey]AggregationFlowRecord
 	// mutex allows multiple readers or one writer at the same time
 	mutex sync.RWMutex
 	// messageChan is the channel to receive the message
@@ -43,6 +43,18 @@ type AggregationInput struct {
 	CorrelateFields []string
 }
 
+type AggregationFlowRecord struct {
+	Record entities.Record
+	// ReadyToSend is an indicator that we received all required records for the
+	// given flow, i.e., records from source and destination nodes for the case
+	// inter-node flow and record from the node for the case of intra-node flow.
+	ReadyToSend bool
+	// IsActive is a flag that indicates whether the flow is active or not. If
+	// aggregation process stop receiving flows from collector process, we deem
+	// the flow as inactive.
+	IsActive bool
+}
+
 type FlowKeyRecordMapCallBack func(key FlowKey, records []entities.Record) error
 
 // InitAggregationProcess takes in message channel (e.g. from collector) as input channel, workerNum(number of workers to process message)
@@ -54,7 +66,7 @@ func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error)
 		return nil, fmt.Errorf("worker number cannot be <= 0")
 	}
 	return &AggregationProcess{
-		make(map[FlowKey][]entities.Record),
+		make(map[FlowKey]AggregationFlowRecord),
 		sync.RWMutex{},
 		input.MessageChan,
 		input.WorkerNum,
@@ -99,7 +111,7 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 		if err != nil {
 			return err
 		}
-		a.correlateRecords(*flowKey, record)
+		a.aggregateRecord(*flowKey, record)
 	}
 	return nil
 }
@@ -124,74 +136,150 @@ func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) {
 	delete(a.flowKeyRecordMap, flowKey)
 }
 
-// correlateRecords fills records info by correlating incoming and current records
-func (a *AggregationProcess) correlateRecords(flowKey FlowKey, record entities.Record) {
+// aggregateRecord either adds the record to flowKeyMap or update the record in
+// flowKeyMap by doing correlation or updating the stats.
+func (a *AggregationProcess) aggregateRecord(flowKey FlowKey, record entities.Record) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	existingRecords := a.flowKeyRecordMap[flowKey]
-	// only fill the information for record from source node
-	if isRecordFromSrc(record) {
-		var isFilled bool
-		for _, existingRec := range existingRecords {
-			for _, field := range a.correlateFields {
-				if ieWithValue, exist := record.GetInfoElementWithValue(field); exist {
-					existingIeWithValue, _ := existingRec.GetInfoElementWithValue(field)
-					ieWithValue.Value = existingIeWithValue.Value
-					isFilled = true
-				}
-			}
-			if isFilled {
-				break
-			}
-		}
-	} else {
-		for _, existingRec := range existingRecords {
-			if isRecordFromSrc(existingRec) {
-				for _, field := range a.correlateFields {
-					if ieWithValue, exist := record.GetInfoElementWithValue(field); exist {
-						existingIeWithValue, _ := existingRec.GetInfoElementWithValue(field)
-						existingIeWithValue.Value = ieWithValue.Value
-					}
-				}
-			}
-		}
-	}
-	a.addRecordToMap(flowKey, record)
-	a.removeDuplicates(flowKey)
-}
 
-// removeDuplicates is currently used only in correlateRecords().
-// For other uses, please acquire the flowKeyRecordLock for protection.
-func (a *AggregationProcess) removeDuplicates(flowKey FlowKey) {
-	records := a.flowKeyRecordMap[flowKey]
-	srcRecords := make([]entities.Record, 0)
-	dstRecords := make([]entities.Record, 0)
-	for _, record := range records {
-		if isRecordFromSrc(record) {
-			srcRecords = append(srcRecords, record)
+	aggregationRecord, exist := a.flowKeyRecordMap[flowKey]
+	if exist {
+		if !isRecordIntraNode(record) {
+			// Do correlation of records if record belongs to inter-node flow and
+			// records from source and destination node are not received.
+			if !aggregationRecord.ReadyToSend && !areRecordsFromSameNode(record, aggregationRecord.Record) {
+				a.correlateRecords(record, aggregationRecord.Record)
+				aggregationRecord.ReadyToSend = true
+			} else {
+				// If the record from the node is already present, update the stats
+				// and timestamps.
+			}
 		} else {
-			dstRecords = append(dstRecords, record)
+			// For intra-node flows, just do aggregation of the flow record with
+			// existing record by updating the stats and flow timestamps. Correlation
+			// is not required.
+
+		}
+	} else {
+		aggregationRecord = AggregationFlowRecord{
+			record,
+			false,
+			true,
+		}
+		if isRecordIntraNode(record) {
+			aggregationRecord.ReadyToSend = true
 		}
 	}
-	if len(srcRecords) != 0 {
-		a.flowKeyRecordMap[flowKey] = srcRecords
-	} else {
-		a.flowKeyRecordMap[flowKey] = dstRecords
+
+	a.addRecordToMap(flowKey, aggregationRecord)
+}
+
+// correlateRecords correlate the incomingRecord with existingRecord using correlation
+// fields.
+func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord entities.Record) {
+	for _, field := range a.correlateFields {
+		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(field); exist {
+			switch ieWithValue.Element.DataType {
+			case entities.String:
+				if ieWithValue.Value != "" {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					if existingIeWithValue.Value != "" {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case entities.Unsigned8, entities.Unsigned16, entities.Unsigned32, entities.Unsigned64,
+				entities.Signed8, entities.Signed16, entities.Signed32, entities.Signed64:
+				if ieWithValue.Value == 0 {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					if existingIeWithValue.Value != 0 {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case entities.Ipv4Address:
+				ipInString := ieWithValue.Value.(net.IP).To4().String()
+				if ipInString == "0. 0. 0. 0" {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					ipInString := existingIeWithValue.Value.(net.IP).To4().String()
+					if ipInString != "0. 0. 0. 0" {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case entities.Ipv6Address:
+				ipInString := ieWithValue.Value.(net.IP).To16().String()
+				dummyIP := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+				if ipInString == dummyIP.To16().String() {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					ipInString := existingIeWithValue.Value.(net.IP).To4().String()
+					if ipInString != dummyIP.To16().String() {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			default:
+				klog.Errorf("Fields with dataType %v is not supported in correlation fields list.", ieWithValue.Element.DataType)
+			}
+		}
 	}
 }
 
-// addRecordToMap is currently used only in correlateRecords().
+// addRecordToMap is currently used only in aggregateRecord().
 // For other uses, please acquire the flowKeyRecordLock for protection.
-func (a *AggregationProcess) addRecordToMap(flowKey FlowKey, record entities.Record) {
+func (a *AggregationProcess) addRecordToMap(flowKey FlowKey, record AggregationFlowRecord) {
 	if _, exist := a.flowKeyRecordMap[flowKey]; !exist {
-		a.flowKeyRecordMap[flowKey] = make([]entities.Record, 0)
+		a.flowKeyRecordMap[flowKey] = record
 	}
-	a.flowKeyRecordMap[flowKey] = append(a.flowKeyRecordMap[flowKey], record)
 }
 
+// isRecordIntraNode returns true if record belongs to intra-node flow.
+func isRecordIntraNode(record entities.Record) bool {
+	srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
+	if exist && srcIEWithValue.Value != "" {
+		dstIEWithValue, exist := record.GetInfoElementWithValue("destinationPodName")
+		if exist && dstIEWithValue.Value != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// isRecordFromSrc returns true if record belongs to inter-node flow and from source node.
 func isRecordFromSrc(record entities.Record) bool {
+	if isRecordIntraNode(record) {
+		return false
+	}
+	ieWithValue, exist := record.GetInfoElementWithValue("destinationPodName")
+	if exist && ieWithValue.Value == "" {
+		return true
+	}
+	return false
+}
+
+// isRecordFromDst returns true if record belongs to inter-node flow and from destination node.
+func isRecordFromDst(record entities.Record) bool {
+	if isRecordIntraNode(record) {
+		return false
+	}
 	ieWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
-	if exist && ieWithValue.Value != "" {
+	if exist && ieWithValue.Value == "" {
+		return true
+	}
+	return false
+}
+
+func areRecordsFromSameNode(record1 entities.Record, record2 entities.Record) bool {
+	// If records belong to intra-node flow, then send true.
+	if isRecordIntraNode(record1) && isRecordIntraNode(record2) {
+		return true
+	}
+	// If records belong to inter-node flow and are from source node, then send true.
+	if isRecordFromSrc(record1) && isRecordFromSrc(record2) {
+		return true
+	}
+	// If records belong to inter-node flow and are from destination node, then send true.
+	if isRecordFromDst(record1) && isRecordFromDst(record2) {
 		return true
 	}
 	return false
