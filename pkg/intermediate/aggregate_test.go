@@ -162,25 +162,45 @@ func createMsgwithDataSetIPv6() *entities.Message {
 	return message
 }
 
+func init() {
+	registry.LoadRegistry()
+}
+
 func TestInitAggregationProcess(t *testing.T) {
-	aggregationProcess, err := InitAggregationProcess(nil, 2, fields)
+	input := AggregationInput{
+		MessageChan:     nil,
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	aggregationProcess, err := InitAggregationProcess(input)
 	assert.NotNil(t, err)
 	assert.Nil(t, aggregationProcess)
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, err = InitAggregationProcess(messageChan, 2, fields)
+	input.MessageChan = messageChan
+	aggregationProcess, err = InitAggregationProcess(input)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, aggregationProcess.workerNum)
 }
 
 func TestGetTupleRecordMap(t *testing.T) {
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
+	input := AggregationInput{
+		MessageChan:     messageChan,
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	aggregationProcess, _ := InitAggregationProcess(input)
 	assert.Equal(t, aggregationProcess.flowKeyRecordMap, aggregationProcess.flowKeyRecordMap)
 }
 
 func TestAggregateMsgByFlowKey(t *testing.T) {
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
+	input := AggregationInput{
+		MessageChan:     messageChan,
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	aggregationProcess, _ := InitAggregationProcess(input)
 	// Template records should be ignored
 	message := createMsgwithTemplateSet()
 	err := aggregationProcess.AggregateMsgByFlowKey(message)
@@ -215,7 +235,12 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 
 func TestAggregationProcess(t *testing.T) {
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
+	input := AggregationInput{
+		MessageChan:     messageChan,
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	aggregationProcess, _ := InitAggregationProcess(input)
 	dataMsg := createMsgwithDataSet1()
 	go func() {
 		messageChan <- createMsgwithTemplateSet()
@@ -235,7 +260,6 @@ func TestAggregationProcess(t *testing.T) {
 }
 
 func TestAddOriginalExporterInfo(t *testing.T) {
-	registry.LoadRegistry()
 	// Test message with template set
 	message := createMsgwithTemplateSet()
 	err := addOriginalExporterInfo(message)
@@ -261,7 +285,12 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 func TestCorrelateRecords(t *testing.T) {
 	registry.LoadRegistry()
 	messageChan := make(chan *entities.Message)
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
+	input := AggregationInput{
+		MessageChan:     messageChan,
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	aggregationProcess, _ := InitAggregationProcess(input)
 	record1 := createMsgwithDataSet1().GetSet().GetRecords()[0]
 	flowKey1, _ := getFlowKeyFromRecord(record1)
 	record2 := createMsgwithDataSet2().GetSet().GetRecords()[0]
@@ -285,7 +314,12 @@ func TestCorrelateRecords(t *testing.T) {
 func TestDeleteTupleFromMap(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	message := createMsgwithDataSet1()
-	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
+	input := AggregationInput{
+		MessageChan:     messageChan,
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	aggregationProcess, _ := InitAggregationProcess(input)
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	aggregationProcess.flowKeyRecordMap[flowKey1] = message.GetSet().GetRecords()

@@ -15,11 +15,14 @@
 package exporter
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net"
 	"sync"
 	"time"
 
+	"github.com/pion/dtls/v2"
 	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
@@ -49,6 +52,15 @@ type ExportingProcess struct {
 	mutex           sync.Mutex
 }
 
+type ExporterInput struct {
+	CollectorAddr       net.Addr
+	ObservationDomainID uint32
+	TempRefTimeout      uint32
+	PathMTU             int
+	IsEncrypted         bool
+	Cert                []byte
+}
+
 // InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID)
 // and tempRefTimeout(template refresh timeout). tempRefTimeout is applicable only
 // for collectors listening over UDP; unit is seconds. For TCP, you can pass any
@@ -58,34 +70,69 @@ type ExportingProcess struct {
 // 0 or a value more than 1500, we consider a default value of 512B as per RFC7011.
 // PathMTU is optional for TCP as we use max socket buffer size of 65535. It can
 // be provided as 0.
-func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout uint32, pathMTU int) (*ExportingProcess, error) {
-	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
-	if err != nil {
-		klog.Errorf("Cannot the create the connection to configured ExportingProcess %s: %v", collectorAddr.String(), err)
-		return nil, err
-	}
+func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
+	var conn net.Conn
+	var err error
+	if input.IsEncrypted {
+		if input.CollectorAddr.Network() == "tcp" { // use TLS
+			roots := x509.NewCertPool()
+			ok := roots.AppendCertsFromPEM(input.Cert)
+			if !ok {
+				return nil, fmt.Errorf("Failed to parse root certificate")
+			}
+			config := &tls.Config{RootCAs: roots}
 
+			conn, err = tls.Dial(input.CollectorAddr.Network(), input.CollectorAddr.String(), config)
+			if err != nil {
+				klog.Errorf("Cannot the create the tls connection to configured ExportingProcess %s: %v", input.CollectorAddr.String(), err)
+				return nil, err
+			}
+		} else if input.CollectorAddr.Network() == "udp" { // use DTLS
+			roots := x509.NewCertPool()
+			ok := roots.AppendCertsFromPEM(input.Cert)
+			if !ok {
+				return nil, fmt.Errorf("Failed to parse root certificate")
+			}
+			config := &dtls.Config{RootCAs: roots,
+				ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
+			address, err := net.ResolveUDPAddr(input.CollectorAddr.Network(), input.CollectorAddr.String())
+			if err != nil {
+				return nil, fmt.Errorf("Cannot resolve udp address %s", input.CollectorAddr.String())
+			}
+			conn, err = dtls.Dial(address.Network(), address, config)
+			if err != nil {
+				klog.Errorf("Cannot the create the dtls connection to configured ExportingProcess %s: %v", address.String(), err)
+				return nil, err
+			}
+		}
+	} else {
+		conn, err = net.Dial(input.CollectorAddr.Network(), input.CollectorAddr.String())
+		if err != nil {
+			klog.Errorf("Cannot the create the connection to configured ExportingProcess %s: %v", input.CollectorAddr.String(), err)
+			return nil, err
+		}
+	}
 	expProc := &ExportingProcess{
 		connToCollector: conn,
-		obsDomainID:     obsID,
+		obsDomainID:     input.ObservationDomainID,
 		seqNumber:       0,
 		templateID:      startTemplateID,
-		pathMTU:         pathMTU,
+		pathMTU:         input.PathMTU,
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
 	}
 
-	// Template refresh logic and pathMTU check is only required for UDP transport.
-	if collectorAddr.Network() == "udp" {
+	// Template refresh logic is only for UDP transport.
+	if input.CollectorAddr.Network() == "udp" {
 		if expProc.pathMTU == 0 || expProc.pathMTU > entities.MaxUDPMsgSize {
 			expProc.pathMTU = entities.DefaultUDPMsgSize
 		}
-		if tempRefTimeout == 0 {
+		if input.TempRefTimeout == 0 {
 			// Default value
-			tempRefTimeout = entities.TemplateRefreshTimeOut
+			input.TempRefTimeout = entities.TemplateRefreshTimeOut
 		}
 		go func() {
-			ticker := time.NewTicker(time.Duration(tempRefTimeout) * time.Second)
+			ticker := time.NewTicker(time.Duration(input.TempRefTimeout) * time.Second)
 			defer ticker.Stop()
 			for {
 				select {
@@ -102,7 +149,6 @@ func InitExportingProcess(collectorAddr net.Addr, obsID uint32, tempRefTimeout u
 			}
 		}()
 	}
-
 	return expProc, nil
 }
 

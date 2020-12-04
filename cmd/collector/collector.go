@@ -131,7 +131,15 @@ func run() error {
 		return fmt.Errorf("input given ipfix.transport flag is not supported or valid")
 	}
 	// Initialize collecting process
-	cp, err := collector.InitCollectingProcess(netAddr, 65535, 0)
+	cpInput := collector.CollectorInput{
+		Address:       netAddr,
+		MaxBufferSize: 65535,
+		TemplateTTL:   0,
+		IsEncrypted:   false,
+		ServerCert:    nil,
+		ServerKey:     nil,
+	}
+	cp, err := collector.InitCollectingProcess(cpInput)
 	if err != nil {
 		return err
 	}

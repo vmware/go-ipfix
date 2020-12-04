@@ -19,10 +19,12 @@ package test
 import (
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/intermediate"
@@ -47,10 +49,24 @@ func TestCollectorToIntermediate(t *testing.T) {
 		t.Error(err)
 	}
 	// Initialize aggregation process and collecting process
-	cp, _ := collector.InitCollectingProcess(address, 1024, 0)
-	ap, _ := intermediate.InitAggregationProcess(cp.GetMsgChan(), 2, fields)
+	cpInput := collector.CollectorInput{
+		Address:       address,
+		MaxBufferSize: 1024,
+		TemplateTTL:   0,
+		IsEncrypted:   false,
+		ServerCert:    nil,
+		ServerKey:     nil,
+	}
+	cp, _ := collector.InitCollectingProcess(cpInput)
+
+	apInput := intermediate.AggregationInput{
+		MessageChan:     cp.GetMsgChan(),
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	ap, _ := intermediate.InitAggregationProcess(apInput)
 	go cp.Start()
-	waitForCollectorReady(t, address)
+	waitForCollectorReady(t, cp)
 	go func() {
 		conn, err := net.DialUDP("udp", nil, address)
 		if err != nil {
@@ -85,15 +101,18 @@ func copyFlowKeyRecordMap(key intermediate.FlowKey, records []entities.Record) e
 	return nil
 }
 
-func waitForCollectorReady(t *testing.T, address net.Addr) {
+func waitForCollectorReady(t *testing.T, cp *collector.CollectingProcess) {
 	checkConn := func() (bool, error) {
-		if _, err := net.Dial(address.Network(), address.String()); err != nil {
+		if strings.Split(cp.GetAddress().String(), ":")[1] == "0" {
+			return false, fmt.Errorf("random port is not resolved")
+		}
+		if _, err := net.Dial(cp.GetAddress().Network(), cp.GetAddress().String()); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
-		t.Errorf("Cannot establish connection to %s", address.String())
+		t.Errorf("Cannot establish connection to %s", cp.GetAddress().String())
 	}
 }
 

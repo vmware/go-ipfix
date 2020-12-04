@@ -26,7 +26,7 @@ func Encode(buff io.Writer, byteOrder binary.ByteOrder, inputs ...interface{}) e
 	for _, in := range inputs {
 		err = binary.Write(buff, byteOrder, in)
 		if err != nil {
-			return fmt.Errorf("Error in encoding data %v: %v", in, err)
+			return fmt.Errorf("error in encoding data %v: %v", in, err)
 		}
 	}
 	return nil
@@ -45,7 +45,7 @@ func Decode(buffer io.Reader, byteOrder binary.ByteOrder, outputs ...interface{}
 	for _, out := range outputs {
 		err = binary.Read(buffer, byteOrder, out)
 		if err != nil {
-			return fmt.Errorf("Error in decoding data: %v", err)
+			return fmt.Errorf("error in decoding data: %v", err)
 		}
 	}
 	return nil
