@@ -111,7 +111,7 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 		if err != nil {
 			return err
 		}
-		a.aggregateRecord(*flowKey, record)
+		a.aggregateRecord(flowKey, record)
 	}
 	return nil
 }
@@ -138,11 +138,11 @@ func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) {
 
 // aggregateRecord either adds the record to flowKeyMap or update the record in
 // flowKeyMap by doing correlation or updating the stats.
-func (a *AggregationProcess) aggregateRecord(flowKey FlowKey, record entities.Record) {
+func (a *AggregationProcess) aggregateRecord(flowKey *FlowKey, record entities.Record) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	aggregationRecord, exist := a.flowKeyRecordMap[flowKey]
+	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
 	if exist {
 		if !isRecordIntraNode(record) {
 			// Do correlation of records if record belongs to inter-node flow and
@@ -160,6 +160,7 @@ func (a *AggregationProcess) aggregateRecord(flowKey FlowKey, record entities.Re
 			// is not required.
 
 		}
+
 	} else {
 		aggregationRecord = AggregationFlowRecord{
 			record,
@@ -188,32 +189,30 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
-			case entities.Unsigned8, entities.Unsigned16, entities.Unsigned32, entities.Unsigned64,
-				entities.Signed8, entities.Signed16, entities.Signed32, entities.Signed64:
-				if ieWithValue.Value == 0 {
+			case entities.Unsigned16:
+				if  ieWithValue.Value != uint16(0) {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
-					if existingIeWithValue.Value != 0 {
+					if existingIeWithValue.Value != uint16(0) {
 						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
 			case entities.Ipv4Address:
 				ipInString := ieWithValue.Value.(net.IP).To4().String()
-				if ipInString == "0. 0. 0. 0" {
+				if ipInString != "0.0.0.0" {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
 					ipInString := existingIeWithValue.Value.(net.IP).To4().String()
-					if ipInString != "0. 0. 0. 0" {
+					if ipInString != "0.0.0.0" {
 						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
 			case entities.Ipv6Address:
 				ipInString := ieWithValue.Value.(net.IP).To16().String()
-				dummyIP := net.IP{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
-				if ipInString == dummyIP.To16().String() {
+				if ipInString != net.ParseIP("::0").To16().String() {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
-					ipInString := existingIeWithValue.Value.(net.IP).To4().String()
-					if ipInString != dummyIP.To16().String() {
+					ipInString := existingIeWithValue.Value.(net.IP).To16().String()
+					if ipInString != net.ParseIP("::0").To16().String() {
 						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
@@ -227,9 +226,9 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 
 // addRecordToMap is currently used only in aggregateRecord().
 // For other uses, please acquire the flowKeyRecordLock for protection.
-func (a *AggregationProcess) addRecordToMap(flowKey FlowKey, record AggregationFlowRecord) {
-	if _, exist := a.flowKeyRecordMap[flowKey]; !exist {
-		a.flowKeyRecordMap[flowKey] = record
+func (a *AggregationProcess) addRecordToMap(flowKey *FlowKey, record AggregationFlowRecord) {
+	if _, exist := a.flowKeyRecordMap[*flowKey]; !exist {
+		a.flowKeyRecordMap[*flowKey] = record
 	}
 }
 
