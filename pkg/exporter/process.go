@@ -58,7 +58,9 @@ type ExporterInput struct {
 	TempRefTimeout      uint32
 	PathMTU             int
 	IsEncrypted         bool
-	Cert                []byte
+	CACert              []byte
+	ClientCert          []byte
+	ClientKey           []byte
 }
 
 // InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID)
@@ -75,13 +77,10 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	var err error
 	if input.IsEncrypted {
 		if input.CollectorAddr.Network() == "tcp" { // use TLS
-			roots := x509.NewCertPool()
-			ok := roots.AppendCertsFromPEM(input.Cert)
-			if !ok {
-				return nil, fmt.Errorf("Failed to parse root certificate")
+			config, err := createClientConfig(input.CACert, input.ClientCert, input.ClientKey)
+			if err != nil {
+				return nil, err
 			}
-			config := &tls.Config{RootCAs: roots}
-
 			conn, err = tls.Dial(input.CollectorAddr.Network(), input.CollectorAddr.String(), config)
 			if err != nil {
 				klog.Errorf("Cannot the create the tls connection to configured ExportingProcess %s: %v", input.CollectorAddr.String(), err)
@@ -89,7 +88,7 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			}
 		} else if input.CollectorAddr.Network() == "udp" { // use DTLS
 			roots := x509.NewCertPool()
-			ok := roots.AppendCertsFromPEM(input.Cert)
+			ok := roots.AppendCertsFromPEM(input.CACert)
 			if !ok {
 				return nil, fmt.Errorf("Failed to parse root certificate")
 			}
@@ -323,4 +322,25 @@ func isChanClosed(ch <-chan struct{}) bool {
 	default:
 	}
 	return false
+}
+
+func createClientConfig(caCert, clientCert, clientKey []byte) (*tls.Config, error) {
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM(caCert)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse root certificate")
+	}
+	if clientCert == nil {
+		return &tls.Config{
+			RootCAs: roots,
+		}, nil
+	}
+	cert, err := tls.X509KeyPair(clientCert, clientKey)
+	if err != nil {
+		return nil, err
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		RootCAs:      roots,
+	}, nil
 }

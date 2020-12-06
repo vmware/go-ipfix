@@ -49,7 +49,8 @@ type CollectingProcess struct {
 	clients map[string]*clientHandler
 	// isEncrypted indicates whether to use TLS/DTLS for communication
 	isEncrypted bool
-	// serverCert and serverKey are for storing encryption info when using TLS/DTLS
+	// caCert, serverCert and serverKey are for storing encryption info when using TLS/DTLS
+	caCert     []byte
 	serverCert []byte
 	serverKey  []byte
 }
@@ -59,6 +60,8 @@ type CollectorInput struct {
 	MaxBufferSize uint16
 	TemplateTTL   uint32
 	IsEncrypted   bool
+	// TODO: group following struct into struct to be reuse in exporter
+	CACert        []byte
 	ServerCert    []byte
 	ServerKey     []byte
 }
@@ -79,6 +82,7 @@ func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 		messageChan:   make(chan *entities.Message),
 		clients:       make(map[string]*clientHandler),
 		isEncrypted:   input.IsEncrypted,
+		caCert:        input.CACert,
 		serverCert:    input.ServerCert,
 		serverKey:     input.ServerKey,
 	}
