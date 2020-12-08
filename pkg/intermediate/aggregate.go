@@ -1,7 +1,24 @@
+// Copyright 2020 VMware, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package intermediate
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
+	"github.com/vmware/go-ipfix/pkg/util"
 	"net"
 	"strings"
 	"sync"
@@ -14,7 +31,7 @@ import (
 
 type AggregationProcess struct {
 	// flowKeyRecordMap maps each connection (5-tuple) with its records
-	flowKeyRecordMap map[FlowKey][]entities.Record
+	flowKeyRecordMap map[FlowKey]AggregationFlowRecord
 	// mutex allows multiple readers or one writer at the same time
 	mutex sync.RWMutex
 	// messageChan is the channel to receive the message
@@ -23,27 +40,25 @@ type AggregationProcess struct {
 	workerNum int
 	// workerList is the list of workers
 	workerList []*worker
-	// correlateFields are the fields to be filled in correlating process
+	// correlateFields are the fields to be filled when correlating records from
+	// two nodes.
 	correlateFields []string
+	// aggregateElements consists of stats and non-stats elements that need to be
+	// updated. In addition, new aggregation elements that has to be added to record
+	// to handle correlated records from two nodes should be given.
+	// TODO: Add checks to validate the lists inside such as no duplicates, order
+	// of stats etc.
+	aggregateElements *AggregationElements
 	// stopChan is the channel to receive stop message
 	stopChan chan bool
 }
 
-type FlowKey struct {
-	SourceAddress      string
-	DestinationAddress string
-	Protocol           uint8
-	SourcePort         uint16
-	DestinationPort    uint16
-}
-
 type AggregationInput struct {
-	MessageChan     chan *entities.Message
-	WorkerNum       int
-	CorrelateFields []string
+	MessageChan       chan *entities.Message
+	WorkerNum         int
+	CorrelateFields   []string
+	AggregateElements *AggregationElements
 }
-
-type FlowKeyRecordMapCallBack func(key FlowKey, records []entities.Record) error
 
 // InitAggregationProcess takes in message channel (e.g. from collector) as input channel, workerNum(number of workers to process message)
 // and correlateFields (fields to be correlated and filled).
@@ -54,12 +69,13 @@ func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error)
 		return nil, fmt.Errorf("worker number cannot be <= 0")
 	}
 	return &AggregationProcess{
-		make(map[FlowKey][]entities.Record),
+		make(map[FlowKey]AggregationFlowRecord),
 		sync.RWMutex{},
 		input.MessageChan,
 		input.WorkerNum,
 		make([]*worker, 0),
 		input.CorrelateFields,
+		input.AggregateElements,
 		make(chan bool),
 	}, nil
 }
@@ -99,7 +115,9 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 		if err != nil {
 			return err
 		}
-		a.correlateRecords(*flowKey, record)
+		if err = a.addOrUpdateRecordInMap(flowKey, record); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -124,74 +142,283 @@ func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) {
 	delete(a.flowKeyRecordMap, flowKey)
 }
 
-// correlateRecords fills records info by correlating incoming and current records
-func (a *AggregationProcess) correlateRecords(flowKey FlowKey, record entities.Record) {
+// addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
+// flowKeyMap by doing correlation or updating the stats.
+func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	existingRecords := a.flowKeyRecordMap[flowKey]
-	// only fill the information for record from source node
-	if isRecordFromSrc(record) {
-		var isFilled bool
-		for _, existingRec := range existingRecords {
-			for _, field := range a.correlateFields {
-				if ieWithValue, exist := record.GetInfoElementWithValue(field); exist {
-					existingIeWithValue, _ := existingRec.GetInfoElementWithValue(field)
-					ieWithValue.Value = existingIeWithValue.Value
-					isFilled = true
-				}
-			}
-			if isFilled {
-				break
-			}
-		}
-	} else {
-		for _, existingRec := range existingRecords {
-			if isRecordFromSrc(existingRec) {
-				for _, field := range a.correlateFields {
-					if ieWithValue, exist := record.GetInfoElementWithValue(field); exist {
-						existingIeWithValue, _ := existingRec.GetInfoElementWithValue(field)
-						existingIeWithValue.Value = ieWithValue.Value
-					}
-				}
-			}
-		}
-	}
-	a.addRecordToMap(flowKey, record)
-	a.removeDuplicates(flowKey)
-}
 
-// removeDuplicates is currently used only in correlateRecords().
-// For other uses, please acquire the flowKeyRecordLock for protection.
-func (a *AggregationProcess) removeDuplicates(flowKey FlowKey) {
-	records := a.flowKeyRecordMap[flowKey]
-	srcRecords := make([]entities.Record, 0)
-	dstRecords := make([]entities.Record, 0)
-	for _, record := range records {
-		if isRecordFromSrc(record) {
-			srcRecords = append(srcRecords, record)
+	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
+	if exist {
+		if !isRecordIntraNode(record) {
+			// Do correlation of records if record belongs to inter-node flow and
+			// records from source and destination node are not received.
+			if !aggregationRecord.ReadyToSend && !areRecordsFromSameNode(record, aggregationRecord.Record) {
+				a.correlateRecords(record, aggregationRecord.Record)
+				aggregationRecord.ReadyToSend = true
+			}
+			// Aggregation of incoming flow record with existing by updating stats
+			// and flow timestamps.
+			if isRecordFromSrc(record) {
+				if err := a.aggregateRecords(record, aggregationRecord.Record, true, false); err != nil {
+					return err
+				}
+			} else {
+				if err := a.aggregateRecords(record, aggregationRecord.Record, false, true); err != nil {
+					return err
+				}
+			}
 		} else {
-			dstRecords = append(dstRecords, record)
+			// For intra-node flows, just do aggregation of the flow record with
+			// existing record by updating the stats and flow timestamps. Correlation
+			// is not required.
+			if err := a.aggregateRecords(record, aggregationRecord.Record, true, true); err != nil {
+				return err
+			}
+		}
+	} else {
+		// Add all the new stat fields and initialize them.
+		if !isRecordIntraNode(record) {
+			if isRecordFromSrc(record) {
+				if err := a.addFieldsForStatsAggregation(record, true, false); err != nil {
+					return err
+				}
+			} else {
+				if err := a.addFieldsForStatsAggregation(record, false, true); err != nil {
+					return err
+				}
+			}
+		} else {
+			if err := a.addFieldsForStatsAggregation(record, true, true); err != nil {
+				return err
+			}
+		}
+		aggregationRecord = AggregationFlowRecord{
+			record,
+			false,
+			true,
+		}
+		if isRecordIntraNode(record) {
+			aggregationRecord.ReadyToSend = true
 		}
 	}
-	if len(srcRecords) != 0 {
-		a.flowKeyRecordMap[flowKey] = srcRecords
-	} else {
-		a.flowKeyRecordMap[flowKey] = dstRecords
+
+	a.flowKeyRecordMap[*flowKey] = aggregationRecord
+	return nil
+}
+
+// correlateRecords correlate the incomingRecord with existingRecord using correlation
+// fields.
+func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord entities.Record) {
+	for _, field := range a.correlateFields {
+		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(field); exist {
+			switch ieWithValue.Element.DataType {
+			case entities.String:
+				if ieWithValue.Value != "" {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					if existingIeWithValue.Value != "" {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case entities.Unsigned16:
+				if ieWithValue.Value != uint16(0) {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					if existingIeWithValue.Value != uint16(0) {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case entities.Ipv4Address:
+				ipInString := ieWithValue.Value.(net.IP).To4().String()
+				if ipInString != "0.0.0.0" {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					ipInString := existingIeWithValue.Value.(net.IP).To4().String()
+					if ipInString != "0.0.0.0" {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case entities.Ipv6Address:
+				ipInString := ieWithValue.Value.(net.IP).To16().String()
+				if ipInString != net.ParseIP("::0").To16().String() {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					ipInString := existingIeWithValue.Value.(net.IP).To16().String()
+					if ipInString != net.ParseIP("::0").To16().String() {
+						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			default:
+				klog.Errorf("Fields with dataType %v is not supported in correlation fields list.", ieWithValue.Element.DataType)
+			}
+		}
 	}
 }
 
-// addRecordToMap is currently used only in correlateRecords().
-// For other uses, please acquire the flowKeyRecordLock for protection.
-func (a *AggregationProcess) addRecordToMap(flowKey FlowKey, record entities.Record) {
-	if _, exist := a.flowKeyRecordMap[flowKey]; !exist {
-		a.flowKeyRecordMap[flowKey] = make([]entities.Record, 0)
+// aggregateRecords aggregate the incomingRecord with existingRecord by updating
+// stats and flow timestamps.
+func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord entities.Record, fillSrcStats, fillDstStats bool) error {
+	if a.aggregateElements == nil {
+		return nil
 	}
-	a.flowKeyRecordMap[flowKey] = append(a.flowKeyRecordMap[flowKey], record)
+
+	for _, element := range a.aggregateElements.nonStatsElements {
+		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(element); exist {
+			switch ieWithValue.Element.Name {
+			case "flowEndSeconds":
+				existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(element)
+				// Update flow end timestamp if it is latest.
+				if ieWithValue.Value.(uint32) > existingIeWithValue.Value.(uint32) {
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			default:
+				klog.Errorf("Fields with name %v is not supported in aggregation fields list.", element)
+			}
+		} else {
+			return fmt.Errorf("element with name %v in nonStatsElements not present in the incoming record", element)
+		}
+	}
+
+	statsElementList := a.aggregateElements.statsElements
+	antreaSourceStatsElements := a.aggregateElements.aggregatedSourceStatsElements
+	antreaDestinationStatsElements := a.aggregateElements.aggregatedDestinationStatsElements
+	for i, element := range statsElementList {
+		isDelta := false
+		if strings.Contains(element, "Delta") {
+			isDelta = true
+		}
+		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(element); exist {
+			existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(element)
+			// Update the corresponding element in existing record.
+			if !isDelta {
+				existingIeWithValue.Value = ieWithValue.Value
+			} else {
+				// We are simply adding the delta stats now. We expect delta stats to be
+				// reset after sending the record from flowKeyMap in aggregation process.
+				// Delta stats from source and destination nodes are added, so we will have
+				// two times the stats approximately.
+				// For delta stats, it is better to use source and destination specific
+				// stats.
+				existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+			}
+			// Update the corresponding source element in antreaStatsElement list.
+			if fillSrcStats {
+				existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
+				if !isDelta {
+					existingIeWithValue.Value = ieWithValue.Value
+				} else {
+					existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+				}
+			}
+			// Update the corresponding destination element in antreaStatsElement list.
+			if fillDstStats {
+				existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
+				if !isDelta {
+					existingIeWithValue.Value = ieWithValue.Value
+				} else {
+					existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+				}
+			}
+		} else {
+			return fmt.Errorf("element with name %v in statsElements not present in the incoming record", element)
+		}
+	}
+	return nil
 }
 
+func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record, fillSrcStats, fillDstStats bool) error {
+	if a.aggregateElements == nil {
+		return nil
+	}
+	statsElementList := a.aggregateElements.statsElements
+	antreaSourceStatsElements := a.aggregateElements.aggregatedSourceStatsElements
+	antreaDestinationStatsElements := a.aggregateElements.aggregatedDestinationStatsElements
+	antreaElements := append(antreaSourceStatsElements, antreaDestinationStatsElements...)
+
+	for _, element := range antreaElements {
+		// Get the new info element from Antrea registry.
+		// TODO: Take antrea registry enterpriseID as input to make this generic.
+		ie, err := registry.GetInfoElement(element, registry.AntreaEnterpriseID)
+		if err != nil {
+			return err
+		}
+		value := new(bytes.Buffer)
+		if err = util.Encode(value, binary.BigEndian, uint64(0)); err != nil {
+			return err
+		}
+		ieWithValue := entities.NewInfoElementWithValue(ie, value)
+		_, err = record.AddInfoElement(ieWithValue, true)
+		if err != nil {
+			return err
+		}
+	}
+	// Initialize the values of newly added stats info elements.
+	for i, element := range statsElementList {
+		if ieWithValue, exist := record.GetInfoElementWithValue(element); exist {
+			// Initialize the corresponding source element in antreaStatsElement list.
+			if fillSrcStats {
+				existingIeWithValue, _ := record.GetInfoElementWithValue(antreaSourceStatsElements[i])
+				existingIeWithValue.Value = ieWithValue.Value
+			}
+			// Initialize the corresponding destination element in antreaStatsElement list.
+			if fillDstStats {
+				existingIeWithValue, _ := record.GetInfoElementWithValue(antreaDestinationStatsElements[i])
+				existingIeWithValue.Value = ieWithValue.Value
+			}
+		}
+	}
+	return nil
+}
+
+
+// isRecordIntraNode returns true if record belongs to intra-node flow.
+func isRecordIntraNode(record entities.Record) bool {
+	if srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName"); exist && srcIEWithValue.Value != "" {
+		if dstIEWithValue, exist := record.GetInfoElementWithValue("destinationPodName"); exist && dstIEWithValue.Value != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// isRecordFromSrc returns true if record belongs to inter-node flow and from source node.
 func isRecordFromSrc(record entities.Record) bool {
-	ieWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
-	if exist && ieWithValue.Value != "" {
+	srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
+	if !exist || srcIEWithValue.Value == "" {
+		return false
+	}
+	dstIEWithValue, exist := record.GetInfoElementWithValue("destinationPodName")
+	if exist && dstIEWithValue.Value != "" {
+		return false
+	}
+	return true
+}
+
+// isRecordFromDst returns true if record belongs to inter-node flow and from destination node.
+func isRecordFromDst(record entities.Record) bool {
+	dstIEWithValue, exist := record.GetInfoElementWithValue("destinationPodName")
+	if !exist || dstIEWithValue.Value == "" {
+		return false
+	}
+	srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
+	if exist && srcIEWithValue.Value != "" {
+		return false
+	}
+	return true
+}
+
+func areRecordsFromSameNode(record1 entities.Record, record2 entities.Record) bool {
+	// If records belong to intra-node flow, then send true.
+	if isRecordIntraNode(record1) && isRecordIntraNode(record2) {
+		return true
+	}
+	// If records belong to inter-node flow and are from source node, then send true.
+	if isRecordFromSrc(record1) && isRecordFromSrc(record2) {
+		return true
+	}
+	// If records belong to inter-node flow and are from destination node, then send true.
+	if isRecordFromDst(record1) && isRecordFromDst(record2) {
 		return true
 	}
 	return false
