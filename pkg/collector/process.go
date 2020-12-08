@@ -60,7 +60,7 @@ type CollectorInput struct {
 	MaxBufferSize uint16
 	TemplateTTL   uint32
 	IsEncrypted   bool
-	// TODO: group following struct into struct to be reuse in exporter
+	// TODO: group following fields into struct to be reuse in exporter
 	CACert     []byte
 	ServerCert []byte
 	ServerKey  []byte
