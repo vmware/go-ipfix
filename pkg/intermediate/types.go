@@ -36,10 +36,10 @@ type AggregationFlowRecord struct {
 	IsActive bool
 }
 
-type AggregationElements struct{
-	nonStatsElements              []string
-	statsElements                 []string
-	aggregatedSourceStatsElements []string
+type AggregationElements struct {
+	nonStatsElements                   []string
+	statsElements                      []string
+	aggregatedSourceStatsElements      []string
 	aggregatedDestinationStatsElements []string
 }
 
