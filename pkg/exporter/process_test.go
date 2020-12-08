@@ -28,57 +28,68 @@ import (
 )
 
 const (
-	fakeKey = `-----BEGIN PRIVATE KEY-----
-MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQCvTekfTcktH3bp
-sB+pRW9B9OqtjmXumWKLsKJq0MxA0gUuRfKr3dc5uKexk2HDM/gTCEMhDSe+SrAF
-PNE6oIb69us8V53XB1AxCQM1G2gZB277Glaw/3o0fxSOXxGYnYO7ac44rrjudqMl
-Tp7DPoQaa0rp00G6eBuzOewUmSxj/i5p5t+i8s5kj5ny014NcXAoVGeec0lI35qp
-+/gda3u+E70BgKxCxaF9bE0DQmE0GClzSKULclV+UBCuoCCgU2iyajVMsUNapelt
-vJC+qjHEpsTGGzSsb0LTCktjSQRooYYkMccmafLpTDhEa0Qmt2L8ilwlxg6c1PRv
-XE25qncPAgMBAAECggEBAJE/z6GFVOPTRza3HHSnOFkA8hVdgC2i31j4wIoaeLJY
-kbxWboxiofqMej2S7RTNEYXLebt/5+cugQvF6WJXMZ/tSNlVi01oHNSUMBknnSfn
-1deuahf7hijLBqA0OyMll8mIEDs84bOLjv/RVZBWUySEs6xrwvEapXDp1Cb5ByPN
-T1iGZ3chcOgGPX6MTq9+P4yREREQXjPZ9uKSiLqQg2rVg/j4sC/iPgiE/nSShPIk
-gpOW3kgUuiYGsTQSJ2YIyr81MEgudmUCnJbu/5P8dqtHiqmHOW1psirwVB7xCow3
-h8JBuxz2jHTqnsAfXwWdmvZyXvAycR+9/t9CCGwee3kCgYEA1ozhdC5h6MfyaagP
-9Hl0i8Jlh6r1WVMXLpPy0pQGPnw1JJUHHiEIU4Yp/tzO+DHOSe2mvKLGrsNIRH89
-Vh0maStI26brPyiw7w5hjelxrJ/zH0UdWzWxbZ8HRNh8F3WGoXkGoaLRMQUfYvOI
-lT/HlOSmyl9UCByzU7sq5bkIU50CgYEA0SwFyGX/rpBC7YWpe1VsLBF8GSat9SUc
-UAXn0/6x4eOvLtdPk67HrnU3FIvV376HuTY5hCC2sQTJ+cxzhAj3cpbJjOpjlJZj
-nAYrVNAQHmgynKjCNP8v2W8LQbi39UPE5Zf6dphFbpgQgqYqMQV0iIWRv4WKJKAD
-w3GMwB6pA5sCgYEAlHT/PAksLorMLlfgUmYIQvzMjEe7ZYedLtmo2BUdDPedPibw
-ueRZgpH/VR8tB4hPGdCb40Mu/5aY1uzEYGXjQjp1O6gQd6+MXp4w2qWBxtUWwbht
-S8OndhboTLcPhpwIAItiD04+OhE1Wp7xD3UGgPyGfNnhp4tUese0MykJnfECgYEA
-ok8MtbIgMq6SoIjFOITSiWeP6lxPRBhl3dqXR7MtCOGKQEim4SwQmlkuQm03qoTI
-AHoJK3PPD5FtwL5bLKtgh7Rl9UizuMrxxFItMYS53T5xd4qkGEekM46tJ3RUmqbZ
-lGbX3UrPJcAtn5Oczak0AfPTYtAWn9Di2rezxiiEcd0CgYA0RSCk8XgtZxAoPQJC
-Y2PJ6FHlSLMtDhsAsUtD+mXlt8+o+tyMG7ZysQZKHsjDMzEZZRK7F8W9+xzzl1fa
-Ok+B9v1BFakMXRc5zcA8XH1ng9Ml2DfVYPXxwmaMsGPnwPZsftUJPNbArS60vJJh
-w9ajWgCA6SGtD17ZpHfgIiMvhA==
------END PRIVATE KEY-----
-`
+	fakeCACert = `-----BEGIN CERTIFICATE-----
+MIICuDCCAaACCQCTFBmkg1kiDDANBgkqhkiG9w0BAQsFADAeMQswCQYDVQQGEwJV
+UzEPMA0GA1UECgwGdm13YXJlMB4XDTIwMTIwNzAxMDkxM1oXDTMwMTIwNTAxMDkx
+M1owHjELMAkGA1UEBhMCVVMxDzANBgNVBAoMBnZtd2FyZTCCASIwDQYJKoZIhvcN
+AQEBBQADggEPADCCAQoCggEBAOIpBF9+FGklbj+ldmiIDeVs5CYWATx+UTd+pnNu
+sXs2+nJ3ZZZJIrWcOU2DEFq0rXQ6/+AtRhqvTFbYAuFEzzTseTnJAYiqW7dyEMyK
+PV4uMrQtWzWp/m6AM48fwmAEWyhDJc6RtGcq+v12uf8z24rA2CMNsW9Axz2Y/XHT
+80eqOr+iiCRApjPVpZrbM2XBH8xgHcUYkMPJmRyUy9IN+CEn5U83YIrXMY2yo7HI
+mTZk+YMwaBkhdGxYTgwLRSwplHhx4ETL6mrH3s7HjoOW40RrEDtwe1iHcJlLK9a9
+8KzJ43AIZpXdzrrGRseW0CjTGhh31kNfS8P6FzwWKM70U7MCAwEAATANBgkqhkiG
+9w0BAQsFAAOCAQEAV3heF6HdlDEJIfJUQGVufvO+vLILEswZ3/Da6/qWRk2qdSVV
+bcVez08JXp+9K78J7M86XNW20Uf8KVOrMCuVL7PjfVsConTfD6FBcVgXLOFqc/oq
+YJ/113OikVys5nXf+4Vgc/drLYmEPTFwkjlqC3MYS99jmyfXUdrnhQICgKw5KkvX
+IrXAj6dkjnj2QkUgIiRkpqdNiZN/8q5kH2vLmBm5/R5yFlcOlW2xGex/9XoA7GCJ
+BUO+0EqD41M72He2fvAIXmPgcQHz9kHQYa4u1sI021qoe69lX0AD+T4E6ducLTlc
+RzZwnry3SsMgqT7Yx6dtd+8Ghl9zblA43kvlyw==
+-----END CERTIFICATE-----`
+	fakeKey = `-----BEGIN RSA PRIVATE KEY-----
+MIIEpQIBAAKCAQEAwaOGeO67mLjYmx3i6HZsI0HzMPf1wN3OtyCMZVpRhVFIPewf
+wOwilVkVliZKxgVdPuGJxnWPg3qrSa+kY0B/TUeW35GR7UC4uH9inOVvtTfGc/C+
+7ZrkYG957xTlharMQJUeoocf+oXBN3NI+/DMPh/ttwNGdSTTd4XBJIPbf8PHOSF1
+malBNgF4z0ns/i45TFvWcqARH8SXqRDHTBrIKNY+kS/AaTvGoin7ER/sHnP0U8sz
+zygP2BxY0gmEhuTbYssaZQgz36fRaLvLuyA8rjiG1AoHuCQC8AghnXOuQr/Rt0J4
+RGOIUGYWZCQtwXzvkn8/x2t9uzrbBDNgsCx8ewIDAQABAoIBABBQB1cOvY0LHWxL
+4z60Iz4BI0yfxvs9dFmnC0zKhA2YIF7fEnm9KtisDY59oVT3RLi0ZVfrtXBdGCr3
++gBGgbLv8fzZlZKIHkekq5kOFxAMJ9LCmEMKBm09VudWOlO9ZMGYDmGgwofnVrSm
+KKLY0Uv2gp8lTn014f6yrOe3l/k2ToEBgX867JT1p1W9NOgPtWQLdYQdi5yE20dQ
+1cP07r0ejvi3JkBGjKxZ4QY/bKa7MsRFV7KdVC2dDGGegzKyYtHd/cIJPqcitzBW
+QKZw3ilvvkiIdY/qAjXtU43XsTku3amwMHUzT7+TWppFt3SlkNICQOF0VzZPqmRO
+88aeF7ECgYEA4Zwz/1oT+C+2XUIG+TyXJiVwtzhQtS76CObye0oDZYpkFSLzhXij
+LXXuR1z7MI60LsgvDqiJwEqqWMSL/ZaxlIEIFuZVOs0UFEjm5NtAhpf4/URL28La
+exveYUAVRsK6cF9y46DcLQiixgl4ZQCmZN23Fzci/NpfiNSO32gE/hkCgYEA27jX
+RkTxPhZHkemCcmwayVhOyb6A5K2U6zV6Sb7q4ruBUfGjQyx3ij8sGtI3PQPQ84Vk
+Oe0HEQzyrDvo+J+5WbIakxi8HzdUhglGsMbbdrvJroz5AkFxrgoQjRLMBCNrTh7s
+dhw8hTPdvFEyc19HJicfeaztusMj5sBvaMXdebMCgYEAyOSjtIyMXaJ2u8IQnZyj
+ZtdN8AhYbY2gHY8wejIkpiU+C0gtGjua6d8qRyd3kPxxW3rr1BylVLHnz9VsZmnq
+RLdE8cc2O37jk1B7MWw+n9rxXuySs+RlUdw1/9jlWTYKeAe2MRVLGVqoPrmuGBol
+EIoQ/74cDJWTHi9P7YUddPkCgYEA2hpLJqd8yGKZPI+MO0Rv+nk8DCqcC2L6tdfp
+wZZP1izGG68+nolfR82ZXC5bQqetHG3GpXFRWG1/3dPCWDlEZXLTyjv9UQc9UaeX
+khZy9xNFCY1KCCEqVNYMw9xqw5jdBTjRBBTXRmnLqwj2iWuEVqzzI3ayrHbUBlPy
+ww/V3t0CgYEA30RxlOoZEGKNv+vsTODhKYSrdyVdIi7pVRZ0/Lkq3mOIhKsTuxOu
+Mmv3+8h7x+AvLTxPD2mmNWKLbi1kznswybOUkwDHj+McY+DKAxkvp1onMbs8n3Bs
+k6q5/YacXNd2ELwlttgH4zr9akuauTguhKDig7+tse2Q/g5zUQHRhSw=
+-----END RSA PRIVATE KEY-----`
 	fakeCert = `-----BEGIN CERTIFICATE-----
-MIIDhjCCAm6gAwIBAgIJAP3U+C7liWf8MA0GCSqGSIb3DQEBCwUAMHgxCzAJBgNV
-BAYTAlhYMQwwCgYDVQQIDANOL0ExDDAKBgNVBAcMA04vQTEgMB4GA1UECgwXU2Vs
-Zi1zaWduZWQgY2VydGlmaWNhdGUxKzApBgNVBAMMIjEyMC4wLjAuMTogU2VsZi1z
-aWduZWQgY2VydGlmaWNhdGUwHhcNMjAxMTA1MDU0NjUyWhcNMjIxMTA1MDU0NjUy
-WjB4MQswCQYDVQQGEwJYWDEMMAoGA1UECAwDTi9BMQwwCgYDVQQHDANOL0ExIDAe
-BgNVBAoMF1NlbGYtc2lnbmVkIGNlcnRpZmljYXRlMSswKQYDVQQDDCIxMjAuMC4w
-LjE6IFNlbGYtc2lnbmVkIGNlcnRpZmljYXRlMIIBIjANBgkqhkiG9w0BAQEFAAOC
-AQ8AMIIBCgKCAQEAr03pH03JLR926bAfqUVvQfTqrY5l7plii7CiatDMQNIFLkXy
-q93XObinsZNhwzP4EwhDIQ0nvkqwBTzROqCG+vbrPFed1wdQMQkDNRtoGQdu+xpW
-sP96NH8Ujl8RmJ2Du2nOOK647najJU6ewz6EGmtK6dNBungbsznsFJksY/4uaebf
-ovLOZI+Z8tNeDXFwKFRnnnNJSN+aqfv4HWt7vhO9AYCsQsWhfWxNA0JhNBgpc0il
-C3JVflAQrqAgoFNosmo1TLFDWqXpbbyQvqoxxKbExhs0rG9C0wpLY0kEaKGGJDHH
-Jmny6Uw4RGtEJrdi/IpcJcYOnNT0b1xNuap3DwIDAQABoxMwETAPBgNVHREECDAG
-hwQAAAAAMA0GCSqGSIb3DQEBCwUAA4IBAQAE6/mSUMVerL8B3Xs2+3YVmhd94Ql5
-ZKLwmEhsvOhP/3KRSncA8bIr4ZGCyvyEgsJqktjHJ4OYUIw3auYOBZgnUe3kM4NI
-H7SS1JEtMu7okoXL/zHZcNrGHslFoEnIzvtoooSTQglcHclo8NWnGng6nJkSsY7w
-DivAX9M7xtyKvGFgh6HuKYSZ3Yd6DeCkpnL2aOXf7cmFk4FT3SIbrtLNsLetbPl3
-rsA9pUDwTYRP8PDOLC3BKyDl84Dpb8JScqVpBMDRBW1dre0emORlh17JllyhA+9b
-fKNX/D1XinAd/OftM5gYBWs7M6uZTm7JxMCvA2kckoN7B+BdrzisxTUR
------END CERTIFICATE-----
-`
+MIIC5jCCAc6gAwIBAgIJAPGVbUxq+B6mMA0GCSqGSIb3DQEBCwUAMB4xCzAJBgNV
+BAYTAlVTMQ8wDQYDVQQKDAZ2bXdhcmUwHhcNMjAxMjA3MDQ1NzU2WhcNMjEwMTA2
+MDQ1NzU2WjAyMQswCQYDVQQGEwJVUzEPMA0GA1UECgwGdm13YXJlMRIwEAYDVQQD
+DAkxMjcuMC4wLjEwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDBo4Z4
+7ruYuNibHeLodmwjQfMw9/XA3c63IIxlWlGFUUg97B/A7CKVWRWWJkrGBV0+4YnG
+dY+DeqtJr6RjQH9NR5bfkZHtQLi4f2Kc5W+1N8Zz8L7tmuRgb3nvFOWFqsxAlR6i
+hx/6hcE3c0j78Mw+H+23A0Z1JNN3hcEkg9t/w8c5IXWZqUE2AXjPSez+LjlMW9Zy
+oBEfxJepEMdMGsgo1j6RL8BpO8aiKfsRH+wec/RTyzPPKA/YHFjSCYSG5Ntiyxpl
+CDPfp9Fou8u7IDyuOIbUCge4JALwCCGdc65Cv9G3QnhEY4hQZhZkJC3BfO+Sfz/H
+a327OtsEM2CwLHx7AgMBAAGjEzARMA8GA1UdEQQIMAaHBH8AAAEwDQYJKoZIhvcN
+AQELBQADggEBALKkqdqBXGpKlquMhYvXSuyIe2GcbhOsHZhmTq2cCHzeObxZfzkI
+GZjqWAsJ/sn/RXjjb+cvOtdY8LhgsQkNa60WV7LJjyylnBNQvrHK6i0+0oUUbyxf
+Ps4MvMH+FjG1obfcPV5dCaJFeDOc/qP8MZQzbBnWDUiLnsyAvg/iCNOxjLqunPhr
+I8nZH/JVsGPZn55Bg8ae6upxYX8Ho+BbgPHLwCImQA1vALaieu0yrm9MGB4KgUCf
+rErlI+RVzS2DeDRNEeHLV3UL+BCjbP0B3Pg6FpDwpe15pnNz0JuBlEOuNmoPEJfE
+iC9J/JWV3fWjsN4ysH4DajKshCMEx1dkNyw=
+-----END CERTIFICATE-----`
 	fakeKey2 = `-----BEGIN PRIVATE KEY-----
 MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQg1h0K9jGfyBQMttaz
 ija4rnsXfTQf1KvXl2o9SABhtvmhRANCAAQnICXGTyc72J2mpIgbZz3mvgmqUzGJ
@@ -140,8 +151,6 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		PathMTU:             0,
-		IsEncrypted:         false,
-		Cert:                nil,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -218,8 +227,6 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      1,
 		PathMTU:             0,
-		IsEncrypted:         false,
-		Cert:                nil,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -300,8 +307,6 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		PathMTU:             0,
-		IsEncrypted:         false,
-		Cert:                nil,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -398,8 +403,6 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		PathMTU:             0,
-		IsEncrypted:         false,
-		Cert:                nil,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -465,7 +468,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 
 func TestExportingProcessWithTLS(t *testing.T) {
 	// Create local server for testing
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4830")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:4739")
 	if err != nil {
 		t.Fatalf("Got error when resolving tcp address: %v", err)
 	}
@@ -506,7 +509,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		IsEncrypted:         true,
-		Cert:                []byte(fakeCert),
+		CACert:              []byte(fakeCACert),
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -588,7 +591,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		IsEncrypted:         true,
-		Cert:                []byte(fakeCert2),
+		CACert:              []byte(fakeCert2),
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {

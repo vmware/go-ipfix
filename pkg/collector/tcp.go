@@ -3,6 +3,8 @@ package collector
 import (
 	"bytes"
 	"crypto/tls"
+	"crypto/x509"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -14,12 +16,11 @@ func (cp *CollectingProcess) startTCPServer() {
 	var listener net.Listener
 	var err error
 	if cp.isEncrypted { // use TLS
-		cer, err := tls.X509KeyPair(cp.serverCert, cp.serverKey)
+		config, err := cp.createServerConfig()
 		if err != nil {
 			klog.Error(err)
 			return
 		}
-		config := &tls.Config{Certificates: []tls.Certificate{cer}}
 		listener, err = tls.Listen("tcp", cp.address.String(), config)
 		if err != nil {
 			klog.Errorf("Cannot start tls collecting process on %s: %v", cp.address.String(), err)
@@ -96,4 +97,26 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 	}()
 	<-client.errChan
 	cp.deleteClient(address)
+}
+
+func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
+	cert, err := tls.X509KeyPair(cp.serverCert, cp.serverKey)
+	if err != nil {
+		return nil, err
+	}
+	if cp.caCert == nil {
+		return &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		}, nil
+	}
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM(cp.caCert)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse root certificate")
+	}
+	return &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    roots,
+	}, nil
 }

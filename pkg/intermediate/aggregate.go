@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/vmware/go-ipfix/pkg/util"
 	"net"
 	"strings"
 	"sync"
@@ -27,6 +26,7 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
+	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 type AggregationProcess struct {
@@ -370,7 +370,6 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 	}
 	return nil
 }
-
 
 // isRecordIntraNode returns true if record belongs to intra-node flow.
 func isRecordIntraNode(record entities.Record) bool {
