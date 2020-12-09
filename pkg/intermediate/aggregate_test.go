@@ -471,10 +471,10 @@ func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
 func TestAggregateRecordsForInterNodeFlow(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	aggElements := &AggregationElements{
-		nonStatsElements:                   nonStatsElementList,
-		statsElements:                      statsElementList,
-		aggregatedSourceStatsElements:      antreaSourceStatsElementList,
-		aggregatedDestinationStatsElements: antreaDestinationStatsElementList,
+		NonStatsElements:                   nonStatsElementList,
+		StatsElements:                      statsElementList,
+		AggregatedSourceStatsElements:      antreaSourceStatsElementList,
+		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
 	}
 	input := AggregationInput{
 		MessageChan:       messageChan,

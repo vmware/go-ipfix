@@ -37,10 +37,10 @@ type AggregationFlowRecord struct {
 }
 
 type AggregationElements struct {
-	nonStatsElements                   []string
-	statsElements                      []string
-	aggregatedSourceStatsElements      []string
-	aggregatedDestinationStatsElements []string
+	NonStatsElements                   []string
+	StatsElements                      []string
+	AggregatedSourceStatsElements      []string
+	AggregatedDestinationStatsElements []string
 }
 
 type FlowKeyRecordMapCallBack func(key FlowKey, record AggregationFlowRecord) error
