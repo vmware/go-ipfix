@@ -21,7 +21,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/entities"
@@ -164,6 +163,29 @@ JSnRKkDuZ/d5wYR59eIld9FsJPFWPCQth2cKnBsM
 `
 )
 
+var (
+	fields = []string{
+		"sourceIPv4Address",
+		"destinationIPv4Address",
+		"sourceTransportPort",
+		"destinationTransportPort",
+		"protocolIdentifier",
+		"flowEndSeconds",
+		"packetTotalCount",
+		"packetDeltaCount",
+	}
+	antreaFields = []string{
+		"sourcePodName",
+		"destinationPodName",
+		"destinationClusterIPv4",
+		"destinationServicePort",
+	}
+	reverseFields = []string{
+		"reversePacketTotalCount",
+		"reversePacketDeltaCount",
+	}
+)
+
 func TestSingleRecordUDPTransport(t *testing.T) {
 	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
@@ -257,139 +279,24 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, isEncrypte
 		}
 		export, err := exporter.InitExportingProcess(epInput)
 		if err != nil {
-			klog.Fatalf("Got error when connecting to %s", cp.GetAddress().String())
+			t.Fatalf("Got error when connecting to %s", cp.GetAddress().String())
 		}
 
-		// Create template record with 5 fields
 		templateID := export.NewTemplateID()
-		templateSet := entities.NewSet(entities.Template, templateID, false)
-		elements := make([]*entities.InfoElementWithValue, 0)
-		element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name sourceIPv4Address")
-		}
-		ie := entities.NewInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name destinationIPv4Address")
-		}
-		ie = entities.NewInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("reverseOctetDeltaCount", registry.IANAReversedEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the reverse element of octetDeltaCount")
-		}
-		ie = entities.NewInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name sourcePodName")
-		}
-		ie = entities.NewInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name flowStartSeconds")
-		}
-		ie = entities.NewInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
-		templateSet.AddRecord(elements, templateID)
-
+		templateSet := createTemplateSet(templateID)
 		// Send template record
 		_, err = export.SendSet(templateSet)
 		if err != nil {
-			klog.Fatalf("Got error when sending record: %v", err)
-		}
-		// Create data set with 1 data record using the same template above
-		dataSet := entities.NewSet(entities.Data, templateID, false)
-		elements = make([]*entities.InfoElementWithValue, 0)
-		element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name sourceIPv4Address")
-		}
-		ie = entities.NewInfoElementWithValue(element, net.ParseIP("1.2.3.4"))
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name destinationIPv4Address")
-		}
-		ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("reverseOctetDeltaCount", registry.IANAReversedEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the reverse element of octetDeltaCount")
-		}
-		ie = entities.NewInfoElementWithValue(element, uint64(12345678))
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name sourcePodName")
-		}
-		ie = entities.NewInfoElementWithValue(element, "pod1")
-		elements = append(elements, ie)
-
-		element, err = registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
-		if err != nil {
-			klog.Errorf("Did not find the element with name flowStartSeconds")
-		}
-		ie = entities.NewInfoElementWithValue(element, uint32(1257894000))
-		elements = append(elements, ie)
-
-		dataSet.AddRecord(elements, templateID)
-		// for multiple records per set, modify element values and add another record to set
-		if isMultipleRecord {
-			elements := make([]*entities.InfoElementWithValue, 0)
-			element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
-			if err != nil {
-				klog.Errorf("Did not find the element with name sourceIPv4Address")
-			}
-			ie := entities.NewInfoElementWithValue(element, net.ParseIP("4.3.2.1"))
-			elements = append(elements, ie)
-
-			element, err = registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
-			if err != nil {
-				klog.Errorf("Did not find the element with name destinationIPv4Address")
-			}
-			ie = entities.NewInfoElementWithValue(element, net.ParseIP("8.7.6.5"))
-			elements = append(elements, ie)
-
-			element, err = registry.GetInfoElement("reverseOctetDeltaCount", registry.IANAReversedEnterpriseID)
-			if err != nil {
-				klog.Errorf("Did not find the reverse element of octetDeltaCount")
-			}
-			ie = entities.NewInfoElementWithValue(element, uint64(0))
-			elements = append(elements, ie)
-
-			element, err = registry.GetInfoElement("sourcePodName", registry.AntreaEnterpriseID)
-			if err != nil {
-				klog.Errorf("Did not find the element with name sourcePodName")
-			}
-			ie = entities.NewInfoElementWithValue(element, "pod2")
-			elements = append(elements, ie)
-
-			element, err = registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
-			if err != nil {
-				klog.Errorf("Did not find the element with name flowStartSeconds")
-			}
-			ie = entities.NewInfoElementWithValue(element, uint32(1257894000))
-			elements = append(elements, ie)
-
-			dataSet.AddRecord(elements, templateID)
+			t.Fatalf("Got error when sending record: %v", err)
 		}
 
+		dataSet := createDataSet(templateID, isMultipleRecord)
 		// Send data set
 		_, err = export.SendSet(dataSet)
 		if err != nil {
-			klog.Fatalf("Got error when sending record: %v", err)
+			t.Fatalf("Got error when sending record: %v", err)
 		}
+
 		export.CloseConnToCollector() // Close exporting process
 	}()
 
@@ -406,26 +313,215 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, isEncrypte
 	assert.Equal(t, uint32(1), templateMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
 	templateSet := templateMsg.GetSet()
 	templateElements := templateSet.GetRecords()[0].GetOrderedElementList()
+	assert.Equal(t, len(templateElements), len(fields)+len(antreaFields)+len(reverseFields))
 	assert.Equal(t, uint32(0), templateElements[0].Element.EnterpriseId, "Template record is not stored correctly.")
 	assert.Equal(t, "sourceIPv4Address", templateElements[0].Element.Name, "Template record is not stored correctly.")
 	assert.Equal(t, "destinationIPv4Address", templateElements[1].Element.Name, "Template record is not stored correctly.")
-	assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[2].Element.EnterpriseId, "Template record is not stored correctly.")
-	assert.Equal(t, registry.AntreaEnterpriseID, templateElements[3].Element.EnterpriseId, "Template record is not stored correctly.")
+	assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[len(fields)+len(antreaFields)+1].Element.EnterpriseId, "Template record is not stored correctly.")
+	assert.Equal(t, registry.AntreaEnterpriseID, templateElements[len(fields)+1].Element.EnterpriseId, "Template record is not stored correctly.")
 
 	dataMsg := messages[1]
 	assert.Equal(t, uint16(10), dataMsg.GetVersion(), "Version of flow record (template) should be 10.")
 	assert.Equal(t, uint32(1), dataMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
 	dataSet := dataMsg.GetSet()
-	dataElements := dataSet.GetRecords()[0].GetOrderedElementList()
-	assert.Equal(t, net.IP([]byte{1, 2, 3, 4}), dataElements[0].Value, "DataSet does not store elements (IANA) correctly.")
-	assert.Equal(t, uint64(12345678), dataElements[2].Value, "DataSet does not store reverse information elements (IANA) correctly.")
-	assert.Equal(t, "pod1", dataElements[3].Value, "DataSet does not store elements (Antrea) correctly.")
-	assert.Equal(t, uint32(1257894000), dataElements[4].Value, "DataSet does not store elements (IANA) correctly.")
-	if isMultipleRecord {
-		dataElements := dataSet.GetRecords()[1].GetOrderedElementList()
-		assert.Equal(t, net.IP([]byte{4, 3, 2, 1}), dataElements[0].Value, "DataSet does not store multiple records correctly.")
-		assert.Equal(t, uint64(0), dataElements[2].Value, "DataSet does not store multiple records correctly.")
-		assert.Equal(t, "pod2", dataElements[3].Value, "DataSet does not store multiple records correctly.")
-		assert.Equal(t, uint32(1257894000), dataElements[4].Value, "DataSet does not store elements (IANA) correctly.")
+	record := dataSet.GetRecords()[0]
+	for _, name := range fields {
+		element, exist := record.GetInfoElementWithValue(name)
+		assert.True(t, exist)
+		switch name {
+		case "sourceIPv4Address", "destinationIPv4Address":
+			assert.Equal(t, net.IP([]byte{10, 0, 0, 1}), element.Value)
+		case "sourceTransportPort", "destinationTransportPort":
+			assert.Equal(t, uint16(1234), element.Value)
+		case "protocolIdentifier":
+			assert.Equal(t, uint8(6), element.Value)
+		case "packetTotalCount", "packetDeltaCount":
+			assert.Equal(t, uint64(500), element.Value)
+		case "flowEndSeconds":
+			assert.Equal(t, uint32(1257894000), element.Value)
+		}
 	}
+
+	for _, name := range antreaFields {
+		element, exist := record.GetInfoElementWithValue(name)
+		assert.True(t, exist)
+		switch name {
+		case "destinationClusterIPv4":
+			assert.Equal(t, net.IP([]byte{10, 0, 0, 2}), element.Value)
+		case "sourcePodName", "destinationPodName":
+			assert.Equal(t, "test_pod", element.Value)
+		case "destinationServicePort":
+			assert.Equal(t, uint16(4739), element.Value)
+		}
+	}
+
+	for _, name := range reverseFields {
+		element, exist := record.GetInfoElementWithValue(name)
+		assert.True(t, exist)
+		switch name {
+		case "reversePacketTotalCount", "reversePacketDeltaCount":
+			assert.Equal(t, uint64(10000), element.Value)
+		}
+	}
+
+	if isMultipleRecord {
+		record := dataSet.GetRecords()[1]
+		for _, name := range fields {
+			element, exist := record.GetInfoElementWithValue(name)
+			assert.True(t, exist)
+			switch name {
+			case "sourceIPv4Address", "destinationIPv4Address":
+				assert.Equal(t, net.IP([]byte{10, 0, 0, 3}), element.Value)
+			case "sourceTransportPort", "destinationTransportPort":
+				assert.Equal(t, uint16(5678), element.Value)
+			case "protocolIdentifier":
+				assert.Equal(t, uint8(17), element.Value)
+			case "packetTotalCount", "packetDeltaCount":
+				assert.Equal(t, uint64(200), element.Value)
+			case "flowEndSeconds":
+				assert.Equal(t, uint32(1257895000), element.Value)
+			}
+		}
+
+		for _, name := range antreaFields {
+			element, exist := record.GetInfoElementWithValue(name)
+			assert.True(t, exist)
+			switch name {
+			case "destinationClusterIPv4":
+				assert.Equal(t, net.IP([]byte{10, 0, 0, 4}), element.Value)
+			case "sourcePodName", "destinationPodName":
+				assert.Equal(t, "test_pod2", element.Value)
+			case "destinationServicePort":
+				assert.Equal(t, uint16(4739), element.Value)
+			}
+		}
+
+		for _, name := range reverseFields {
+			element, exist := record.GetInfoElementWithValue(name)
+			assert.True(t, exist)
+			switch name {
+			case "reversePacketTotalCount", "reversePacketDeltaCount":
+				assert.Equal(t, uint64(400), element.Value)
+			}
+		}
+	}
+}
+
+func createTemplateSet(templateID uint16) entities.Set {
+	templateSet := entities.NewSet(entities.Template, templateID, false)
+	elements := make([]*entities.InfoElementWithValue, 0)
+	for _, name := range fields {
+		element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
+		ie := entities.NewInfoElementWithValue(element, nil)
+		elements = append(elements, ie)
+	}
+	for _, name := range antreaFields {
+		element, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
+		ie := entities.NewInfoElementWithValue(element, nil)
+		elements = append(elements, ie)
+	}
+	for _, name := range reverseFields {
+		element, _ := registry.GetInfoElement(name, registry.IANAReversedEnterpriseID)
+		ie := entities.NewInfoElementWithValue(element, nil)
+		elements = append(elements, ie)
+	}
+	templateSet.AddRecord(elements, templateID)
+	return templateSet
+}
+
+func createDataSet(templateID uint16, isMultipleRecord bool) entities.Set {
+	dataSet := entities.NewSet(entities.Data, templateID, false)
+	elements := make([]*entities.InfoElementWithValue, 0)
+	for _, name := range fields {
+		element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
+		var ie *entities.InfoElementWithValue
+		switch name {
+		case "sourceIPv4Address", "destinationIPv4Address":
+			ie = entities.NewInfoElementWithValue(element, net.ParseIP("10.0.0.1"))
+		case "sourceTransportPort", "destinationTransportPort":
+			ie = entities.NewInfoElementWithValue(element, uint16(1234))
+		case "protocolIdentifier":
+			ie = entities.NewInfoElementWithValue(element, uint8(6))
+		case "packetTotalCount", "packetDeltaCount":
+			ie = entities.NewInfoElementWithValue(element, uint64(500))
+		case "flowEndSeconds":
+			ie = entities.NewInfoElementWithValue(element, uint32(1257894000))
+		}
+		elements = append(elements, ie)
+	}
+
+	for _, name := range antreaFields {
+		element, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
+		var ie *entities.InfoElementWithValue
+		switch name {
+		case "destinationClusterIPv4":
+			ie = entities.NewInfoElementWithValue(element, net.ParseIP("10.0.0.2"))
+		case "sourcePodName", "destinationPodName":
+			ie = entities.NewInfoElementWithValue(element, "test_pod")
+		case "destinationServicePort":
+			ie = entities.NewInfoElementWithValue(element, uint16(4739))
+		}
+		elements = append(elements, ie)
+	}
+
+	for _, name := range reverseFields {
+		element, _ := registry.GetInfoElement(name, registry.IANAReversedEnterpriseID)
+		var ie *entities.InfoElementWithValue
+		switch name {
+		case "reversePacketTotalCount", "reversePacketDeltaCount":
+			ie = entities.NewInfoElementWithValue(element, uint64(10000))
+		}
+		elements = append(elements, ie)
+	}
+
+	dataSet.AddRecord(elements, templateID)
+
+	if isMultipleRecord {
+		elements = make([]*entities.InfoElementWithValue, 0)
+		for _, name := range fields {
+			element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
+			var ie *entities.InfoElementWithValue
+			switch name {
+			case "sourceIPv4Address", "destinationIPv4Address":
+				ie = entities.NewInfoElementWithValue(element, net.ParseIP("10.0.0.3"))
+			case "sourceTransportPort", "destinationTransportPort":
+				ie = entities.NewInfoElementWithValue(element, uint16(5678))
+			case "protocolIdentifier":
+				ie = entities.NewInfoElementWithValue(element, uint8(17))
+			case "packetTotalCount", "packetDeltaCount":
+				ie = entities.NewInfoElementWithValue(element, uint64(200))
+			case "flowEndSeconds":
+				ie = entities.NewInfoElementWithValue(element, uint32(1257895000))
+			}
+			elements = append(elements, ie)
+		}
+
+		for _, name := range antreaFields {
+			element, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
+			var ie *entities.InfoElementWithValue
+			switch name {
+			case "destinationClusterIPv4":
+				ie = entities.NewInfoElementWithValue(element, net.ParseIP("10.0.0.4"))
+			case "sourcePodName", "destinationPodName":
+				ie = entities.NewInfoElementWithValue(element, "test_pod2")
+			case "destinationServicePort":
+				ie = entities.NewInfoElementWithValue(element, uint16(4739))
+			}
+			elements = append(elements, ie)
+		}
+
+		for _, name := range reverseFields {
+			element, _ := registry.GetInfoElement(name, registry.IANAReversedEnterpriseID)
+			var ie *entities.InfoElementWithValue
+			switch name {
+			case "reversePacketTotalCount", "reversePacketDeltaCount":
+				ie = entities.NewInfoElementWithValue(element, uint64(400))
+			}
+			elements = append(elements, ie)
+		}
+
+		dataSet.AddRecord(elements, templateID)
+	}
+
+	return dataSet
 }

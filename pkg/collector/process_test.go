@@ -403,7 +403,8 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
 		time.Sleep(time.Millisecond)
-		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
+		// function waitForCollectorReady may introduce more clients when testing connection
+		assert.GreaterOrEqual(t, 2, cp.getClientCount(), "There should be at least two tcp clients.")
 	}()
 	// there should be two messages received
 	<-cp.GetMsgChan()

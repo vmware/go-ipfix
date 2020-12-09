@@ -29,20 +29,87 @@ import (
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
-var templatePacket = []byte{0, 10, 0, 76, 95, 154, 84, 121, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 60, 1, 0, 0, 9, 0, 8, 0, 4, 0, 12, 0, 4, 0, 7, 0, 2, 0, 11, 0, 2, 0, 4, 0, 1, 128, 101, 255, 255, 0, 0, 220, 186, 128, 103, 255, 255, 0, 0, 220, 186, 128, 106, 0, 4, 0, 0, 220, 186, 128, 107, 0, 2, 0, 0, 220, 186}
-var dataPacket1 = []byte{0, 10, 0, 45, 95, 154, 80, 113, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 29, 1, 2, 3, 4, 5, 6, 7, 8, 4, 210, 22, 46, 6, 4, 112, 111, 100, 49, 0, 192, 168, 0, 1, 18, 131}
-var dataPacket2 = []byte{0, 10, 0, 45, 95, 154, 82, 114, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 29, 1, 2, 3, 4, 5, 6, 7, 8, 4, 210, 22, 46, 6, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0}
-var flowKeyRecordMap = make(map[intermediate.FlowKey]intermediate.AggregationFlowRecord)
+var templatePacket = []byte{0, 10, 0, 104, 95, 208, 69, 75, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 88, 1, 0, 0, 14, 0, 8, 0, 4, 0, 12, 0, 4, 0, 7, 0, 2, 0, 11, 0, 2, 0, 4, 0, 1, 0, 151, 0, 4, 0, 86, 0, 8, 0, 2, 0, 8, 128, 101, 255, 255, 0, 0, 220, 186, 128, 103, 255, 255, 0, 0, 220, 186, 128, 106, 0, 4, 0, 0, 220, 186, 128, 108, 0, 2, 0, 0, 220, 186, 128, 86, 0, 8, 0, 0, 114, 121, 128, 2, 0, 8, 0, 0, 114, 121}
+var dataPacket1 = []byte{0, 10, 0, 81, 95, 208, 77, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 240, 112, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200}
+var dataPacket2 = []byte{0, 10, 0, 81, 95, 208, 77, 154, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 244, 88, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200, 4, 112, 111, 100, 49, 0, 10, 0, 0, 3, 18, 131, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244}
 
-func TestCollectorToIntermediate(t *testing.T) {
-	registry.LoadRegistry()
-	var fields = []string{
+/*
+dataPacket1:
+	"sourceIPv4Address": 10.0.0.1
+	"destinationIPv4Address": 10.0.0.2
+	"sourceTransportPort": 1234
+	"destinationTransportPort": 5678
+	"protocolIdentifier": 6
+	"flowEndSeconds": 1257894000
+	"packetTotalCount": 1000
+	"packetDeltaCount": 500
+	"sourcePodName": ""
+	"destinationPodName": "pod2"
+	"destinationClusterIPv4":
+	"destinationServicePort":
+	"reversePacketTotalCount": 400
+	"reversePacketDeltaCount": 200
+dataPacket 2:
+	"sourceIPv4Address": 10.0.0.1
+	"destinationIPv4Address": 10.0.0.2
+	"sourceTransportPort": 1234
+	"destinationTransportPort": 5678
+	"protocolIdentifier": 6
+	"flowEndSeconds": 1257895000
+	"packetTotalCount": 400
+	"packetDeltaCount": 200
+	"sourcePodName": "pod1"
+	"destinationPodName": ""
+	"destinationClusterIPv4": 10.0.0.3
+	"destinationServicePort": 4739
+	"reversePacketTotalCount": 1000
+	"reversePacketDeltaCount": 500
+*/
+
+var (
+	flowKeyRecordMap = make(map[intermediate.FlowKey]intermediate.AggregationFlowRecord)
+	flowKey          = intermediate.FlowKey{SourceAddress: "10.0.0.1", DestinationAddress: "10.0.0.2", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
+	correlatefields  = []string{
 		"sourcePodName",
 		"sourcePodNamespace",
 		"sourceNodeName",
 		"destinationPodName",
 		"destinationPodNamespace",
 		"destinationNodeName",
+		"destinationClusterIPv4",
+		"destinationServicePort",
+	}
+	nonStatsElementList = []string{
+		"flowEndSeconds",
+	}
+	statsElementList = []string{
+		"packetTotalCount",
+		"packetDeltaCount",
+		"reversePacketTotalCount",
+		"reversePacketDeltaCount",
+	}
+	antreaSourceStatsElementList = []string{
+		"packetTotalCountFromSourceNode",
+		"packetDeltaCountFromSourceNode",
+		"reversePacketTotalCountFromSourceNode",
+		"reversePacketDeltaCountFromSourceNode",
+	}
+	antreaDestinationStatsElementList = []string{
+		"packetTotalCountFromDestinationNode",
+		"packetDeltaCountFromDestinationNode",
+		"reversePacketTotalCountFromDestinationNode",
+		"reversePacketDeltaCountFromDestinationNode",
+	}
+)
+
+func TestCollectorToIntermediate(t *testing.T) {
+	registry.LoadRegistry()
+
+	aggregatedFields := &intermediate.AggregationElements{
+		NonStatsElements:                   nonStatsElementList,
+		StatsElements:                      statsElementList,
+		AggregatedSourceStatsElements:      antreaSourceStatsElementList,
+		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
 	}
 	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
 	if err != nil {
@@ -60,9 +127,10 @@ func TestCollectorToIntermediate(t *testing.T) {
 	cp, _ := collector.InitCollectingProcess(cpInput)
 
 	apInput := intermediate.AggregationInput{
-		MessageChan:     cp.GetMsgChan(),
-		WorkerNum:       2,
-		CorrelateFields: fields,
+		MessageChan:       cp.GetMsgChan(),
+		WorkerNum:         2,
+		CorrelateFields:   correlatefields,
+		AggregateElements: aggregatedFields,
 	}
 	ap, _ := intermediate.InitAggregationProcess(apInput)
 	go cp.Start()
@@ -83,16 +151,39 @@ func TestCollectorToIntermediate(t *testing.T) {
 	ap.Stop()
 
 	assert.Equal(t, 1, len(flowKeyRecordMap), "Aggregation process should store the data record to map with corresponding flow key.")
-	flowKey := intermediate.FlowKey{SourceAddress: "1.2.3.4", DestinationAddress: "5.6.7.8", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
+
 	assert.NotNil(t, flowKeyRecordMap[flowKey])
-	aggRecord := flowKeyRecordMap[flowKey]
-	elements := aggRecord.Record.GetOrderedElementList()
-	assert.Equal(t, "pod1", elements[5].Value)
-	ieWithValue, _ := aggRecord.Record.GetInfoElementWithValue("destinationPodName")
-	assert.Equal(t, "pod2", ieWithValue.Value, "Aggregation process should correlate and fill corresponding fields.")
-	assert.Equal(t, 11, len(elements), "There should be two more fields for exporter information in the record.")
-	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("originalObservationDomainId")
-	assert.Equal(t, uint32(1), ieWithValue.Value, "originalObservationDomainId should be added correctly in record.")
+	record := flowKeyRecordMap[flowKey].Record
+	assert.Equal(t, 24, len(record.GetOrderedElementList()))
+	for _, element := range record.GetOrderedElementList() {
+		switch element.Element.Name {
+		case "sourcePodName":
+			assert.Equal(t, "pod1", element.Value)
+		case "destinationPodName":
+			assert.Equal(t, "pod2", element.Value)
+		case "flowEndSeconds":
+			assert.Equal(t, uint32(1257895000), element.Value)
+		case "packetTotalCount":
+			assert.Equal(t, uint64(400), element.Value)
+		case "packetDeltaCount":
+			assert.Equal(t, uint64(700), element.Value)
+		case "destinationClusterIPv4":
+			assert.Equal(t, net.IP{10, 0, 0, 3}, element.Value)
+		case "destinationServicePort":
+			assert.Equal(t, uint16(4739), element.Value)
+		case "reversePacketDeltaCount":
+			assert.Equal(t, uint64(700), element.Value)
+		case "reversePacketTotalCount":
+			assert.Equal(t, uint64(1000), element.Value)
+		case "packetTotalCountFromSourceNode":
+			assert.Equal(t, uint64(400), element.Value)
+		case "packetDeltaCountFromSourceNode":
+			assert.Equal(t, uint64(200), element.Value)
+		case "packetTotalCountFromDestinationNode":
+			assert.Equal(t, uint64(1000), element.Value)
+		}
+	}
+
 }
 
 func copyFlowKeyRecordMap(key intermediate.FlowKey, aggregationFlowRecord intermediate.AggregationFlowRecord) error {
@@ -119,7 +210,13 @@ func waitForAggregationToFinish(t *testing.T, ap *intermediate.AggregationProces
 	checkConn := func() (bool, error) {
 		ap.ForAllRecordsDo(copyFlowKeyRecordMap)
 		if len(flowKeyRecordMap) > 0 {
-			return true, nil
+			ie1, _ := flowKeyRecordMap[flowKey].Record.GetInfoElementWithValue("sourcePodName")
+			ie2, _ := flowKeyRecordMap[flowKey].Record.GetInfoElementWithValue("destinationPodName")
+			if ie1.Value == "pod1" && ie2.Value == "pod2" {
+				return true, nil
+			} else {
+				return false, nil
+			}
 		} else {
 			return false, fmt.Errorf("aggregation process does not process and store data correctly")
 		}

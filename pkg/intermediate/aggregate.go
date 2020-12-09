@@ -263,7 +263,7 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		return nil
 	}
 
-	for _, element := range a.aggregateElements.nonStatsElements {
+	for _, element := range a.aggregateElements.NonStatsElements {
 		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(element); exist {
 			switch ieWithValue.Element.Name {
 			case "flowEndSeconds":
@@ -280,9 +280,9 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		}
 	}
 
-	statsElementList := a.aggregateElements.statsElements
-	antreaSourceStatsElements := a.aggregateElements.aggregatedSourceStatsElements
-	antreaDestinationStatsElements := a.aggregateElements.aggregatedDestinationStatsElements
+	statsElementList := a.aggregateElements.StatsElements
+	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
+	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
 	for i, element := range statsElementList {
 		isDelta := false
 		if strings.Contains(element, "Delta") {
@@ -331,9 +331,9 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 	if a.aggregateElements == nil {
 		return nil
 	}
-	statsElementList := a.aggregateElements.statsElements
-	antreaSourceStatsElements := a.aggregateElements.aggregatedSourceStatsElements
-	antreaDestinationStatsElements := a.aggregateElements.aggregatedDestinationStatsElements
+	statsElementList := a.aggregateElements.StatsElements
+	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
+	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
 	antreaElements := append(antreaSourceStatsElements, antreaDestinationStatsElements...)
 
 	for _, element := range antreaElements {
