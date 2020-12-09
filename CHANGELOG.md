@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.4.1 12-09-2020
+### Changed
+- Expose fields in AggregateElements and add integration tests. (#104, @zyiou)
 ## 0.4.0 12-08-2020
 Includes all the bug fixes from [0.3.1](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#031-11-21-2020).
 ### Added
