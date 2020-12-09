@@ -9,7 +9,7 @@ codegen:
 	# Make sure the IPFIX registries are up-to-date.
     # Hitting 304 error when getting IANA registry csv file multiple times, so
     # skipping this check temporarily.
-	#GO111MODULE=on $(GO) run pkg/registry/build_registry/build_registry.go
+	# GO111MODULE=on $(GO) run pkg/registry/build_registry/build_registry.go
 
     # Generate protobuf code for flow.proto with protoc.
 	protoc --go_out=. --plugin=$(GOPATH)/bin/protoc-gen-go pkg/producer/protobuf/*.proto

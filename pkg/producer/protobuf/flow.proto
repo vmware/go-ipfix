@@ -19,6 +19,62 @@ package github.com.vmware.goipfix.producer.protobuf;
 option go_package = "pkg/producer/protobuf";
 
 message FlowMessage {
+  oneof FlowType {
+    FlowType1 flow1 = 1;
+    FlowType2 flow2 = 2;
+  }
+}
+
+// FlowType1 and FlowType2 are two different proto schemas with same fields. Used
+// two different proto schemas to demonstrate that the producer can be built in a
+// flexible manner and can support multiple proto schemas.
+message FlowType1 {
+  // Header of IPFIX Message.
+  uint32 TimeReceived = 1;
+  uint32 SequenceNumber = 2;
+  uint32 ObsDomainID = 3;
+  string ExportAddress = 33;
+
+  // Fields of flow record.
+  uint32 TimeFlowStartInSecs = 4;
+  uint32 TimeFlowEndInSecs = 5;
+  uint64 TimeFlowStartInMilliSecs = 27;
+  uint32 TimeFlowEndInMilliSecs = 28;
+
+  // 5-tuple of flows
+  string SrcIP = 6;
+  string DstIP = 7;
+  uint32 SrcPort = 8;
+  uint32 DstPort = 9;
+  uint32 Proto = 10;
+
+  // Statistics of flow in original and reverse directions.
+  uint64 PacketsTotal = 11;
+  uint64 BytesTotal = 12;
+  uint64 PacketsDelta = 13;
+  uint64 BytesDelta = 14;
+  uint64 ReversePacketsTotal = 15;
+  uint64 ReverseBytesTotal = 16;
+  uint64 ReversePacketsDelta = 17;
+  uint64 ReverseBytesDelta = 18;
+
+  // Kubernetes metadata
+  string SrcPodName = 19;
+  string SrcPodNamespace = 20;
+  string SrcNodeName = 21;
+  string DstPodName = 22;
+  string DstPodNamespace = 23;
+  string DstNodeName = 24;
+  string DstClusterIP = 25;
+  uint32 DstServicePort = 34;
+  string DstServicePortName = 26;
+  string IngressPolicyName = 29;
+  string IngressPolicyNamespace = 30;
+  string EgressPolicyName = 31;
+  string EgressPolicyNamespace = 32;
+}
+
+message FlowType2 {
   // Header of IPFIX Message.
   uint32 TimeReceived = 1;
   uint32 SequenceNumber = 2;

@@ -14,7 +14,7 @@ make codegen
 diff=$(git status --porcelain pkg)
 
 if [ ! -z "$diff" ]; then
-    echo "The generated mock files are not up-to-date" >&2
+    echo "The generated mock files are not up-to-date. Check protoc version and make sure it is v3.15.0." >&2
     echo "You can regenerate them with 'make codegen' and commit the changes" >&2
     exit 1
 fi
