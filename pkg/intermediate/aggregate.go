@@ -105,9 +105,18 @@ func (a *AggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) 
 	return nil
 }
 
-func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) {
+func (a *AggregationProcess) DeleteFlowKeyFromMapWithLock(flowKey FlowKey) {
 	a.flowKeyRecordLock.Lock()
 	defer a.flowKeyRecordLock.Unlock()
+	delete(a.flowKeyRecordMap, flowKey)
+}
+
+// DeleteFlowKeyFromMapWithoutLock need to be used only when the caller has already
+// acquired the lock. For example, this can be used in a callback of ForAllRecordsDo
+// function.
+// TODO:Remove this when there is notion of invalid flows supported in aggregation
+// process.
+func (a *AggregationProcess) DeleteFlowKeyFromMapWithoutLock(flowKey FlowKey) {
 	delete(a.flowKeyRecordMap, flowKey)
 }
 
@@ -275,7 +284,7 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		// Add originalExporterIPv4Address
 		ie, err := registry.GetInfoElement("originalExporterIPv4Address", registry.IANAEnterpriseID)
 		if err != nil {
-			return fmt.Errorf("IANA Registry is not loaded correctly with originalExporterIPv4Address.")
+			return fmt.Errorf("IANA Registry is not loaded correctly with originalExporterIPv4Address")
 		}
 		if set.GetSetType() == entities.Template {
 			originalExporterIPv4Address = entities.NewInfoElementWithValue(ie, nil)
@@ -292,7 +301,7 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		// Add originalObservationDomainId
 		ie, err = registry.GetInfoElement("originalObservationDomainId", registry.IANAEnterpriseID)
 		if err != nil {
-			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId.")
+			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId")
 		}
 		if set.GetSetType() == entities.Template {
 			originalObservationDomainId = entities.NewInfoElementWithValue(ie, nil)
