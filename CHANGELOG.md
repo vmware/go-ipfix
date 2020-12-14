@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.3.2 12-14-2020
+## Added
+- Added a function in aggregation process to delete flow key from flowKeyRecord
+  map without a lock. (#110, @stati)
 ## 0.3.1 11-21-2020
 ### Changed
 - Simplified standalone collector code. (#83, @stati)
