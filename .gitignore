@@ -1,6 +1,7 @@
 bin
 pkg/registry/build_registry/build_registry
 .coverage/
+.golangci-bin/
 
 .DS_Store
 

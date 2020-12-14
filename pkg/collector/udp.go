@@ -93,7 +93,6 @@ func (cp *CollectingProcess) startUDPServer() {
 		}
 		cp.updateAddress(conn.LocalAddr())
 		klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
-		var wg sync.WaitGroup
 		defer conn.Close()
 		go func() {
 			for {

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"sync"
 
 	"k8s.io/klog"
 )
@@ -38,7 +37,6 @@ func (cp *CollectingProcess) startTCPServer() {
 		klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
 	}
 
-	var wg sync.WaitGroup
 	go func() {
 		defer listener.Close()
 		for {
@@ -47,18 +45,15 @@ func (cp *CollectingProcess) startTCPServer() {
 				klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
 				return
 			}
-			wg.Add(1)
-			go cp.handleTCPClient(conn, &wg)
+			go cp.handleTCPClient(conn)
 		}
 	}()
 	<-cp.stopChan
 	// close all connections
 	cp.closeAllClients()
-	wg.Wait()
 }
 
-func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) {
-	defer wg.Done()
+func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	address := conn.RemoteAddr().String()
 	client := cp.createClient()
 	cp.addClient(address, client)
@@ -74,6 +69,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 				} else {
 					klog.Errorf("Error in collecting process: %v", err)
 				}
+				client.errChan <- true
 				break out
 			}
 			klog.V(2).Infof("Receiving %d bytes from %s", size, address)
@@ -81,6 +77,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 				length, err := getMessageLength(bytes.NewBuffer(buff))
 				if err != nil {
 					klog.Error(err)
+					client.errChan <- true
 					break out
 				}
 				if size < length {
@@ -92,6 +89,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 				message, err := cp.decodePacket(bytes.NewBuffer(buff[0:length]), address)
 				if err != nil {
 					klog.Error(err)
+					client.errChan <- true
 					break out
 				}
 				klog.V(4).Info(message)
@@ -111,6 +109,7 @@ func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
 	if cp.caCert == nil {
 		return &tls.Config{
 			Certificates: []tls.Certificate{cert},
+			MinVersion:   tls.VersionTLS12,
 		}, nil
 	}
 	roots := x509.NewCertPool()
@@ -122,5 +121,6 @@ func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
 		Certificates: []tls.Certificate{cert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    roots,
+		MinVersion:   tls.VersionTLS12,
 	}, nil
 }
