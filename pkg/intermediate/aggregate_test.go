@@ -265,7 +265,7 @@ func TestCorrelateRecords(t *testing.T) {
 	}
 }
 
-func TestDeleteTupleFromMap(t *testing.T) {
+func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	message := createMsgwithDataSet1()
 	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
@@ -273,8 +273,26 @@ func TestDeleteTupleFromMap(t *testing.T) {
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	aggregationProcess.flowKeyRecordMap[flowKey1] = message.Set.GetRecords()
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
-	aggregationProcess.DeleteFlowKeyFromMap(flowKey2)
+	aggregationProcess.DeleteFlowKeyFromMapWithLock(flowKey2)
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
-	aggregationProcess.DeleteFlowKeyFromMap(flowKey1)
+	aggregationProcess.DeleteFlowKeyFromMapWithLock(flowKey1)
+	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
+}
+
+func TestDeleteFlowKeyFromMapWithoutLock(t *testing.T) {
+	messageChan := make(chan *entities.Message)
+	message := createMsgwithDataSet1()
+	aggregationProcess, _ := InitAggregationProcess(messageChan, 2, fields)
+	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
+	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
+	aggregationProcess.flowKeyRecordMap[flowKey1] = message.Set.GetRecords()
+	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	aggregationProcess.flowKeyRecordLock.Lock()
+	aggregationProcess.DeleteFlowKeyFromMapWithoutLock(flowKey2)
+	aggregationProcess.flowKeyRecordLock.Unlock()
+	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	aggregationProcess.flowKeyRecordLock.Lock()
+	aggregationProcess.DeleteFlowKeyFromMapWithoutLock(flowKey1)
+	aggregationProcess.flowKeyRecordLock.Unlock()
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 }
