@@ -175,6 +175,14 @@ func (ep *ExportingProcess) SendSet(set entities.Set) (int, error) {
 	return bytesSent, nil
 }
 
+func (ep *ExportingProcess) GetMsgSizeLimit() int {
+	if ep.connToCollector.LocalAddr().Network() == "tcp" {
+		return entities.MaxTcpSocketMsgSize
+	} else {
+		return ep.pathMTU
+	}
+}
+
 func (ep *ExportingProcess) CloseConnToCollector() {
 	if !isChanClosed(ep.templateRefCh) {
 		close(ep.templateRefCh) // Close template refresh channel
