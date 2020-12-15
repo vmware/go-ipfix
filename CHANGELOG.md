@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.4.2 12-15-2020
+### Added
+- Exposed message size limit in exporter. (#115, @zyiou)
+- Added a function in aggregation process to delete flow key from flowKeyRecord
+  map without a lock. (#113, @stati)
 ## 0.4.1 12-09-2020
 ### Changed
 - Expose fields in AggregateElements and add integration tests. (#104, @zyiou)
