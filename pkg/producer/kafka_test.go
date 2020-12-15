@@ -202,13 +202,13 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 	if err := set.AddRecord(elements, 256); err != nil {
 		t.Fatal("Error when adding elements to the record")
 	}
-    msg := entities.NewMessage(true)
-    msg.SetVersion(10)
-    msg.SetObsDomainID(uint32(1234))
-    msg.SetSequenceNum(1)
-    msg.SetMessageLen(32)
-    msg.SetExportAddress("127.0.0.1")
-    msg.AddSet(set)
+	msg := entities.NewMessage(true)
+	msg.SetVersion(10)
+	msg.SetObsDomainID(uint32(1234))
+	msg.SetSequenceNum(1)
+	msg.SetMessageLen(32)
+	msg.SetExportAddress("127.0.0.1")
+	msg.AddSet(set)
 
 	return msg
 }

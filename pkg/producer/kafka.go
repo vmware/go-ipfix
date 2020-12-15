@@ -15,10 +15,11 @@
 package producer
 
 import (
+	"net"
+
 	"github.com/Shopify/sarama"
 	"github.com/golang/protobuf/proto"
 	"k8s.io/klog"
-	"net"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/producer/protobuf"
@@ -124,7 +125,7 @@ func convertIPFIXMsgToFlowMsgs(msg *entities.Message) []*protobuf.FlowMessage {
 	return flowMsgs
 }
 
-func NewKafkaProducer(asyncProducer sarama.AsyncProducer, topic string) *KafkaProducer{
+func NewKafkaProducer(asyncProducer sarama.AsyncProducer, topic string) *KafkaProducer {
 	return &KafkaProducer{
 		producer: asyncProducer,
 		topic:    topic,
