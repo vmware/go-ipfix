@@ -626,3 +626,30 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 	exporter.CloseConnToCollector()
 }
+
+func TestExportingProcess_GetMsgSizeLimit(t *testing.T) {
+	// Create local server for testing
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Got error when resolving UDP address: %v", err)
+	}
+	conn, err := net.ListenUDP("udp", udpAddr)
+	if err != nil {
+		t.Fatalf("Got error when creating a local server: %v", err)
+	}
+	t.Log("Created local server on random available port for testing")
+	defer conn.Close()
+	// Create exporter using local server info
+	input := ExporterInput{
+		CollectorAddr:       conn.LocalAddr(),
+		ObservationDomainID: 1,
+		TempRefTimeout:      1,
+		PathMTU:             0,
+	}
+	exporter, err := InitExportingProcess(input)
+	if err != nil {
+		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
+	}
+	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
+	assert.Equal(t, entities.DefaultUDPMsgSize, exporter.GetMsgSizeLimit())
+}
