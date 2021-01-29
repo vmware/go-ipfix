@@ -110,14 +110,25 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 		return nil
 	}
 	records := set.GetRecords()
+	invalidRecs := 0
 	for _, record := range records {
-		flowKey, err := getFlowKeyFromRecord(record)
-		if err != nil {
-			return err
+		// Validate the data record. If invalid, we log the error and move to the next
+		// record.
+		if !validateDataRecord(record) {
+			klog.Errorf("Invalid data record because decoded values of elements are not valid.")
+			invalidRecs = invalidRecs + 1
+		} else {
+			flowKey, err := getFlowKeyFromRecord(record)
+			if err != nil {
+				return err
+			}
+			if err = a.addOrUpdateRecordInMap(flowKey, record); err != nil {
+				return err
+			}
 		}
-		if err = a.addOrUpdateRecordInMap(flowKey, record); err != nil {
-			return err
-		}
+	}
+	if invalidRecs == len(records) {
+		return fmt.Errorf("all data records in the message are invalid")
 	}
 	return nil
 }
@@ -242,7 +253,7 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 				ipInString := ieWithValue.Value.(net.IP).To4().String()
 				if ipInString != "0.0.0.0" {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
-					ipInString := existingIeWithValue.Value.(net.IP).To4().String()
+					ipInString = existingIeWithValue.Value.(net.IP).To4().String()
 					if ipInString != "0.0.0.0" {
 						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
 					}
@@ -252,7 +263,7 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 				ipInString := ieWithValue.Value.(net.IP).To16().String()
 				if ipInString != net.ParseIP("::0").To16().String() {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
-					ipInString := existingIeWithValue.Value.(net.IP).To16().String()
+					ipInString = existingIeWithValue.Value.(net.IP).To16().String()
 					if ipInString != net.ParseIP("::0").To16().String() {
 						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
 					}
@@ -313,7 +324,7 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			}
 			// Update the corresponding source element in antreaStatsElement list.
 			if fillSrcStats {
-				existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
+				existingIeWithValue, _ = existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
 				if !isDelta {
 					existingIeWithValue.Value = ieWithValue.Value
 				} else {
@@ -322,7 +333,7 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			}
 			// Update the corresponding destination element in antreaStatsElement list.
 			if fillDstStats {
-				existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
+				existingIeWithValue, _ = existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
 				if !isDelta {
 					existingIeWithValue.Value = ieWithValue.Value
 				} else {
@@ -566,4 +577,15 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		}
 	}
 	return nil
+}
+
+func validateDataRecord(record entities.Record) bool {
+	for _, element := range record.GetOrderedElementList() {
+		if element.Value == nil {
+			// All element values should have been filled after decoding.
+			// If not, it is an invalid data record.
+			return false
+		}
+	}
+	return true
 }
