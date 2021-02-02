@@ -83,6 +83,10 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, wg *sync.WaitGroup) 
 					klog.Error(err)
 					break out
 				}
+				if size < length {
+					klog.Errorf("Message length %v is larger than size read from buffer %v", length, size)
+					break out
+				}
 				size = size - length
 				// get the message here
 				message, err := cp.decodePacket(bytes.NewBuffer(buff[0:length]), address)
