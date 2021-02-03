@@ -362,6 +362,12 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ieWithValue.Value)
 	assert.Equal(t, message.GetSet().GetRecords()[0], aggRecord.Record)
+
+	// Test data record with invalid "flowEndSeconds" field
+	element, _ := message.GetSet().GetRecords()[0].GetInfoElementWithValue("flowEndSeconds")
+	element.Value = nil
+	err = aggregationProcess.AggregateMsgByFlowKey(message)
+	assert.Error(t, err)
 }
 
 func TestAggregationProcess(t *testing.T) {
