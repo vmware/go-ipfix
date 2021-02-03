@@ -22,10 +22,11 @@ import (
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
-func TestLoadRegistry(t *testing.T) {
-	assert.Equal(t, 0, len(globalRegistryByID))
-	assert.Equal(t, 0, len(globalRegistryByName))
+func init() {
 	LoadRegistry()
+}
+
+func TestLoadRegistry(t *testing.T) {
 	assert.NotEmpty(t, globalRegistryByName[IANAEnterpriseID])
 	assert.NotEmpty(t, globalRegistryByName[AntreaEnterpriseID])
 	assert.NotEmpty(t, globalRegistryByName[IANAReversedEnterpriseID])
@@ -35,7 +36,6 @@ func TestLoadRegistry(t *testing.T) {
 }
 
 func TestGetInfoElement(t *testing.T) {
-	LoadRegistry()
 	var expectedIE *entities.InfoElement
 	ie, error := GetInfoElement("ingressInterfaceTest", IANAEnterpriseID)
 	assert.Equal(t, expectedIE, ie, "GetIANAInfoElement did not return correct value.")
@@ -47,7 +47,6 @@ func TestGetInfoElement(t *testing.T) {
 }
 
 func TestGetIANAReverseIE(t *testing.T) {
-	LoadRegistry()
 	// InfoElement does not exist in the registry
 	_, error := getIANAReverseInfoElement("sourcePodName")
 	assert.NotEqual(t, nil, error, "GetIANAReverseIE should return error when ie does not exist.")
@@ -61,7 +60,6 @@ func TestGetIANAReverseIE(t *testing.T) {
 }
 
 func TestGetInfoElementFromID(t *testing.T) {
-	LoadRegistry()
 	// InfoElement does not exist
 	_, err := GetInfoElementFromID(1, 1)
 	assert.NotEqual(t, nil, err, "TestGetInfoElementFromID should return error when ie does not exist.")

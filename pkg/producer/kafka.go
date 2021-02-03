@@ -15,10 +15,11 @@
 package producer
 
 import (
+	"encoding/binary"
 	"net"
 
 	"github.com/Shopify/sarama"
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
@@ -158,17 +159,23 @@ func InitKafkaProducer(addrs []string, topic string, logErrors bool) (*KafkaProd
 }
 
 // SendFlowMessage takes in the flow message in proto schema, encodes it and sends
-// it to on the producer channel.
-func (kp *KafkaProducer) SendFlowMessage(msg *protobuf.FlowMessage) {
-	buf := proto.NewBuffer([]byte{})
-	if err := buf.EncodeMessage(msg); err != nil {
+// it to on the producer channel. If kafkaDelimitMsgWithLen is set to true, it will
+// return  a length-prefixed encoded message.
+func (kp *KafkaProducer) SendFlowMessage(msg *protobuf.FlowMessage, kafkaDelimitMsgWithLen bool) {
+	bytes, err := proto.Marshal(msg)
+	if err != nil {
 		klog.Errorf("Error when encoding flow message: %v", err)
 		return
+	}
+	if kafkaDelimitMsgWithLen {
+		b := make([]byte, 4)
+		binary.BigEndian.PutUint32(b, uint32(len(bytes)))
+		bytes = append(b, bytes...)
 	}
 
 	kp.producer.Input() <- &sarama.ProducerMessage{
 		Topic: kp.topic,
-		Value: sarama.ByteEncoder(buf.Bytes()),
+		Value: sarama.ByteEncoder(bytes),
 	}
 }
 
@@ -179,7 +186,7 @@ func (kp *KafkaProducer) Publish(msgCh chan *entities.Message) {
 	for msg := range msgCh {
 		flowMsgs := convertIPFIXMsgToFlowMsgs(msg)
 		for _, flowMsg := range flowMsgs {
-			kp.SendFlowMessage(flowMsg)
+			kp.SendFlowMessage(flowMsg, true)
 		}
 	}
 }

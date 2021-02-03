@@ -471,7 +471,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 
 func TestExportingProcessWithTLS(t *testing.T) {
 	// Create local server for testing
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:4739")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when resolving tcp address: %v", err)
 	}
@@ -508,7 +508,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       address,
+		CollectorAddr:       listener.Addr(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		IsEncrypted:         true,
@@ -516,9 +516,9 @@ func TestExportingProcessWithTLS(t *testing.T) {
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
-		t.Fatalf("Got error when connecting to local tls server %s: %v", address, err)
+		t.Fatalf("Got error when connecting to local tls server %s: %v", listener.Addr(), err)
 	}
-	t.Logf("Created exporter connecting to local tls server with address: %s", address)
+	t.Logf("Created exporter connecting to local tls server with address: %s", listener.Addr())
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
@@ -550,7 +550,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 
 func TestExportingProcessWithDTLS(t *testing.T) {
 	// Create local server for testing
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4831")
+	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("Got error when resolving udp address: %v", err)
 	}
@@ -565,7 +565,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 	}
 	listener, err := dtls.Listen("udp", address, config)
 	if err != nil {
-		t.Errorf("Cannot start dtls collecting process on 0.0.0.0:4739: %v", err)
+		t.Errorf("Cannot start dtls collecting process on %s: %v", listener.Addr().String(), err)
 		return
 	}
 
@@ -590,7 +590,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       address,
+		CollectorAddr:       listener.Addr(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		IsEncrypted:         true,
@@ -598,9 +598,9 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
-		t.Fatalf("Got error when connecting to local dtls server %s: %v", address, err)
+		t.Fatalf("Got error when connecting to local dtls server %s: %v", listener.Addr().String(), err)
 	}
-	t.Logf("Created exporter connecting to local dtls server with address: %s", address)
+	t.Logf("Created exporter connecting to local dtls server with address: %s", listener.Addr().String())
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()

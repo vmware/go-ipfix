@@ -178,7 +178,7 @@ func init() {
 }
 
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4730")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -196,12 +196,12 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}
 	go cp.Start()
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
-
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
 	go func() {
-		conn, err := net.Dial(address.Network(), address.String())
+		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
-			t.Errorf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
@@ -213,7 +213,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4731")
+	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -231,10 +231,10 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}
 	go cp.Start()
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
-
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
 	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
+		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
@@ -253,7 +253,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4732")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -275,12 +275,12 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	go cp.Start()
 
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
-
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
 	go func() {
-		conn, err := net.Dial(address.Network(), address.String())
+		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
-			t.Errorf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
 		defer conn.Close()
 		conn.Write(validDataPacket)
@@ -290,7 +290,7 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4733")
+	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -311,10 +311,10 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 
 	go cp.Start()
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
-
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
 	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
+		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
@@ -330,7 +330,7 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4734")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -345,28 +345,30 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 	cp, _ := InitCollectingProcess(input)
 	go func() {
 		// wait until collector is ready
-		waitForCollectorReady(t, address)
-		_, err := net.Dial(address.Network(), address.String())
+		waitForCollectorReady(t, cp)
+		collectorAddr := cp.GetAddress()
+		_, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
-			t.Errorf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
 	}()
 	go func() {
 		// wait until collector is ready
-		waitForCollectorReady(t, address)
-		_, err := net.Dial(address.Network(), address.String())
+		waitForCollectorReady(t, cp)
+		collectorAddr := cp.GetAddress()
+		_, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
-			t.Errorf("Cannot establish connection to %s", address.String())
+			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
 		time.Sleep(time.Millisecond)
-		assert.Equal(t, 4, cp.getClientCount(), "There should be 4 tcp clients.")
+		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
 }
 
 func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4735")
+	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -381,9 +383,10 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 	cp, _ := InitCollectingProcess(input)
 	go cp.Start()
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
 	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
+		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
@@ -395,7 +398,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		conn.Write(validTemplatePacket)
 	}()
 	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
+		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
@@ -406,8 +409,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
 		time.Sleep(time.Millisecond)
-		// function waitForCollectorReady may introduce more clients when testing connection
-		assert.GreaterOrEqual(t, 2, cp.getClientCount(), "There should be at least two tcp clients.")
+		assert.Equal(t, 2, cp.getClientCount(), "There should be two udp clients.")
 	}()
 	// there should be two messages received
 	<-cp.GetMsgChan()
@@ -419,7 +421,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.mutex = sync.RWMutex{}
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4736")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -460,7 +462,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.mutex = sync.RWMutex{}
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4737")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -493,7 +495,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4738")
+	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -511,9 +513,10 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	}
 	go cp.Start()
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
 	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(address.Network(), address.String())
+		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
@@ -539,7 +542,7 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 }
 
 func TestTLSCollectingProcess(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:4739")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -558,7 +561,8 @@ func TestTLSCollectingProcess(t *testing.T) {
 	}
 	go cp.Start()
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
 	go func() {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM([]byte(fakeCACert))
@@ -574,7 +578,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 			Certificates: []tls.Certificate{cert},
 		}
 
-		conn, err := tls.Dial("tcp", address.String(), config)
+		conn, err := tls.Dial("tcp", collectorAddr.String(), config)
 		if err != nil {
 			t.Error(err)
 			return
@@ -589,7 +593,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 }
 
 func TestDTLSCollectingProcess(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4740")
+	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -607,7 +611,8 @@ func TestDTLSCollectingProcess(t *testing.T) {
 	}
 	go cp.Start()
 	// wait until collector is ready
-	waitForCollectorReady(t, address)
+	waitForCollectorReady(t, cp)
+	collectorAddr, _ := net.ResolveUDPAddr("udp", cp.GetAddress().String())
 	go func() {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM([]byte(fakeCert2))
@@ -617,7 +622,7 @@ func TestDTLSCollectingProcess(t *testing.T) {
 		config := &dtls.Config{RootCAs: roots,
 			ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
 
-		conn, err := dtls.Dial("udp", address, config)
+		conn, err := dtls.Dial("udp", collectorAddr, config)
 		if err != nil {
 			t.Error(err)
 			return
@@ -631,14 +636,16 @@ func TestDTLSCollectingProcess(t *testing.T) {
 	assert.NotNil(t, cp.templatesMap[1], "DTLS Collecting Process should receive and store the received template.")
 }
 
-func waitForCollectorReady(t *testing.T, address net.Addr) {
+func waitForCollectorReady(t *testing.T, cp *CollectingProcess) {
 	checkConn := func() (bool, error) {
-		if _, err := net.Dial(address.Network(), address.String()); err != nil {
+		if conn, err := net.Dial(cp.GetAddress().Network(), cp.GetAddress().String()); err != nil {
 			return false, err
+		} else {
+			defer conn.Close()
+			return true, nil
 		}
-		return true, nil
 	}
 	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
-		t.Errorf("Cannot establish connection to %s", address.String())
+		t.Errorf("Cannot establish connection to %s", cp.GetAddress().String())
 	}
 }
