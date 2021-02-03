@@ -53,7 +53,11 @@ type ExportingProcess struct {
 }
 
 type ExporterInput struct {
-	CollectorAddr       net.Addr
+	// CollectorAddress needs to be provided in hostIP:port format.
+	CollectorAddress string
+	// CollectorProtocol needs to be provided in lower case format.
+	// We support "tcp" and "udp" protocols.
+	CollectorProtocol   string
 	ObservationDomainID uint32
 	TempRefTimeout      uint32
 	PathMTU             int
@@ -74,40 +78,52 @@ type ExporterInput struct {
 // be provided as 0.
 func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	var conn net.Conn
+	var collectorAddr net.Addr
+	var udpAddr *net.UDPAddr // This is for DTLS.
 	var err error
+
+	// Resolve TCP and UDP addresses
+	if input.CollectorProtocol == "tcp" {
+		collectorAddr, err = net.ResolveTCPAddr(input.CollectorProtocol, input.CollectorAddress)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		udpAddr, err = net.ResolveUDPAddr(input.CollectorProtocol, input.CollectorAddress)
+		if err != nil {
+			return nil, err
+		}
+		collectorAddr = udpAddr
+	}
 	if input.IsEncrypted {
-		if input.CollectorAddr.Network() == "tcp" { // use TLS
-			config, err := createClientConfig(input.CACert, input.ClientCert, input.ClientKey)
+		if input.CollectorProtocol == "tcp" { // use TLS
+			config, configErr := createClientConfig(input.CACert, input.ClientCert, input.ClientKey)
+			if configErr != nil {
+				return nil, configErr
+			}
+			conn, err = tls.Dial(collectorAddr.Network(), collectorAddr.String(), config)
 			if err != nil {
+				klog.Errorf("Cannot the create the tls connection to the Collector %s: %v", collectorAddr.String(), err)
 				return nil, err
 			}
-			conn, err = tls.Dial(input.CollectorAddr.Network(), input.CollectorAddr.String(), config)
-			if err != nil {
-				klog.Errorf("Cannot the create the tls connection to configured ExportingProcess %s: %v", input.CollectorAddr.String(), err)
-				return nil, err
-			}
-		} else if input.CollectorAddr.Network() == "udp" { // use DTLS
+		} else if input.CollectorProtocol == "udp" { // use DTLS
 			roots := x509.NewCertPool()
 			ok := roots.AppendCertsFromPEM(input.CACert)
 			if !ok {
-				return nil, fmt.Errorf("Failed to parse root certificate")
+				return nil, fmt.Errorf("failed to parse root certificate")
 			}
 			config := &dtls.Config{RootCAs: roots,
 				ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
-			address, err := net.ResolveUDPAddr(input.CollectorAddr.Network(), input.CollectorAddr.String())
+			conn, err = dtls.Dial(collectorAddr.Network(), udpAddr, config)
 			if err != nil {
-				return nil, fmt.Errorf("Cannot resolve udp address %s", input.CollectorAddr.String())
-			}
-			conn, err = dtls.Dial(address.Network(), address, config)
-			if err != nil {
-				klog.Errorf("Cannot the create the dtls connection to configured ExportingProcess %s: %v", address.String(), err)
+				klog.Errorf("Cannot the create the dtls connection to the Collector %s: %v", collectorAddr.String(), err)
 				return nil, err
 			}
 		}
 	} else {
-		conn, err = net.Dial(input.CollectorAddr.Network(), input.CollectorAddr.String())
+		conn, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
-			klog.Errorf("Cannot the create the connection to configured ExportingProcess %s: %v", input.CollectorAddr.String(), err)
+			klog.Errorf("Cannot the create the connection to the Collector %s: %v", collectorAddr.String(), err)
 			return nil, err
 		}
 	}
@@ -122,7 +138,7 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	}
 
 	// Template refresh logic is only for UDP transport.
-	if input.CollectorAddr.Network() == "udp" {
+	if input.CollectorProtocol == "udp" {
 		if expProc.pathMTU == 0 || expProc.pathMTU > entities.MaxUDPMsgSize {
 			expProc.pathMTU = entities.DefaultUDPMsgSize
 		}
