@@ -47,15 +47,10 @@ var (
 
 func initLoggingToFile(fs *pflag.FlagSet) {
 	var err error
-	var logToStdErr bool
 
-	logToStdErr, err = fs.GetBool(logToStdErrFlag)
+	_, err = fs.GetBool(logToStdErrFlag)
 	if err != nil {
 		// Should not happen. Return for safety.
-		return
-	}
-	if logToStdErr {
-		// Logging to files is not enabled.
 		return
 	}
 }

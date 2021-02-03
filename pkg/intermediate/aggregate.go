@@ -135,8 +135,8 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 
 // ForAllRecordsDo takes in callback function to process the operations to flowkey->records pairs in the map
 func (a *AggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) error {
-	a.mutex.RLock()
-	defer a.mutex.RUnlock()
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
 	for k, v := range a.flowKeyRecordMap {
 		err := callback(k, v)
 		if err != nil {
@@ -312,7 +312,9 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(element)
 			// Update the corresponding element in existing record.
 			if !isDelta {
-				existingIeWithValue.Value = ieWithValue.Value
+				if existingIeWithValue.Value.(uint64) < ieWithValue.Value.(uint64) {
+					existingIeWithValue.Value = ieWithValue.Value
+				}
 			} else {
 				// We are simply adding the delta stats now. We expect delta stats to be
 				// reset after sending the record from flowKeyMap in aggregation process.
