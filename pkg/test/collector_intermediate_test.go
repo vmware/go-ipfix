@@ -30,8 +30,8 @@ import (
 )
 
 var templatePacket = []byte{0, 10, 0, 104, 95, 208, 69, 75, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 88, 1, 0, 0, 14, 0, 8, 0, 4, 0, 12, 0, 4, 0, 7, 0, 2, 0, 11, 0, 2, 0, 4, 0, 1, 0, 151, 0, 4, 0, 86, 0, 8, 0, 2, 0, 8, 128, 101, 255, 255, 0, 0, 220, 186, 128, 103, 255, 255, 0, 0, 220, 186, 128, 106, 0, 4, 0, 0, 220, 186, 128, 108, 0, 2, 0, 0, 220, 186, 128, 86, 0, 8, 0, 0, 114, 121, 128, 2, 0, 8, 0, 0, 114, 121}
-var dataPacket1 = []byte{0, 10, 0, 81, 95, 208, 77, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 240, 112, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200}
-var dataPacket2 = []byte{0, 10, 0, 81, 95, 208, 77, 154, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 244, 88, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200, 4, 112, 111, 100, 49, 0, 10, 0, 0, 3, 18, 131, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244}
+var dataPacket1 = []byte{0, 10, 0, 81, 95, 218, 99, 200, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 240, 112, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200}
+var dataPacket2 = []byte{0, 10, 0, 81, 95, 218, 100, 162, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 248, 64, 0, 0, 0, 0, 0, 0, 3, 32, 0, 0, 0, 0, 0, 0, 1, 244, 4, 112, 111, 100, 49, 0, 10, 0, 0, 3, 18, 131, 0, 0, 0, 0, 0, 0, 1, 44, 0, 0, 0, 0, 0, 0, 0, 150}
 
 /*
 dataPacket1:
@@ -55,15 +55,15 @@ dataPacket 2:
 	"sourceTransportPort": 1234
 	"destinationTransportPort": 5678
 	"protocolIdentifier": 6
-	"flowEndSeconds": 1257895000
-	"packetTotalCount": 400
-	"packetDeltaCount": 200
+	"flowEndSeconds": 1257896000
+	"packetTotalCount": 800
+	"packetDeltaCount": 500
 	"sourcePodName": "pod1"
 	"destinationPodName": ""
 	"destinationClusterIPv4": 10.0.0.3
 	"destinationServicePort": 4739
-	"reversePacketTotalCount": 1000
-	"reversePacketDeltaCount": 500
+	"reversePacketTotalCount": 300
+	"reversePacketDeltaCount": 150
 */
 
 var (
@@ -100,18 +100,22 @@ var (
 		"reversePacketTotalCountFromDestinationNode",
 		"reversePacketDeltaCountFromDestinationNode",
 	}
+	aggregationWorkerNum = 2
 )
 
-func TestCollectorToIntermediate(t *testing.T) {
+func init() {
+	// Load the global registry
 	registry.LoadRegistry()
+}
 
+func TestCollectorToIntermediate(t *testing.T) {
 	aggregatedFields := &intermediate.AggregationElements{
 		NonStatsElements:                   nonStatsElementList,
 		StatsElements:                      statsElementList,
 		AggregatedSourceStatsElements:      antreaSourceStatsElementList,
 		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
 	}
-	address, err := net.ResolveTCPAddr("tcp", "0.0.0.0:4739")
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Error(err)
 	}
@@ -128,7 +132,7 @@ func TestCollectorToIntermediate(t *testing.T) {
 
 	apInput := intermediate.AggregationInput{
 		MessageChan:       cp.GetMsgChan(),
-		WorkerNum:         2,
+		WorkerNum:         aggregationWorkerNum,
 		CorrelateFields:   correlatefields,
 		AggregateElements: aggregatedFields,
 	}
@@ -136,7 +140,8 @@ func TestCollectorToIntermediate(t *testing.T) {
 	go cp.Start()
 	waitForCollectorReady(t, cp)
 	go func() {
-		conn, err := net.DialTCP("tcp", nil, address)
+		collectorAddr, _ := net.ResolveTCPAddr("tcp", cp.GetAddress().String())
+		conn, err := net.DialTCP("tcp", nil, collectorAddr)
 		if err != nil {
 			t.Errorf("TCP Collecting Process does not start correctly.")
 		}
@@ -162,27 +167,35 @@ func TestCollectorToIntermediate(t *testing.T) {
 		case "destinationPodName":
 			assert.Equal(t, "pod2", element.Value)
 		case "flowEndSeconds":
-			assert.Equal(t, uint32(1257895000), element.Value)
+			assert.Equal(t, uint32(1257896000), element.Value)
 		case "packetTotalCount":
-			assert.Equal(t, uint64(400), element.Value)
+			assert.Equal(t, uint64(1000), element.Value)
 		case "packetDeltaCount":
-			assert.Equal(t, uint64(700), element.Value)
+			assert.Equal(t, uint64(1000), element.Value)
 		case "destinationClusterIPv4":
 			assert.Equal(t, net.IP{10, 0, 0, 3}, element.Value)
 		case "destinationServicePort":
 			assert.Equal(t, uint16(4739), element.Value)
 		case "reversePacketDeltaCount":
-			assert.Equal(t, uint64(700), element.Value)
+			assert.Equal(t, uint64(350), element.Value)
 		case "reversePacketTotalCount":
-			assert.Equal(t, uint64(1000), element.Value)
-		case "packetTotalCountFromSourceNode":
 			assert.Equal(t, uint64(400), element.Value)
+		case "packetTotalCountFromSourceNode":
+			assert.Equal(t, uint64(800), element.Value)
 		case "packetDeltaCountFromSourceNode":
-			assert.Equal(t, uint64(200), element.Value)
+			assert.Equal(t, uint64(500), element.Value)
 		case "packetTotalCountFromDestinationNode":
 			assert.Equal(t, uint64(1000), element.Value)
 		case "packetDeltaCountFromDestinationNode":
 			assert.Equal(t, uint64(500), element.Value)
+		case "reversePacketTotalCountFromSourceNode":
+			assert.Equal(t, uint64(300), element.Value)
+		case "reversePacketDeltaCountFromSourceNode":
+			assert.Equal(t, uint64(150), element.Value)
+		case "reversePacketTotalCountFromDestinationNode":
+			assert.Equal(t, uint64(400), element.Value)
+		case "reversePacketDeltaCountFromDestinationNode":
+			assert.Equal(t, uint64(200), element.Value)
 		}
 	}
 

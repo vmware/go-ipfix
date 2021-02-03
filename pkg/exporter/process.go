@@ -340,7 +340,8 @@ func createClientConfig(caCert, clientCert, clientKey []byte) (*tls.Config, erro
 	}
 	if clientCert == nil {
 		return &tls.Config{
-			RootCAs: roots,
+			RootCAs:    roots,
+			MinVersion: tls.VersionTLS12,
 		}, nil
 	}
 	cert, err := tls.X509KeyPair(clientCert, clientKey)
@@ -350,5 +351,6 @@ func createClientConfig(caCert, clientCert, clientKey []byte) (*tls.Config, erro
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      roots,
+		MinVersion:   tls.VersionTLS12,
 	}, nil
 }
