@@ -150,7 +150,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       listener.Addr(),
+		CollectorAddress:    listener.Addr().String(),
+		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		PathMTU:             0,
@@ -226,7 +227,8 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       conn.LocalAddr(),
+		CollectorAddress:    conn.LocalAddr().String(),
+		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      1,
 		PathMTU:             0,
@@ -306,7 +308,8 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       listener.Addr(),
+		CollectorAddress:    listener.Addr().String(),
+		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		PathMTU:             0,
@@ -402,7 +405,8 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       conn.LocalAddr(),
+		CollectorAddress:    conn.LocalAddr().String(),
+		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		PathMTU:             0,
@@ -508,7 +512,8 @@ func TestExportingProcessWithTLS(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       listener.Addr(),
+		CollectorAddress:    listener.Addr().String(),
+		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		IsEncrypted:         true,
@@ -590,7 +595,8 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       listener.Addr(),
+		CollectorAddress:    listener.Addr().String(),
+		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		IsEncrypted:         true,
@@ -644,7 +650,8 @@ func TestExportingProcess_GetMsgSizeLimit(t *testing.T) {
 	defer conn.Close()
 	// Create exporter using local server info
 	input := ExporterInput{
-		CollectorAddr:       conn.LocalAddr(),
+		CollectorAddress:    conn.LocalAddr().String(),
+		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      1,
 		PathMTU:             0,

@@ -121,7 +121,8 @@ func TestCollectorToIntermediate(t *testing.T) {
 	}
 	// Initialize aggregation process and collecting process
 	cpInput := collector.CollectorInput{
-		Address:       address,
+		Address:       address.String(),
+		Protocol:      address.Network(),
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
