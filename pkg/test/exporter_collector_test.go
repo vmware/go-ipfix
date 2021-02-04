@@ -205,6 +205,22 @@ func TestSingleRecordTCPTransport(t *testing.T) {
 	testExporterToCollector(address, false, false, t)
 }
 
+func TestSingleRecordTCPTransportIPv6(t *testing.T) {
+	address, err := net.ResolveTCPAddr("tcp", "[::1]:0")
+	if err != nil {
+		t.Error(err)
+	}
+	testExporterToCollector(address, false, false, t)
+}
+
+func TestSingleRecordUDPTransportIPv6(t *testing.T) {
+	address, err := net.ResolveUDPAddr("udp", "[::1]:0")
+	if err != nil {
+		t.Error(err)
+	}
+	testExporterToCollector(address, false, false, t)
+}
+
 func TestMultipleRecordUDPTransport(t *testing.T) {
 	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
 	if err != nil {

@@ -183,7 +183,13 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 	message.SetExportTime(exportTime)
 	message.SetSequenceNum(sequencNum)
 	message.SetObsDomainID(obsDomainID)
-	message.SetExportAddress(strings.Split(exportAddress, ":")[0])
+
+	// handle IPv6 address which may involve []
+	portIndex := strings.LastIndex(exportAddress, ":")
+	exportAddress = exportAddress[:portIndex]
+	exportAddress = strings.Replace(exportAddress, "[", "", -1)
+	exportAddress = strings.Replace(exportAddress, "]", "", -1)
+	message.SetExportAddress(exportAddress)
 
 	var set entities.Set
 	if setID == entities.TemplateSetID {
