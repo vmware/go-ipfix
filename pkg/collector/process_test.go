@@ -32,7 +32,9 @@ import (
 )
 
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 154, 107, 127, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 101, 255, 255, 0, 0, 220, 186}
+var validTemplatePacketIPv6 = []byte{0, 10, 0, 32, 96, 27, 70, 6, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 16, 1, 0, 0, 2, 0, 27, 0, 16, 0, 28, 0, 16}
 var validDataPacket = []byte{0, 10, 0, 33, 95, 154, 108, 18, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 112, 111, 100, 49}
+var validDataPacketIPv6 = []byte{0, 10, 0, 52, 96, 27, 75, 252, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 36, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251}
 
 const (
 	// TODO: update the certs before 2022-02-01
@@ -167,10 +169,11 @@ RVaPKj9ad0Z/3GiwaxtW+74bvc2vF3JS9cRU6DhY
 `
 	tcpTransport = "tcp"
 	udpTransport = "udp"
-	hostPort     = "127.0.0.1:0"
+	hostPortIPv4 = "127.0.0.1:0"
+	hostPortIPv6 = "[::1]:0"
 )
 
-var elementsWithValue = []*entities.InfoElementWithValue{
+var elementsWithValueIPv4 = []*entities.InfoElementWithValue{
 	{Element: &entities.InfoElement{Name: "sourceIPv4Address", ElementId: 8, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
 	{Element: &entities.InfoElement{Name: "destinationIPv4Address", ElementId: 12, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
 	{Element: &entities.InfoElement{Name: "destinationNodeName", ElementId: 105, DataType: 13, EnterpriseId: 55829, Len: 65535}, Value: nil},
@@ -181,15 +184,7 @@ func init() {
 }
 
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      tcpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
-	}
+	input := getCollectorInput(tcpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
@@ -213,15 +208,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      udpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
-	}
+	input := getCollectorInput(udpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
@@ -250,18 +237,10 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      tcpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
-	}
+	input := getCollectorInput(tcpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
 	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
 	if err != nil {
 		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
 	}
@@ -284,21 +263,15 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      udpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
-	}
+	input := getCollectorInput(udpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
+	// Add the templates before sending data record
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
 	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
 
 	go cp.Start()
 	// wait until collector is ready
@@ -321,19 +294,8 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      tcpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
-	}
-	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("Collecting Process does not start correctly: %v", err)
-	}
+	input := getCollectorInput(tcpTransport, false, false)
+	cp, _ := InitCollectingProcess(input)
 	go func() {
 		// wait until collector is ready
 		waitForCollectorReady(t, cp)
@@ -359,19 +321,8 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      udpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
-	}
-	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("Collecting Process does not start correctly: %v", err)
-	}
+	input := getCollectorInput(udpTransport, false, false)
+	cp, _ := InitCollectingProcess(input)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
@@ -412,7 +363,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.mutex = sync.RWMutex{}
-	address, err := net.ResolveTCPAddr(tcpTransport, hostPort)
+	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
 	if err != nil {
 		t.Error(err)
 	}
@@ -453,7 +404,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.mutex = sync.RWMutex{}
-	address, err := net.ResolveTCPAddr(tcpTransport, hostPort)
+	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
 	if err != nil {
 		t.Error(err)
 	}
@@ -467,7 +418,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	_, err = cp.decodePacket(bytes.NewBuffer(validDataPacket), address.String())
 	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
 	// Decode with template
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
 	message, err := cp.decodePacket(bytes.NewBuffer(validDataPacket), address.String())
 	assert.Nil(t, err, "Error should not be logged if corresponding template exists.")
 	assert.Equal(t, uint16(10), message.GetVersion(), "Flow record version should be 10.")
@@ -487,7 +438,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	input := CollectorInput{
-		Address:       hostPort,
+		Address:       hostPortIPv4,
 		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   1,
@@ -530,16 +481,7 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 }
 
 func TestTLSCollectingProcess(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      tcpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   true,
-		CACert:        []byte(fakeCACert),
-		ServerCert:    []byte(fakeCert),
-		ServerKey:     []byte(fakeKey),
-	}
+	input := getCollectorInput(tcpTransport, true, false)
 	cp, err := InitCollectingProcess(input)
 	if err != nil {
 		t.Fatalf("Collecting Process does not initiate correctly: %v", err)
@@ -578,15 +520,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 }
 
 func TestDTLSCollectingProcess(t *testing.T) {
-	input := CollectorInput{
-		Address:       hostPort,
-		Protocol:      udpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   0,
-		IsEncrypted:   true,
-		ServerCert:    []byte(fakeCert2),
-		ServerKey:     []byte(fakeKey2),
-	}
+	input := getCollectorInput(udpTransport, true, false)
 	cp, err := InitCollectingProcess(input)
 	if err != nil {
 		t.Fatalf("DTLS Collecting Process does not initiate correctly: %v", err)
@@ -615,6 +549,117 @@ func TestDTLSCollectingProcess(t *testing.T) {
 	<-cp.GetMsgChan()
 	cp.Stop()
 	assert.NotNil(t, cp.templatesMap[1], "DTLS Collecting Process should receive and store the received template.")
+}
+
+func TestTCPCollectingProcessIPv6(t *testing.T) {
+	input := getCollectorInput(tcpTransport, false, true)
+	cp, err := InitCollectingProcess(input)
+	if err != nil {
+		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
+	}
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
+	go func() {
+		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+		if err != nil {
+			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
+		}
+		defer conn.Close()
+		conn.Write(validTemplatePacketIPv6)
+		conn.Write(validDataPacketIPv6)
+	}()
+	<-cp.GetMsgChan()
+	message := <-cp.GetMsgChan()
+	cp.Stop()
+	template, _ := cp.getTemplate(1, 256)
+	assert.NotNil(t, template)
+	ie, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
+	assert.True(t, exist)
+	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.Value)
+}
+
+func TestUDPCollectingProcessIPv6(t *testing.T) {
+	input := getCollectorInput(udpTransport, false, true)
+	cp, err := InitCollectingProcess(input)
+	if err != nil {
+		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
+	}
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
+	go func() {
+		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+		if err != nil {
+			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
+		}
+		defer conn.Close()
+		conn.Write(validTemplatePacketIPv6)
+		conn.Write(validDataPacketIPv6)
+	}()
+	<-cp.GetMsgChan()
+	message := <-cp.GetMsgChan()
+	cp.Stop()
+	template, _ := cp.getTemplate(1, 256)
+	assert.NotNil(t, template)
+	ie, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
+	assert.True(t, exist)
+	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.Value)
+}
+
+func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorInput {
+	if network == tcpTransport {
+		var address string
+		if isIPv6 {
+			address = hostPortIPv6
+		} else {
+			address = hostPortIPv4
+		}
+		if isEncrypted {
+			return CollectorInput{
+				Address:       address,
+				Protocol:      tcpTransport,
+				MaxBufferSize: 1024,
+				TemplateTTL:   0,
+				IsEncrypted:   true,
+				CACert:        []byte(fakeCACert),
+				ServerCert:    []byte(fakeCert),
+				ServerKey:     []byte(fakeKey),
+			}
+		} else {
+			return CollectorInput{
+				Address:       address,
+				Protocol:      tcpTransport,
+				MaxBufferSize: 1024,
+			}
+		}
+	} else {
+		var address string
+		if isIPv6 {
+			address = hostPortIPv6
+		} else {
+			address = hostPortIPv4
+		}
+		if isEncrypted {
+			return CollectorInput{
+				Address:       address,
+				Protocol:      udpTransport,
+				MaxBufferSize: 1024,
+				TemplateTTL:   0,
+				IsEncrypted:   true,
+				ServerCert:    []byte(fakeCert2),
+				ServerKey:     []byte(fakeKey2),
+			}
+		} else {
+			return CollectorInput{
+				Address:       address,
+				Protocol:      udpTransport,
+				MaxBufferSize: 1024,
+			}
+		}
+	}
 }
 
 func waitForCollectorReady(t *testing.T, cp *CollectingProcess) {
