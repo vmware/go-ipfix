@@ -420,8 +420,8 @@ func EncodeToIEDataType(dataType IEDataType, val interface{}, buff *bytes.Buffer
 			return 0, fmt.Errorf("val argument is not of type net.IP for this element")
 		}
 		if ipv6Add := v.To16(); ipv6Add != nil {
-			err := util.Encode(buff, binary.BigEndian, v)
-			return v, err
+			err := util.Encode(buff, binary.BigEndian, ipv6Add)
+			return ipv6Add, err
 		} else {
 			return 0, fmt.Errorf("provided IPv6 address is not of correct length")
 		}
