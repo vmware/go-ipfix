@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"net"
 	"os"
 	"os/signal"
 	"strconv"
@@ -106,28 +105,12 @@ func signalHandler(stopCh chan struct{}, messageReceived chan *entities.Message)
 
 func run() error {
 	klog.Info("Starting IPFIX collector")
-
 	// Load the IPFIX global registry
 	registry.LoadRegistry()
-
-	var netAddr net.Addr
-	var err error
-	if IPFIXTransport == "tcp" {
-		netAddr, err = net.ResolveTCPAddr("tcp", IPFIXAddr+":"+strconv.Itoa(int(IPFIXPort)))
-		if err != nil {
-			return err
-		}
-	} else if IPFIXTransport == "udp" {
-		netAddr, err = net.ResolveUDPAddr("udp", IPFIXAddr+":"+strconv.Itoa(int(IPFIXPort)))
-		if err != nil {
-			return err
-		}
-	} else {
-		return fmt.Errorf("input given ipfix.transport flag is not supported or valid")
-	}
 	// Initialize collecting process
 	cpInput := collector.CollectorInput{
-		Address:       netAddr,
+		Address:       IPFIXAddr + ":" + strconv.Itoa(int(IPFIXPort)),
+		Protocol:      IPFIXTransport,
 		MaxBufferSize: 65535,
 		TemplateTTL:   0,
 		IsEncrypted:   false,

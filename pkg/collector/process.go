@@ -56,7 +56,11 @@ type CollectingProcess struct {
 }
 
 type CollectorInput struct {
-	Address       net.Addr
+	// Address needs to be provided in hostIP:port format.
+	Address string
+	// Protocol needs to be provided in lower case format.
+	// We support "tcp" and "udp" protocols.
+	Protocol      string
 	MaxBufferSize uint16
 	TemplateTTL   uint32
 	IsEncrypted   bool
@@ -72,11 +76,23 @@ type clientHandler struct {
 }
 
 func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
+	var address net.Addr
+	var err error
+	if input.Protocol == "tcp" {
+		address, err = net.ResolveTCPAddr(input.Protocol, input.Address)
+	} else if input.Protocol == "udp" {
+		address, err = net.ResolveUDPAddr(input.Protocol, input.Address)
+	} else {
+		return nil, fmt.Errorf("collecting process with protocol %s is not supported", input.Protocol)
+	}
+	if err != nil {
+		return nil, err
+	}
 	collectProc := &CollectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		mutex:         sync.RWMutex{},
 		templateTTL:   input.TemplateTTL,
-		address:       input.Address,
+		address:       address,
 		maxBufferSize: input.MaxBufferSize,
 		stopChan:      make(chan bool),
 		messageChan:   make(chan *entities.Message),

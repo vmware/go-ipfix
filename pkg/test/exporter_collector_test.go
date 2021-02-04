@@ -241,7 +241,8 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, isEncrypte
 	// Initialize collecting process
 	messages := make([]*entities.Message, 0)
 	cpInput := collector.CollectorInput{
-		Address:       address,
+		Address:       address.String(),
+		Protocol:      address.Network(),
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   isEncrypted,
@@ -264,7 +265,8 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, isEncrypte
 	go func() { // Start exporting process in go routine
 		waitForCollectorReady(t, cp)
 		epInput := exporter.ExporterInput{
-			CollectorAddr:       cp.GetAddress(),
+			CollectorAddress:    cp.GetAddress().String(),
+			CollectorProtocol:   cp.GetAddress().Network(),
 			ObservationDomainID: 1,
 			TempRefTimeout:      0,
 			PathMTU:             0,
