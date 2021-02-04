@@ -55,7 +55,8 @@ func TestCollectorToProducer(t *testing.T) {
 	}
 	// Initialize collecting process
 	cpInput := collector.CollectorInput{
-		Address:       address,
+		Address:       address.String(),
+		Protocol:      address.Network(),
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
@@ -81,9 +82,9 @@ func TestCollectorToProducer(t *testing.T) {
 		}
 		defer conn.Close()
 		// Using the packets from collector_intermediate_test.go
-		conn.Write(templatePacket)
-		conn.Write(dataPacket1)
-		conn.Write(dataPacket2)
+		conn.Write(templatePacketIPv4)
+		conn.Write(dataPacket1IPv4)
+		conn.Write(dataPacket2IPv4)
 	}()
 
 	go func() {

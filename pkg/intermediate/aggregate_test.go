@@ -82,7 +82,11 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	message.SetSequenceNum(1)
 	message.SetObsDomainID(5678)
 	message.SetExportTime(0)
-	message.SetExportAddress("127.0.0.1")
+	if isIPv6 {
+		message.SetExportAddress("::1")
+	} else {
+		message.SetExportAddress("127.0.0.1")
+	}
 	message.AddSet(set)
 
 	return message
@@ -182,7 +186,11 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	message.SetSequenceNum(1)
 	message.SetObsDomainID(1234)
 	message.SetExportTime(0)
-	message.SetExportAddress("127.0.0.1")
+	if isIPv6 {
+		message.SetExportAddress("::1")
+	} else {
+		message.SetExportAddress("127.0.0.1")
+	}
 	message.AddSet(set)
 
 	return message
@@ -285,7 +293,11 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	message.SetSequenceNum(1)
 	message.SetObsDomainID(1234)
 	message.SetExportTime(0)
-	message.SetExportAddress("127.0.0.1")
+	if isIPv6 {
+		message.SetExportAddress("::1")
+	} else {
+		message.SetExportAddress("127.0.0.1")
+	}
 	message.AddSet(set)
 
 	return message
@@ -415,6 +427,29 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, ieWithValue.Value)
+	ieWithValue, exist = record.GetInfoElementWithValue("originalObservationDomainId")
+	assert.Equal(t, true, exist)
+	assert.Equal(t, uint32(1234), ieWithValue.Value)
+}
+
+func TestAddOriginalExporterInfoIPv6(t *testing.T) {
+	// Test message with template set
+	message := createMsgwithTemplateSet(true)
+	err := addOriginalExporterInfo(message)
+	assert.NoError(t, err)
+	record := message.GetSet().GetRecords()[0]
+	_, exist := record.GetInfoElementWithValue("originalExporterIPv6Address")
+	assert.Equal(t, true, exist)
+	_, exist = record.GetInfoElementWithValue("originalObservationDomainId")
+	assert.Equal(t, true, exist)
+	// Test message with data set
+	message = createDataMsgForSrc(t, true, false, false)
+	err = addOriginalExporterInfo(message)
+	assert.NoError(t, err)
+	record = message.GetSet().GetRecords()[0]
+	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv6Address")
+	assert.Equal(t, true, exist)
+	assert.Equal(t, net.IP{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1}, ieWithValue.Value)
 	ieWithValue, exist = record.GetInfoElementWithValue("originalObservationDomainId")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, uint32(1234), ieWithValue.Value)

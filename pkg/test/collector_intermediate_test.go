@@ -25,18 +25,22 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
+	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/intermediate"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
-var templatePacket = []byte{0, 10, 0, 104, 95, 208, 69, 75, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 88, 1, 0, 0, 14, 0, 8, 0, 4, 0, 12, 0, 4, 0, 7, 0, 2, 0, 11, 0, 2, 0, 4, 0, 1, 0, 151, 0, 4, 0, 86, 0, 8, 0, 2, 0, 8, 128, 101, 255, 255, 0, 0, 220, 186, 128, 103, 255, 255, 0, 0, 220, 186, 128, 106, 0, 4, 0, 0, 220, 186, 128, 108, 0, 2, 0, 0, 220, 186, 128, 86, 0, 8, 0, 0, 114, 121, 128, 2, 0, 8, 0, 0, 114, 121}
-var dataPacket1 = []byte{0, 10, 0, 81, 95, 218, 99, 200, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 240, 112, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200}
-var dataPacket2 = []byte{0, 10, 0, 81, 95, 218, 100, 162, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 248, 64, 0, 0, 0, 0, 0, 0, 3, 32, 0, 0, 0, 0, 0, 0, 1, 244, 4, 112, 111, 100, 49, 0, 10, 0, 0, 3, 18, 131, 0, 0, 0, 0, 0, 0, 1, 44, 0, 0, 0, 0, 0, 0, 0, 150}
+var templatePacketIPv4 = []byte{0, 10, 0, 104, 95, 208, 69, 75, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 88, 1, 0, 0, 14, 0, 8, 0, 4, 0, 12, 0, 4, 0, 7, 0, 2, 0, 11, 0, 2, 0, 4, 0, 1, 0, 151, 0, 4, 0, 86, 0, 8, 0, 2, 0, 8, 128, 101, 255, 255, 0, 0, 220, 186, 128, 103, 255, 255, 0, 0, 220, 186, 128, 106, 0, 4, 0, 0, 220, 186, 128, 108, 0, 2, 0, 0, 220, 186, 128, 86, 0, 8, 0, 0, 114, 121, 128, 2, 0, 8, 0, 0, 114, 121}
+var dataPacket1IPv4 = []byte{0, 10, 0, 81, 95, 218, 99, 200, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 240, 112, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200}
+var dataPacket2IPv4 = []byte{0, 10, 0, 81, 95, 218, 100, 162, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 65, 10, 0, 0, 1, 10, 0, 0, 2, 4, 210, 22, 46, 6, 74, 249, 248, 64, 0, 0, 0, 0, 0, 0, 3, 32, 0, 0, 0, 0, 0, 0, 1, 244, 4, 112, 111, 100, 49, 0, 10, 0, 0, 3, 18, 131, 0, 0, 0, 0, 0, 0, 1, 44, 0, 0, 0, 0, 0, 0, 0, 150}
+var templatePacketIPv6 = []byte{0, 10, 0, 104, 96, 27, 133, 188, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 88, 1, 0, 0, 14, 0, 27, 0, 16, 0, 28, 0, 16, 0, 7, 0, 2, 0, 11, 0, 2, 0, 4, 0, 1, 0, 151, 0, 4, 0, 86, 0, 8, 0, 2, 0, 8, 128, 101, 255, 255, 0, 0, 220, 186, 128, 103, 255, 255, 0, 0, 220, 186, 128, 107, 0, 16, 0, 0, 220, 186, 128, 108, 0, 2, 0, 0, 220, 186, 128, 86, 0, 8, 0, 0, 114, 121, 128, 2, 0, 8, 0, 0, 114, 121}
+var dataPacket1IPv6 = []byte{0, 10, 0, 117, 96, 27, 135, 193, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 101, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 252, 4, 210, 22, 46, 6, 74, 249, 240, 112, 0, 0, 0, 0, 0, 0, 3, 232, 0, 0, 0, 0, 0, 0, 1, 244, 0, 4, 112, 111, 100, 50, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 144, 0, 0, 0, 0, 0, 0, 0, 200}
+var dataPacket2IPv6 = []byte{0, 10, 0, 117, 96, 27, 136, 108, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 101, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 252, 4, 210, 22, 46, 6, 74, 249, 248, 64, 0, 0, 0, 0, 0, 0, 3, 32, 0, 0, 0, 0, 0, 0, 1, 244, 4, 112, 111, 100, 49, 0, 32, 1, 0, 0, 50, 56, 187, 187, 0, 99, 0, 0, 0, 0, 170, 170, 18, 131, 0, 0, 0, 0, 0, 0, 1, 44, 0, 0, 0, 0, 0, 0, 0, 150}
 
 /*
-dataPacket1:
-	"sourceIPv4Address": 10.0.0.1
-	"destinationIPv4Address": 10.0.0.2
+dataPacket1: (IPv6 difference)
+	"sourceIPv4Address": 10.0.0.1		("sourceIPv6Address": 2001:0:3238:DFE1:63::FEFB)
+	"destinationIPv4Address": 10.0.0.2  ("destinationIPv6Address": 2001:0:3238:DFE1:63::FEFC)
 	"sourceTransportPort": 1234
 	"destinationTransportPort": 5678
 	"protocolIdentifier": 6
@@ -49,9 +53,9 @@ dataPacket1:
 	"destinationServicePort":
 	"reversePacketTotalCount": 400
 	"reversePacketDeltaCount": 200
-dataPacket 2:
-	"sourceIPv4Address": 10.0.0.1
-	"destinationIPv4Address": 10.0.0.2
+dataPacket 2: (IPv6 difference)
+	"sourceIPv4Address": 10.0.0.1		("sourceIPv6Address": 2001:0:3238:DFE1:63::FEFB)
+	"destinationIPv4Address": 10.0.0.2	("destinationIPv6Address": 2001:0:3238:DFE1:63::FEFC)
 	"sourceTransportPort": 1234
 	"destinationTransportPort": 5678
 	"protocolIdentifier": 6
@@ -60,7 +64,7 @@ dataPacket 2:
 	"packetDeltaCount": 500
 	"sourcePodName": "pod1"
 	"destinationPodName": ""
-	"destinationClusterIPv4": 10.0.0.3
+	"destinationClusterIPv4": 10.0.0.3	("destinationClusterIPv6": 2001:0:3238:BBBB:63::AAAA)
 	"destinationServicePort": 4739
 	"reversePacketTotalCount": 300
 	"reversePacketDeltaCount": 150
@@ -68,7 +72,8 @@ dataPacket 2:
 
 var (
 	flowKeyRecordMap = make(map[intermediate.FlowKey]intermediate.AggregationFlowRecord)
-	flowKey          = intermediate.FlowKey{SourceAddress: "10.0.0.1", DestinationAddress: "10.0.0.2", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
+	flowKey1         = intermediate.FlowKey{SourceAddress: "10.0.0.1", DestinationAddress: "10.0.0.2", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
+	flowKey2         = intermediate.FlowKey{SourceAddress: "2001:0:3238:dfe1:63::fefb", DestinationAddress: "2001:0:3238:dfe1:63::fefc", Protocol: 6, SourcePort: 1234, DestinationPort: 5678}
 	correlatefields  = []string{
 		"sourcePodName",
 		"sourcePodNamespace",
@@ -77,6 +82,7 @@ var (
 		"destinationPodNamespace",
 		"destinationNodeName",
 		"destinationClusterIPv4",
+		"destinationClusterIPv6",
 		"destinationServicePort",
 	}
 	nonStatsElementList = []string{
@@ -108,16 +114,28 @@ func init() {
 	registry.LoadRegistry()
 }
 
-func TestCollectorToIntermediate(t *testing.T) {
+func TestCollectorToIntermediateIPv4(t *testing.T) {
+	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Error(err)
+	}
+	testCollectorToIntermediate(t, address, false)
+}
+
+func TestCollectorToIntermediateIPv6(t *testing.T) {
+	address, err := net.ResolveTCPAddr("tcp", "[::1]:0")
+	if err != nil {
+		t.Error(err)
+	}
+	testCollectorToIntermediate(t, address, true)
+}
+
+func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 	aggregatedFields := &intermediate.AggregationElements{
 		NonStatsElements:                   nonStatsElementList,
 		StatsElements:                      statsElementList,
 		AggregatedSourceStatsElements:      antreaSourceStatsElementList,
 		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
-	}
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
 	}
 	// Initialize aggregation process and collecting process
 	cpInput := collector.CollectorInput{
@@ -147,19 +165,33 @@ func TestCollectorToIntermediate(t *testing.T) {
 			t.Errorf("TCP Collecting Process does not start correctly.")
 		}
 		defer conn.Close()
-		conn.Write(templatePacket)
-		conn.Write(dataPacket1)
-		conn.Write(dataPacket2)
+		if isIPv6 {
+			conn.Write(templatePacketIPv6)
+			conn.Write(dataPacket1IPv6)
+			conn.Write(dataPacket2IPv6)
+		} else {
+			conn.Write(templatePacketIPv4)
+			conn.Write(dataPacket1IPv4)
+			conn.Write(dataPacket2IPv4)
+		}
 	}()
 	go ap.Start()
-	waitForAggregationToFinish(t, ap)
+	if isIPv6 {
+		waitForAggregationToFinish(t, ap, flowKey2)
+	} else {
+		waitForAggregationToFinish(t, ap, flowKey1)
+	}
 	cp.Stop()
 	ap.Stop()
 
-	assert.Equal(t, 1, len(flowKeyRecordMap), "Aggregation process should store the data record to map with corresponding flow key.")
-
-	assert.NotNil(t, flowKeyRecordMap[flowKey])
-	record := flowKeyRecordMap[flowKey].Record
+	var record entities.Record
+	if isIPv6 {
+		assert.NotNil(t, flowKeyRecordMap[flowKey2])
+		record = flowKeyRecordMap[flowKey2].Record
+	} else {
+		assert.NotNil(t, flowKeyRecordMap[flowKey1])
+		record = flowKeyRecordMap[flowKey1].Record
+	}
 	assert.Equal(t, 24, len(record.GetOrderedElementList()))
 	for _, element := range record.GetOrderedElementList() {
 		switch element.Element.Name {
@@ -175,6 +207,8 @@ func TestCollectorToIntermediate(t *testing.T) {
 			assert.Equal(t, uint64(1000), element.Value)
 		case "destinationClusterIPv4":
 			assert.Equal(t, net.IP{10, 0, 0, 3}, element.Value)
+		case "destinationClusterIPv6":
+			assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xbb, 0xbb, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xaa, 0xaa}, element.Value)
 		case "destinationServicePort":
 			assert.Equal(t, uint16(4739), element.Value)
 		case "reversePacketDeltaCount":
@@ -222,12 +256,12 @@ func waitForCollectorReady(t *testing.T, cp *collector.CollectingProcess) {
 	}
 }
 
-func waitForAggregationToFinish(t *testing.T, ap *intermediate.AggregationProcess) {
+func waitForAggregationToFinish(t *testing.T, ap *intermediate.AggregationProcess, key intermediate.FlowKey) {
 	checkConn := func() (bool, error) {
 		ap.ForAllRecordsDo(copyFlowKeyRecordMap)
 		if len(flowKeyRecordMap) > 0 {
-			ie1, _ := flowKeyRecordMap[flowKey].Record.GetInfoElementWithValue("sourcePodName")
-			ie2, _ := flowKeyRecordMap[flowKey].Record.GetInfoElementWithValue("destinationPodName")
+			ie1, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("sourcePodName")
+			ie2, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("destinationPodName")
 			if ie1.Value == "pod1" && ie2.Value == "pod2" {
 				return true, nil
 			} else {
