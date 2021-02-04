@@ -165,6 +165,9 @@ PQQDAgNIADBFAiEAzUT2hG3WChJh8cBo7EMQan2eJiF96OlSB+rWKKMaoGACIGOp
 RVaPKj9ad0Z/3GiwaxtW+74bvc2vF3JS9cRU6DhY
 -----END CERTIFICATE-----
 `
+	tcpTransport = "tcp"
+	udpTransport = "udp"
+	hostPort     = "127.0.0.1:0"
 )
 
 var elementsWithValue = []*entities.InfoElementWithValue{
@@ -178,12 +181,9 @@ func init() {
 }
 
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      tcpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
@@ -213,12 +213,9 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
@@ -238,7 +235,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
-		conn, err := net.DialUDP("udp", nil, resolveAddr)
+		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
 		if err != nil {
 			t.Errorf("UDP Collecting Process does not start correctly.")
 		}
@@ -253,12 +250,9 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      tcpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
@@ -290,12 +284,9 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
@@ -303,11 +294,11 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		ServerKey:     nil,
 	}
 	cp, err := InitCollectingProcess(input)
-	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 	if err != nil {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
+	// Add the templates before sending data record
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValue)
 
 	go cp.Start()
 	// wait until collector is ready
@@ -318,7 +309,7 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
-		conn, err := net.DialUDP("udp", nil, resolveAddr)
+		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
 		if err != nil {
 			t.Errorf("UDP Collecting Process does not start correctly.")
 		}
@@ -330,19 +321,19 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      tcpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
 		ServerCert:    nil,
 		ServerKey:     nil,
 	}
-	cp, _ := InitCollectingProcess(input)
+	cp, err := InitCollectingProcess(input)
+	if err != nil {
+		t.Fatalf("Collecting Process does not start correctly: %v", err)
+	}
 	go func() {
 		// wait until collector is ready
 		waitForCollectorReady(t, cp)
@@ -368,19 +359,19 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
 		ServerCert:    nil,
 		ServerKey:     nil,
 	}
-	cp, _ := InitCollectingProcess(input)
+	cp, err := InitCollectingProcess(input)
+	if err != nil {
+		t.Fatalf("Collecting Process does not start correctly: %v", err)
+	}
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
@@ -390,7 +381,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
-		conn, err := net.DialUDP("udp", nil, resolveAddr)
+		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
 		if err != nil {
 			t.Errorf("UDP Collecting Process does not start correctly.")
 		}
@@ -402,7 +393,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
-		conn, err := net.DialUDP("udp", nil, resolveAddr)
+		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
 		if err != nil {
 			t.Errorf("UDP Collecting Process does not start correctly.")
 		}
@@ -421,7 +412,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.mutex = sync.RWMutex{}
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	address, err := net.ResolveTCPAddr(tcpTransport, hostPort)
 	if err != nil {
 		t.Error(err)
 	}
@@ -462,7 +453,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
 	cp.mutex = sync.RWMutex{}
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
+	address, err := net.ResolveTCPAddr(tcpTransport, hostPort)
 	if err != nil {
 		t.Error(err)
 	}
@@ -495,12 +486,9 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 }
 
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   1,
 		IsEncrypted:   false,
@@ -520,7 +508,7 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 		if err != nil {
 			t.Errorf("UDP Address cannot be resolved.")
 		}
-		conn, err := net.DialUDP("udp", nil, resolveAddr)
+		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
 		if err != nil {
 			t.Errorf("UDP Collecting Process does not start correctly.")
 		}
@@ -542,12 +530,9 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 }
 
 func TestTLSCollectingProcess(t *testing.T) {
-	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      tcpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   true,
@@ -593,12 +578,9 @@ func TestTLSCollectingProcess(t *testing.T) {
 }
 
 func TestDTLSCollectingProcess(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
-	if err != nil {
-		t.Error(err)
-	}
 	input := CollectorInput{
-		Address:       address,
+		Address:       hostPort,
+		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   true,
@@ -621,7 +603,6 @@ func TestDTLSCollectingProcess(t *testing.T) {
 		}
 		config := &dtls.Config{RootCAs: roots,
 			ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
-
 		conn, err := dtls.Dial("udp", collectorAddr, config)
 		if err != nil {
 			t.Error(err)
