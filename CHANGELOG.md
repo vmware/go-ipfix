@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.4.3 02-04-2021
+### Changed
+- Modify the input of Exporting and Collecting process. (#129, @stati)
+- Improve testing coverage on IPv6. (#130, @zyiou)
+- Add log information for debugging. (#132, @zyiou)
+### Fixed
+- Fix slicing problem on TCP collector. (#126, @zyiou)
+- Validate data records in aggregation process. (#125, @stati)
+- Fix testing issues: update TLS certificate in tests (#128, @zyiou), fix flaky tests problem and golangci-lint error (#114, @zyiou).
 ## 0.4.2 12-15-2020
 ### Added
 - Exposed message size limit in exporter. (#115, @zyiou)
