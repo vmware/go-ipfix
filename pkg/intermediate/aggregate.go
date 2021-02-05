@@ -237,7 +237,7 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 				if ieWithValue.Value != "" {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
 					if existingIeWithValue.Value != "" {
-						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
@@ -245,7 +245,7 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 				if ieWithValue.Value != uint16(0) {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
 					if existingIeWithValue.Value != uint16(0) {
-						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
@@ -255,7 +255,7 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
 					ipInString = existingIeWithValue.Value.(net.IP).To4().String()
 					if ipInString != "0.0.0.0" {
-						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
@@ -265,7 +265,7 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
 					ipInString = existingIeWithValue.Value.(net.IP).To16().String()
 					if ipInString != net.ParseIP("::0").To16().String() {
-						klog.Warningf("This field with name %v should not have been filled with value %v in existing record.", field, existingIeWithValue.Value)
+						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
