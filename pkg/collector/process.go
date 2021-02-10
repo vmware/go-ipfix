@@ -68,6 +68,7 @@ type CollectorInput struct {
 	CACert     []byte
 	ServerCert []byte
 	ServerKey  []byte
+	IsIPv6     bool
 }
 
 type clientHandler struct {
@@ -78,10 +79,14 @@ type clientHandler struct {
 func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 	var address net.Addr
 	var err error
+	collectorAddress, err := util.ResolveDNSAddress(input.Address, input.IsIPv6)
+	if err != nil {
+		return nil, err
+	}
 	if input.Protocol == "tcp" {
-		address, err = net.ResolveTCPAddr(input.Protocol, input.Address)
+		address, err = net.ResolveTCPAddr(input.Protocol, collectorAddress)
 	} else if input.Protocol == "udp" {
-		address, err = net.ResolveUDPAddr(input.Protocol, input.Address)
+		address, err = net.ResolveUDPAddr(input.Protocol, collectorAddress)
 	} else {
 		return nil, fmt.Errorf("collecting process with protocol %s is not supported", input.Protocol)
 	}
