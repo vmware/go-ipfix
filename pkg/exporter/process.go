@@ -26,6 +26,7 @@ import (
 	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 const startTemplateID uint16 = 255
@@ -65,6 +66,7 @@ type ExporterInput struct {
 	CACert              []byte
 	ClientCert          []byte
 	ClientKey           []byte
+	IsIPv6              bool
 }
 
 // InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID)
@@ -82,14 +84,18 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	var udpAddr *net.UDPAddr // This is for DTLS.
 	var err error
 
-	// Resolve TCP and UDP addresses
+	// Resolve DNS address
+	collectorAddress, err := util.ResolveDNSAddress(input.CollectorAddress, input.IsIPv6)
+	if err != nil {
+		return nil, err
+	}
 	if input.CollectorProtocol == "tcp" {
-		collectorAddr, err = net.ResolveTCPAddr(input.CollectorProtocol, input.CollectorAddress)
+		collectorAddr, err = net.ResolveTCPAddr(input.CollectorProtocol, collectorAddress)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		udpAddr, err = net.ResolveUDPAddr(input.CollectorProtocol, input.CollectorAddress)
+		udpAddr, err = net.ResolveUDPAddr(input.CollectorProtocol, collectorAddress)
 		if err != nil {
 			return nil, err
 		}
@@ -101,7 +107,8 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			if configErr != nil {
 				return nil, configErr
 			}
-			conn, err = tls.Dial(collectorAddr.Network(), collectorAddr.String(), config)
+			// for TLS, we take the input address directly without resolving any DNS name
+			conn, err = tls.Dial(input.CollectorProtocol, input.CollectorAddress, config)
 			if err != nil {
 				klog.Errorf("Cannot the create the tls connection to the Collector %s: %v", collectorAddr.String(), err)
 				return nil, err
