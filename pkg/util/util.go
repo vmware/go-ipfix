@@ -18,6 +18,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"net"
+	"strings"
 )
 
 // Encode writes the multiple inputs of different possible datatypes to the io writer.
@@ -49,4 +51,34 @@ func Decode(buffer io.Reader, byteOrder binary.ByteOrder, outputs ...interface{}
 		}
 	}
 	return nil
+}
+
+// ResolveDNSAddress gets ip:port or dns:port as input and resolves the dns name if exists
+// then return ip:port
+func ResolveDNSAddress(address string, isIPv6 bool) (string, error) {
+	portIndex := strings.LastIndex(address, ":")
+	port := address[portIndex+1:]
+	addr := address[:portIndex]
+	addr = strings.Replace(addr, "[", "", -1)
+	addr = strings.Replace(addr, "]", "", -1)
+	if ipAddr := net.ParseIP(addr); ipAddr == nil { // resolve DNS name
+		hostIPs, err := net.LookupIP(addr)
+		if err != nil {
+			if !isIPv6 {
+				if ip := hostIPs[0].To4(); ip != nil {
+					return net.JoinHostPort(ip.String(), port), nil
+				} else {
+					return "", fmt.Errorf("cannot resolve %s to IPv4 address", address)
+				}
+			} else {
+				if ip := hostIPs[0].To16(); ip != nil {
+					return net.JoinHostPort(ip.String(), port), nil
+				} else {
+					return "", fmt.Errorf("cannot resolve %s to IPv6 address", address)
+				}
+			}
+		}
+		return "", err
+	}
+	return address, nil
 }
