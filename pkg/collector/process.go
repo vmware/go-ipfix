@@ -38,7 +38,11 @@ type CollectingProcess struct {
 	// template lifetime
 	templateTTL uint32
 	// server information
-	address net.Addr
+	address string
+	// server protocol
+	protocol string
+	// server net address
+	netAddress net.Addr
 	// maximum buffer size to read the record
 	maxBufferSize uint16
 	// chanel to receive stop information
@@ -77,27 +81,12 @@ type clientHandler struct {
 }
 
 func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
-	var address net.Addr
-	var err error
-	collectorAddress, err := util.ResolveDNSAddress(input.Address, input.IsIPv6)
-	if err != nil {
-		return nil, err
-	}
-	if input.Protocol == "tcp" {
-		address, err = net.ResolveTCPAddr(input.Protocol, collectorAddress)
-	} else if input.Protocol == "udp" {
-		address, err = net.ResolveUDPAddr(input.Protocol, collectorAddress)
-	} else {
-		return nil, fmt.Errorf("collecting process with protocol %s is not supported", input.Protocol)
-	}
-	if err != nil {
-		return nil, err
-	}
 	collectProc := &CollectingProcess{
 		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
 		mutex:         sync.RWMutex{},
 		templateTTL:   input.TemplateTTL,
-		address:       address,
+		address:       input.Address,
+		protocol:      input.Protocol,
 		maxBufferSize: input.MaxBufferSize,
 		stopChan:      make(chan bool),
 		messageChan:   make(chan *entities.Message),
@@ -111,9 +100,9 @@ func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 }
 
 func (cp *CollectingProcess) Start() {
-	if cp.address.Network() == "tcp" {
+	if cp.protocol == "tcp" {
 		cp.startTCPServer()
-	} else if cp.address.Network() == "udp" {
+	} else if cp.protocol == "udp" {
 		cp.startUDPServer()
 	}
 }
@@ -125,7 +114,7 @@ func (cp *CollectingProcess) Stop() {
 func (cp *CollectingProcess) GetAddress() net.Addr {
 	cp.mutex.RLock()
 	defer cp.mutex.RUnlock()
-	return cp.address
+	return cp.netAddress
 }
 
 func (cp *CollectingProcess) GetMsgChan() chan *entities.Message {
@@ -322,7 +311,7 @@ func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}
 	cp.templatesMap[obsDomainID][templateID] = elements
 	// template lifetime management
-	if cp.address.Network() == "tcp" {
+	if cp.protocol == "tcp" {
 		return
 	}
 
@@ -361,7 +350,7 @@ func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint1
 func (cp *CollectingProcess) updateAddress(address net.Addr) {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
-	cp.address = address
+	cp.netAddress = address
 }
 
 // getMessageLength returns buffer length by decoding the header
