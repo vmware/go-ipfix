@@ -218,12 +218,14 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (entities.Set, error) {
 	var templateID uint16
 	var fieldCount uint16
-	err := util.Decode(templateBuffer, binary.BigEndian, &templateID, &fieldCount)
-	if err != nil {
+	if err := util.Decode(templateBuffer, binary.BigEndian, &templateID, &fieldCount); err != nil {
 		return nil, err
 	}
 	elementsWithValue := make([]*entities.InfoElementWithValue, 0)
-	templateSet := entities.NewSet(entities.Template, templateID, true)
+	templateSet := entities.NewSet(true)
+	if err := templateSet.PrepareSet(entities.Template, templateID); err != nil {
+		return nil, err
+	}
 
 	for i := 0; i < int(fieldCount); i++ {
 		var element *entities.InfoElement
@@ -232,7 +234,7 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		// check whether enterprise ID is 0 or not
 		elementid := make([]byte, 2)
 		var elementLength uint16
-		err = util.Decode(templateBuffer, binary.BigEndian, &elementid, &elementLength)
+		err := util.Decode(templateBuffer, binary.BigEndian, &elementid, &elementLength)
 		if err != nil {
 			return nil, err
 		}
@@ -285,7 +287,10 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	if err != nil {
 		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
-	dataSet := entities.NewSet(entities.Data, templateID, true)
+	dataSet := entities.NewSet(true)
+	if err := dataSet.PrepareSet(entities.Data, templateID); err != nil {
+		return nil, err
+	}
 
 	for dataBuffer.Len() > 0 {
 		elements := make([]*entities.InfoElementWithValue, 0)

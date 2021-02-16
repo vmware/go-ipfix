@@ -429,7 +429,8 @@ func testExporterToCollector(address net.Addr, isMultipleRecord bool, isEncrypte
 }
 
 func createTemplateSet(templateID uint16) entities.Set {
-	templateSet := entities.NewSet(entities.Template, templateID, false)
+	templateSet := entities.NewSet(false)
+	templateSet.PrepareSet(entities.Template, templateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	for _, name := range fields {
 		element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
@@ -451,7 +452,8 @@ func createTemplateSet(templateID uint16) entities.Set {
 }
 
 func createDataSet(templateID uint16, isMultipleRecord bool) entities.Set {
-	dataSet := entities.NewSet(entities.Data, templateID, false)
+	dataSet := entities.NewSet(false)
+	dataSet.PrepareSet(entities.Data, templateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	for _, name := range fields {
 		element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
