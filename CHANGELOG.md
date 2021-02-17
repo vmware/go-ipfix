@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.4.5 02-17-2021
+### Added
+- Added new methods in Set interface to reduce set allocations for user. (#139,
+  @stati)
+### Changed
+- Simplified the network address consumption in exporter and collector processes.
+  (#140, @stati)
+### Fixed
+- Fix standalone collector issue. (#136, @zyiou)
 ## 0.4.4 02-10-2021
 ### Changed
 - Modify address resolution method in exporter and collector. (#134, @zyiou)
