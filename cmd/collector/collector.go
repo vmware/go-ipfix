@@ -55,7 +55,7 @@ func initLoggingToFile(fs *pflag.FlagSet) {
 }
 
 func addIPFIXFlags(fs *pflag.FlagSet) {
-	fs.StringVar(&IPFIXAddr, "ipfix.addr", "", "IPFIX collector address")
+	fs.StringVar(&IPFIXAddr, "ipfix.addr", "0.0.0.0", "IPFIX collector address")
 	fs.Uint16Var(&IPFIXPort, "ipfix.port", 4739, "IPFIX collector port")
 	fs.StringVar(&IPFIXTransport, "ipfix.transport", "tcp", "IPFIX collector transport layer")
 }
