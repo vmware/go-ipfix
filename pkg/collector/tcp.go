@@ -20,21 +20,21 @@ func (cp *CollectingProcess) startTCPServer() {
 			klog.Error(err)
 			return
 		}
-		listener, err = tls.Listen("tcp", cp.address.String(), config)
+		listener, err = tls.Listen("tcp", cp.address, config)
 		if err != nil {
-			klog.Errorf("Cannot start tls collecting process on %s: %v", cp.address.String(), err)
+			klog.Errorf("Cannot start tls collecting process on %s: %v", cp.address, err)
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Start tls collecting process on %s", cp.address.String())
+		klog.Infof("Started TLS collecting process on %s", cp.address)
 	} else {
-		listener, err = net.Listen("tcp", cp.address.String())
+		listener, err = net.Listen("tcp", cp.address)
 		if err != nil {
-			klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
+			klog.Errorf("Cannot start collecting process on %s: %v", cp.address, err)
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
+		klog.Infof("Start TCP collecting process on %s", cp.address)
 	}
 
 	go func() {
@@ -42,7 +42,7 @@ func (cp *CollectingProcess) startTCPServer() {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				klog.Errorf("Cannot start collecting process on %s: %v", cp.address.String(), err)
+				klog.Errorf("Cannot start collecting process on %s: %v", cp.address, err)
 				return
 			}
 			go cp.handleTCPClient(conn)
