@@ -62,20 +62,6 @@ func (mr *MockSetMockRecorder) AddRecord(arg0, arg1 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), arg0, arg1)
 }
 
-// GetBuffLen mocks base method
-func (m *MockSet) GetBuffLen() int {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBuffLen")
-	ret0, _ := ret[0].(int)
-	return ret0
-}
-
-// GetBuffLen indicates an expected call of GetBuffLen
-func (mr *MockSetMockRecorder) GetBuffLen() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBuffLen", reflect.TypeOf((*MockSet)(nil).GetBuffLen))
-}
-
 // GetBuffer mocks base method
 func (m *MockSet) GetBuffer() *bytes.Buffer {
 	m.ctrl.T.Helper()
@@ -130,6 +116,32 @@ func (m *MockSet) GetSetType() entities.ContentType {
 func (mr *MockSetMockRecorder) GetSetType() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSetType", reflect.TypeOf((*MockSet)(nil).GetSetType))
+}
+
+// PrepareSet mocks base method
+func (m *MockSet) PrepareSet(arg0 entities.ContentType, arg1 uint16) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PrepareSet", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PrepareSet indicates an expected call of PrepareSet
+func (mr *MockSetMockRecorder) PrepareSet(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareSet", reflect.TypeOf((*MockSet)(nil).PrepareSet), arg0, arg1)
+}
+
+// ResetSet mocks base method
+func (m *MockSet) ResetSet() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "ResetSet")
+}
+
+// ResetSet indicates an expected call of ResetSet
+func (mr *MockSetMockRecorder) ResetSet() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetSet", reflect.TypeOf((*MockSet)(nil).ResetSet))
 }
 
 // UpdateLenInHeader mocks base method

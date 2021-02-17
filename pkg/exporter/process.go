@@ -177,6 +177,9 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 func (ep *ExportingProcess) SendSet(set entities.Set) (int, error) {
 	// Iterate over all records in the set.
 	setType := set.GetSetType()
+	if setType == entities.Undefined {
+		return 0, fmt.Errorf("set type is not properly defined")
+	}
 	for _, record := range set.GetRecords() {
 		if setType == entities.Template {
 			ep.updateTemplate(record.GetTemplateID(), record.GetOrderedElementList(), record.GetMinDataRecordLen())
@@ -187,7 +190,6 @@ func (ep *ExportingProcess) SendSet(set entities.Set) (int, error) {
 			}
 		}
 	}
-
 	// Update the length in set header before sending the message.
 	set.UpdateLenInHeader()
 	bytesSent, err := ep.createAndSendMsg(set)
@@ -238,7 +240,7 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 
 	// Check if message is exceeding the limit after adding the set. Include message
 	// header length too.
-	msgLen := msg.GetMsgBufferLen() + set.GetBuffLen()
+	msgLen := msg.GetMsgBufferLen() + set.GetBuffer().Len()
 	if ep.connToCollector.LocalAddr().Network() == "tcp" {
 		if msgLen > entities.MaxTcpSocketMsgSize {
 			return 0, fmt.Errorf("TCP transport: message size exceeds max socket buffer size")
@@ -309,7 +311,10 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 
 	ep.mutex.Lock()
 	for templateID, tempValue := range ep.templatesMap {
-		tempSet := entities.NewSet(entities.Template, templateID, false)
+		tempSet := entities.NewSet(false)
+		if err := tempSet.PrepareSet(entities.Template, templateID); err != nil {
+			return err
+		}
 		elements := make([]*entities.InfoElementWithValue, 0)
 		for _, element := range tempValue.elements {
 			ie := entities.NewInfoElementWithValue(element, nil)

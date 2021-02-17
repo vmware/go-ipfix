@@ -23,7 +23,8 @@ import (
 )
 
 func TestMessage_SetAndGetFunctions(t *testing.T) {
-	set := NewSet(Data, 257, false)
+	newSet := NewSet(false)
+	newSet.PrepareSet(Data, testTemplateID)
 
 	message := NewMessage(false)
 	message.CreateHeader()
@@ -46,8 +47,8 @@ func TestMessage_SetAndGetFunctions(t *testing.T) {
 	assert.Equal(t, binary.BigEndian.Uint32(message.GetMsgBuffer().Bytes()[4:8]), currTimeInUnixSecs)
 	message.SetExportAddress("127.0.0.1")
 	assert.Equal(t, message.GetExportAddress(), "127.0.0.1")
-	message.AddSet(set)
-	assert.Equal(t, message.GetSet(), set)
+	message.AddSet(newSet)
+	assert.Equal(t, message.GetSet(), newSet)
 	message.ResetMsgBuffer()
 	assert.Equal(t, message.GetMsgBufferLen(), 0)
 }
