@@ -61,7 +61,7 @@ func ResolveDNSAddress(address string, isIPv6 bool) (string, error) {
 	addr := address[:portIndex]
 	addr = strings.Replace(addr, "[", "", -1)
 	addr = strings.Replace(addr, "]", "", -1)
-	if ipAddr := net.ParseIP(addr); ipAddr == nil { // resolve DNS name
+	if ipAddr := net.ParseIP(addr); ipAddr == nil && len(addr) != 0 { // resolve DNS name
 		hostIPs, err := net.LookupIP(addr)
 		if err != nil {
 			if !isIPv6 {
