@@ -367,7 +367,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cp.address = address
+	cp.netAddress = address
 	cp.messageChan = make(chan *entities.Message)
 	go func() { // remove the message from the message channel
 		for range cp.GetMsgChan() {
@@ -408,7 +408,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	cp.address = address
+	cp.netAddress = address
 	cp.messageChan = make(chan *entities.Message)
 	go func() { // remove the message from the message channel
 		for range cp.GetMsgChan() {

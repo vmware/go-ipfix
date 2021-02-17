@@ -33,7 +33,7 @@ func (cp *CollectingProcess) startUDPServer() {
 	var err error
 	var conn net.Conn
 	var wg sync.WaitGroup
-	address, err := net.ResolveUDPAddr(cp.address.Network(), cp.address.String())
+	address, err := net.ResolveUDPAddr(cp.protocol, cp.address)
 	if err != nil {
 		klog.Error(err)
 		return
@@ -57,7 +57,7 @@ func (cp *CollectingProcess) startUDPServer() {
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Start dtls collecting process on %s", cp.address.String())
+		klog.Infof("Start dtls collecting process on %s", cp.address)
 		conn, err = listener.Accept()
 		if err != nil {
 			klog.Error(err)
@@ -92,7 +92,7 @@ func (cp *CollectingProcess) startUDPServer() {
 			return
 		}
 		cp.updateAddress(conn.LocalAddr())
-		klog.Infof("Start %s collecting process on %s", cp.address.Network(), cp.address.String())
+		klog.Infof("Start UDP collecting process on %s", cp.address)
 		defer conn.Close()
 		go func() {
 			for {
