@@ -164,7 +164,9 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(entities.Template, templateID, false)
+	templateSet := entities.NewSet(false)
+	err = templateSet.PrepareSet(entities.Template, templateID)
+	assert.NoError(t, err)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -241,7 +243,9 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(entities.Template, templateID, false)
+	templateSet := entities.NewSet(false)
+	err = templateSet.PrepareSet(entities.Template, templateID)
+	assert.NoError(t, err)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -337,7 +341,9 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
 
 	// Create data set with 1 data record
-	dataSet := entities.NewSet(entities.Data, templateID, false)
+	dataSet := entities.NewSet(false)
+	err = dataSet.PrepareSet(entities.Data, templateID)
+	assert.NoError(t, err)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -366,7 +372,9 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 
 	// Create data set with multiple data records to test invalid message length
 	// logic for TCP transport.
-	dataSet = entities.NewSet(entities.Data, templateID, false)
+	dataSet.ResetSet()
+	err = dataSet.PrepareSet(entities.Data, templateID)
+	assert.NoError(t, err)
 	for i := 0; i < 10000; i++ {
 		err := dataSet.AddRecord(elements, templateID)
 		assert.NoError(t, err)
@@ -434,7 +442,9 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	exporter.updateTemplate(templateID, []*entities.InfoElementWithValue{element1, element2}, 8)
 
 	// Create data set with 1 data record
-	dataSet := entities.NewSet(entities.Data, templateID, false)
+	dataSet := entities.NewSet(false)
+	err = dataSet.PrepareSet(entities.Data, templateID)
+	assert.NoError(t, err)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err = registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -463,7 +473,9 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 
 	// Create data set with multiple data records to test invalid message length
 	// logic for UDP transport.
-	dataSet = entities.NewSet(entities.Data, templateID, false)
+	dataSet.ResetSet()
+	err = dataSet.PrepareSet(entities.Data, templateID)
+	assert.NoError(t, err)
 	for i := 0; i < 100; i++ {
 		dataSet.AddRecord(elements, templateID)
 	}
@@ -527,7 +539,9 @@ func TestExportingProcessWithTLS(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(entities.Template, templateID, false)
+	templateSet := entities.NewSet(false)
+	err = templateSet.PrepareSet(entities.Template, templateID)
+	assert.NoError(t, err)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {
@@ -610,7 +624,9 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 
 	// Create template record with two fields
 	templateID := exporter.NewTemplateID()
-	templateSet := entities.NewSet(entities.Template, templateID, false)
+	templateSet := entities.NewSet(false)
+	err = templateSet.PrepareSet(entities.Template, templateID)
+	assert.NoError(t, err)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	element, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
 	if err != nil {

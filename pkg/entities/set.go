@@ -41,7 +41,8 @@ const (
 )
 
 type Set interface {
-	GetBuffLen() int
+	PrepareSet(setType ContentType, templateID uint16) error
+	ResetSet()
 	GetBuffer() *bytes.Buffer
 	GetSetType() ContentType
 	UpdateLenInHeader()
@@ -58,22 +59,31 @@ type set struct {
 	isDecoding bool
 }
 
-func NewSet(setType ContentType, templateID uint16, isDecoding bool) Set {
-	set := &set{
+func NewSet(isDecoding bool) Set {
+	return &set{
 		buffer:     &bytes.Buffer{},
-		setType:    setType,
 		records:    make([]Record, 0),
 		isDecoding: isDecoding,
 	}
-	if !isDecoding {
-		// Create the set header and append it when encoding
-		set.createHeader(setType, templateID)
-	}
-	return set
 }
 
-func (s *set) GetBuffLen() int {
-	return s.buffer.Len()
+func (s *set) PrepareSet(setType ContentType, templateID uint16) error {
+	if setType == Undefined {
+		return fmt.Errorf("set type is not properly defined")
+	} else {
+		s.setType = setType
+	}
+	if !s.isDecoding {
+		// Create the set header and append it when encoding
+		return s.createHeader(s.setType, templateID)
+	}
+	return nil
+}
+
+func (s *set) ResetSet() {
+	s.buffer.Reset()
+	s.setType = Undefined
+	s.records = s.records[:0]
 }
 
 func (s *set) GetBuffer() *bytes.Buffer {
@@ -98,6 +108,8 @@ func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) err
 		record = NewDataRecord(templateID)
 	} else if s.setType == Template {
 		record = NewTemplateRecord(uint16(len(elements)), templateID)
+	} else {
+		return fmt.Errorf("set type is not supported")
 	}
 	record.PrepareRecord()
 	for _, element := range elements {
@@ -126,13 +138,15 @@ func (s *set) GetNumberOfRecords() uint32 {
 	return uint32(len(s.records))
 }
 
-func (s *set) createHeader(setType ContentType, templateID uint16) {
+func (s *set) createHeader(setType ContentType, templateID uint16) error {
 	header := make([]byte, 4)
 	if setType == Template {
 		binary.BigEndian.PutUint16(header[0:2], TemplateSetID)
 	} else if setType == Data {
 		binary.BigEndian.PutUint16(header[0:2], templateID)
 	}
-	// TODO: Handle this error in a future PR.
-	s.buffer.Write(header)
+	if _, err := s.buffer.Write(header); err != nil {
+		return err
+	}
+	return nil
 }
