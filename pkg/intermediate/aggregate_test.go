@@ -54,8 +54,13 @@ func init() {
 	registry.LoadRegistry()
 }
 
+const (
+	testTemplateID = uint16(256)
+)
+
 func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
-	set := entities.NewSet(entities.Template, 256, true)
+	set := entities.NewSet(true)
+	set.PrepareSet(entities.Template, testTemplateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), nil)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), nil)
@@ -94,7 +99,8 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 
 // TODO:Cleanup this function using a loop, to make it easy to add elements for testing.
 func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool) *entities.Message {
-	set := entities.NewSet(entities.Data, 256, true)
+	set := entities.NewSet(true)
+	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	srcPort := new(bytes.Buffer)
 	dstPort := new(bytes.Buffer)
@@ -197,7 +203,8 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 }
 
 func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool) *entities.Message {
-	set := entities.NewSet(entities.Data, 256, true)
+	set := entities.NewSet(true)
+	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	srcPort := new(bytes.Buffer)
 	dstPort := new(bytes.Buffer)
