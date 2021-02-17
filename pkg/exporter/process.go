@@ -26,7 +26,6 @@ import (
 	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
-	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 const startTemplateID uint16 = 255
@@ -80,37 +79,17 @@ type ExporterInput struct {
 // be provided as 0.
 func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	var conn net.Conn
-	var collectorAddr net.Addr
-	var udpAddr *net.UDPAddr // This is for DTLS.
 	var err error
 
-	// Resolve DNS address
-	collectorAddress, err := util.ResolveDNSAddress(input.CollectorAddress, input.IsIPv6)
-	if err != nil {
-		return nil, err
-	}
-	if input.CollectorProtocol == "tcp" {
-		collectorAddr, err = net.ResolveTCPAddr(input.CollectorProtocol, collectorAddress)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		udpAddr, err = net.ResolveUDPAddr(input.CollectorProtocol, collectorAddress)
-		if err != nil {
-			return nil, err
-		}
-		collectorAddr = udpAddr
-	}
 	if input.IsEncrypted {
 		if input.CollectorProtocol == "tcp" { // use TLS
 			config, configErr := createClientConfig(input.CACert, input.ClientCert, input.ClientKey)
 			if configErr != nil {
 				return nil, configErr
 			}
-			// for TLS, we take the input address directly without resolving any DNS name
 			conn, err = tls.Dial(input.CollectorProtocol, input.CollectorAddress, config)
 			if err != nil {
-				klog.Errorf("Cannot the create the tls connection to the Collector %s: %v", collectorAddr.String(), err)
+				klog.Errorf("Cannot the create the tls connection to the Collector %s: %v", input.CollectorAddress, err)
 				return nil, err
 			}
 		} else if input.CollectorProtocol == "udp" { // use DTLS
@@ -121,16 +100,20 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			}
 			config := &dtls.Config{RootCAs: roots,
 				ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
-			conn, err = dtls.Dial(collectorAddr.Network(), udpAddr, config)
+			udpAddr, err := net.ResolveUDPAddr(input.CollectorProtocol, input.CollectorAddress)
 			if err != nil {
-				klog.Errorf("Cannot the create the dtls connection to the Collector %s: %v", collectorAddr.String(), err)
+				return nil, err
+			}
+			conn, err = dtls.Dial(udpAddr.Network(), udpAddr, config)
+			if err != nil {
+				klog.Errorf("Cannot the create the dtls connection to the Collector %s: %v", udpAddr.String(), err)
 				return nil, err
 			}
 		}
 	} else {
-		conn, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
+		conn, err = net.Dial(input.CollectorProtocol, input.CollectorAddress)
 		if err != nil {
-			klog.Errorf("Cannot the create the connection to the Collector %s: %v", collectorAddr.String(), err)
+			klog.Errorf("Cannot the create the connection to the Collector %s: %v", input.CollectorAddress, err)
 			return nil, err
 		}
 	}
