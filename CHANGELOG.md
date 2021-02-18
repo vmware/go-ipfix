@@ -25,7 +25,7 @@ Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 - Expose fields in AggregateElements and add integration tests. (#104, @zyiou)
 ## 0.4.0 12-08-2020
-Includes all the bug fixes from [0.3.1](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#031-11-21-2020).
+Includes all the bug fixes from [0.3.1](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#031-11-21-2020).
 ### Added
 - Supported message size check for UDP transport. (#92, @stati)
 - Added stats support in aggregation process. (#99, @stati)
@@ -43,8 +43,8 @@ Includes all the bug fixes from [0.3.1](https://github.com/vmware/go-ipfix/blob/
 ### Fixed
 - Modified versions of some packages in go.mod to keep it consistent with Antrea, the main user of go-ipfix library. (#82, @zyiou)
 ## 0.3.0 11-06-2020
-Includes all the bug fixes from [0.2.1](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#021-09-23-2020),
-[0.2.2](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#022-09-25-2020),
+Includes all the bug fixes from [0.2.1](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#021-09-23-2020),
+[0.2.2](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#022-09-25-2020),
 [0.2.3](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#023-10-30-2020),
 and [0.2.4](https://github.com/vmware/go-ipfix/blob/master/CHANGELOG.md#024-11-05-2020).
 ### Added
