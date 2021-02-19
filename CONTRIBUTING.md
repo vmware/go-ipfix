@@ -20,7 +20,7 @@ project's repository.
     ```
     git remote add upstream https://github.com/vmware/go-ipfix
     ```
-    Never push to upstream master
+    Never push to upstream main
     ```
     git remote set-url --push upstream no_push
     ```
@@ -39,7 +39,7 @@ project's repository.
     ```
     git checkout branchName
     git fetch upstream
-    git rebase upstream/master
+    git rebase upstream/main
     ```
 7. Push local branch to your forked repository.
     ```
