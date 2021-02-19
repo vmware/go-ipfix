@@ -57,8 +57,8 @@ func init() {
 }
 
 func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
-	set := entities.NewSet(entities.Data, 256, true)
-
+	set := entities.NewSet(true)
+	_ = set.PrepareSet(entities.Data, 256)
 	elements := make([]*entities.InfoElementWithValue, 0)
 	ieNamesIANA := []string{
 		"flowStartSeconds",
