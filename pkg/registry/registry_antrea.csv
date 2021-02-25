@@ -1,6 +1,6 @@
 ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,Range,References,Requester,Revision,Date,Enterprise ID,
-100,sourcePodNamespace,string,,current,,,,,,,,56506,https://www.iana.org/assignments/enterprise-numbers/enterprise-numbers
-101,sourcePodName,string,,current,,,,,,,,56506,Picked the enterprise ID that was not reserved yet.
+100,sourcePodNamespace,string,,current,,,,,,,,56506,
+101,sourcePodName,string,,current,,,,,,,,56506,
 102,destinationPodNamespace,string,,current,,,,,,,,56506,
 103,destinationPodName,string,,current,,,,,,,,56506,
 104,sourceNodeName,string,,current,,,,,,,,56506,
@@ -35,3 +35,4 @@ ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,R
 133,reverseOctetTotalCountFromDestinationNode,unsigned64,,current,,,,,,,,56506,
 134,reversePacketDeltaCountFromDestinationNode,unsigned64,,current,,,,,,,,56506,
 135,reverseOctetDeltaCountFromDestinationNode,unsigned64,,current,,,,,,,,56506,
+136,tcpState,string,,current,,,,,,,,56506,
