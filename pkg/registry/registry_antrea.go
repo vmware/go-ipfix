@@ -57,4 +57,5 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("reverseOctetTotalCountFromDestinationNode", 133, 4, 56506, 8), 56506)
 	registerInfoElement(*entities.NewInfoElement("reversePacketDeltaCountFromDestinationNode", 134, 4, 56506, 8), 56506)
 	registerInfoElement(*entities.NewInfoElement("reverseOctetDeltaCountFromDestinationNode", 135, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("tcpState", 136, 13, 56506, 65535), 56506)
 }
