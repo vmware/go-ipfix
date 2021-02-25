@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.4.6 02-25-2021
+### Added
+- Added tcpState information element for Antrea registry. (#145, @zyiou)
 ## 0.4.5 02-17-2021
 ### Added
 - Added new methods in Set interface to reduce set allocations for user. (#139,
