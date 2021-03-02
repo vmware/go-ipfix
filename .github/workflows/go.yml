@@ -70,7 +70,7 @@ jobs:
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
       with:
-        version: '3.x'
+        version: '3.15.0'
 
     - name: Check-out code
       uses: actions/checkout@v2
