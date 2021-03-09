@@ -65,20 +65,22 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), nil)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), nil)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), nil)
-	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), nil)
-	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), nil)
-	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), nil)
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), nil)
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), nil)
+	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), nil)
 	var ie1, ie2, ie8 *entities.InfoElementWithValue
 	if !isIPv6 {
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
-		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, 55829, 4), nil)
+		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), nil)
 	} else {
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), nil)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), nil)
-		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, 55829, 16), nil)
+		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), nil)
 	}
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9)
+	ie10 := entities.NewInfoElementWithValue(entities.NewInfoElement("flowEndSeconds", 151, 14, 0, 4), nil)
+	ie11 := entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), nil)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11)
 	set.AddRecord(elements, 256)
 
 	message := entities.NewMessage(true)
@@ -93,12 +95,11 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 		message.SetExportAddress("127.0.0.1")
 	}
 	message.AddSet(set)
-
 	return message
 }
 
 // TODO:Cleanup this function using a loop, to make it easy to add elements for testing.
-func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool) *entities.Message {
+func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool, isToExternal bool) *entities.Message {
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
@@ -112,6 +113,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	dstAddr := new(bytes.Buffer)
 	svcAddr := new(bytes.Buffer)
 	flowEndTime := new(bytes.Buffer)
+	antreaFlowType := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -126,24 +128,24 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
-	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), srcPod)
-	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), dstPod)
-	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), svcPort)
-	var ie1, ie2, ie8 *entities.InfoElementWithValue
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), srcPod)
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), dstPod)
+	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), svcPort)
+	var ie1, ie2, ie8, ie11 *entities.InfoElementWithValue
 	if !isIPv6 {
 		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("10.0.0.1").To4())
 		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("10.0.0.2").To4())
 		util.Encode(svcAddr, binary.BigEndian, net.ParseIP("192.168.0.1").To4())
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), dstAddr)
-		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, 55829, 4), svcAddr)
+		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), svcAddr)
 	} else {
 		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
 		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 		util.Encode(svcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
-		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, 55829, 16), svcAddr)
+		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
 	}
 
 	if !isUpdatedRecord {
@@ -153,8 +155,16 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	}
 	element, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(element, flowEndTime)
+	if isToExternal {
+		util.Encode(antreaFlowType, binary.BigEndian, registry.ToExternal)
+	} else if !isIntraNode {
+		util.Encode(antreaFlowType, binary.BigEndian, registry.InterNode)
+	} else {
+		util.Encode(antreaFlowType, binary.BigEndian, registry.IntraNode)
+	}
+	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -216,6 +226,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	dstAddr := new(bytes.Buffer)
 	svcAddr := new(bytes.Buffer)
 	flowEndTime := new(bytes.Buffer)
+	antreaFlowType := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -231,17 +242,17 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
-	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, 55829, 65535), srcPod)
-	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, 55829, 65535), dstPod)
-	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, 55829, 2), svcPort)
-	var ie1, ie2, ie8 *entities.InfoElementWithValue
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), srcPod)
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), dstPod)
+	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), svcPort)
+	var ie1, ie2, ie8, ie11 *entities.InfoElementWithValue
 	if !isIPv6 {
 		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("10.0.0.1").To4())
 		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("10.0.0.2").To4())
 		util.Encode(svcAddr, binary.BigEndian, net.ParseIP("0.0.0.0").To4())
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), dstAddr)
-		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, 55829, 4), svcAddr)
+		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), svcAddr)
 	} else {
 		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
 		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
@@ -252,7 +263,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		}
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
-		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, 55829, 16), svcAddr)
+		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
 	}
 
 	if !isUpdatedRecord {
@@ -262,8 +273,13 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	}
 	element, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(element, flowEndTime)
-
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10)
+	if !isIntraNode {
+		util.Encode(antreaFlowType, binary.BigEndian, registry.InterNode)
+	} else {
+		util.Encode(antreaFlowType, binary.BigEndian, registry.IntraNode)
+	}
+	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -351,7 +367,7 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 	// Data records should be processed and stored with corresponding flow key
-	message = createDataMsgForSrc(t, false, false, false)
+	message = createDataMsgForSrc(t, false, false, false, false)
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
 	assert.NotZero(t, len(aggregationProcess.flowKeyRecordMap))
@@ -370,7 +386,7 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	// It should have only data record with IPv4 fields that is added before.
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
 	// Data record with IPv6 addresses should be processed and stored correctly
-	message = createDataMsgForSrc(t, true, false, false)
+	message = createDataMsgForSrc(t, true, false, false, false)
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(aggregationProcess.flowKeyRecordMap))
@@ -397,7 +413,7 @@ func TestAggregationProcess(t *testing.T) {
 		CorrelateFields: fields,
 	}
 	aggregationProcess, _ := InitAggregationProcess(input)
-	dataMsg := createDataMsgForSrc(t, false, false, false)
+	dataMsg := createDataMsgForSrc(t, false, false, false, false)
 	go func() {
 		messageChan <- createMsgwithTemplateSet(false)
 		time.Sleep(time.Second)
@@ -426,7 +442,7 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	_, exist = record.GetInfoElementWithValue("originalObservationDomainId")
 	assert.Equal(t, true, exist)
 	// Test message with data set
-	message = createDataMsgForSrc(t, false, false, false)
+	message = createDataMsgForSrc(t, false, false, false, false)
 	err = addOriginalExporterInfo(message)
 	assert.NoError(t, err)
 	record = message.GetSet().GetRecords()[0]
@@ -449,7 +465,7 @@ func TestAddOriginalExporterInfoIPv6(t *testing.T) {
 	_, exist = record.GetInfoElementWithValue("originalObservationDomainId")
 	assert.Equal(t, true, exist)
 	// Test message with data set
-	message = createDataMsgForSrc(t, true, false, false)
+	message = createDataMsgForSrc(t, true, false, false, false)
 	err = addOriginalExporterInfo(message)
 	assert.NoError(t, err)
 	record = message.GetSet().GetRecords()[0]
@@ -471,30 +487,30 @@ func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
 	ap, _ := InitAggregationProcess(input)
 	// Test IPv4 fields.
 	// Test the scenario, where record1 is added first and then record2.
-	record1 := createDataMsgForSrc(t, false, false, false).GetSet().GetRecords()[0]
+	record1 := createDataMsgForSrc(t, false, false, false, false).GetSet().GetRecords()[0]
 	record2 := createDataMsgForDst(t, false, false, false).GetSet().GetRecords()[0]
-	runCorrelationAndCheckResult(t, ap, record1, record2, false, false)
+	runCorrelationAndCheckResult(t, ap, record1, record2, false, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
 	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 	// Test the scenario, where record2 is added first and then record1.
-	record1 = createDataMsgForSrc(t, false, false, false).GetSet().GetRecords()[0]
+	record1 = createDataMsgForSrc(t, false, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, false, false, false).GetSet().GetRecords()[0]
-	runCorrelationAndCheckResult(t, ap, record2, record1, false, false)
+	runCorrelationAndCheckResult(t, ap, record2, record1, false, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 
 	// Test IPv6 fields.
 	// Test the scenario, where record1 is added first and then record2.
-	record1 = createDataMsgForSrc(t, true, false, false).GetSet().GetRecords()[0]
+	record1 = createDataMsgForSrc(t, true, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, true, false, false).GetSet().GetRecords()[0]
-	runCorrelationAndCheckResult(t, ap, record1, record2, true, false)
+	runCorrelationAndCheckResult(t, ap, record1, record2, true, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 	// Test the scenario, where record2 is added first and then record1.
-	record1 = createDataMsgForSrc(t, true, false, false).GetSet().GetRecords()[0]
+	record1 = createDataMsgForSrc(t, true, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, true, false, false).GetSet().GetRecords()[0]
-	runCorrelationAndCheckResult(t, ap, record2, record1, true, false)
+	runCorrelationAndCheckResult(t, ap, record2, record1, true, false, false)
 }
 
 func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
@@ -506,14 +522,33 @@ func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
 	}
 	ap, _ := InitAggregationProcess(input)
 	// Test IPv4 fields.
-	record1 := createDataMsgForSrc(t, false, true, false).GetSet().GetRecords()[0]
-	runCorrelationAndCheckResult(t, ap, record1, nil, false, true)
+	record1 := createDataMsgForSrc(t, false, true, false, false).GetSet().GetRecords()[0]
+	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
 	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 	// Test IPv6 fields.
-	record1 = createDataMsgForSrc(t, true, true, false).GetSet().GetRecords()[0]
-	runCorrelationAndCheckResult(t, ap, record1, nil, true, true)
+	record1 = createDataMsgForSrc(t, true, true, false, false).GetSet().GetRecords()[0]
+	runCorrelationAndCheckResult(t, ap, record1, nil, true, true, false)
+}
+
+func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
+	messageChan := make(chan *entities.Message)
+	input := AggregationInput{
+		MessageChan:     messageChan,
+		WorkerNum:       2,
+		CorrelateFields: fields,
+	}
+	ap, _ := InitAggregationProcess(input)
+	// Test IPv4 fields.
+	record1 := createDataMsgForSrc(t, false, true, false, true).GetSet().GetRecords()[0]
+	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, true)
+	// Cleanup the flowKeyMap in aggregation process.
+	flowKey1, _ := getFlowKeyFromRecord(record1)
+	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
+	// Test IPv6 fields.
+	record1 = createDataMsgForSrc(t, true, true, false, true).GetSet().GetRecords()[0]
+	runCorrelationAndCheckResult(t, ap, record1, nil, true, true, true)
 }
 
 func TestAggregateRecordsForInterNodeFlow(t *testing.T) {
@@ -533,9 +568,9 @@ func TestAggregateRecordsForInterNodeFlow(t *testing.T) {
 	ap, _ := InitAggregationProcess(input)
 
 	// Test the scenario (added in order): srcRecord, dstRecord, record1_updated, record2_updated
-	srcRecord := createDataMsgForSrc(t, false, false, false).GetSet().GetRecords()[0]
+	srcRecord := createDataMsgForSrc(t, false, false, false, false).GetSet().GetRecords()[0]
 	dstRecord := createDataMsgForDst(t, false, false, false).GetSet().GetRecords()[0]
-	latestSrcRecord := createDataMsgForSrc(t, false, false, true).GetSet().GetRecords()[0]
+	latestSrcRecord := createDataMsgForSrc(t, false, false, true, false).GetSet().GetRecords()[0]
 	latestDstRecord := createDataMsgForDst(t, false, false, true).GetSet().GetRecords()[0]
 	runAggregationAndCheckResult(t, ap, srcRecord, dstRecord, latestSrcRecord, latestDstRecord, false)
 }
@@ -548,7 +583,7 @@ func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 		CorrelateFields: fields,
 	}
 	aggregationProcess, _ := InitAggregationProcess(input)
-	message := createDataMsgForSrc(t, false, false, false)
+	message := createDataMsgForSrc(t, false, false, false, false)
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	aggFlowRecord := AggregationFlowRecord{
@@ -572,7 +607,7 @@ func TestDeleteFlowKeyFromMapWithoutLock(t *testing.T) {
 		CorrelateFields: fields,
 	}
 	aggregationProcess, _ := InitAggregationProcess(input)
-	message := createDataMsgForSrc(t, false, false, false)
+	message := createDataMsgForSrc(t, false, false, false, false)
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	aggFlowRecord := AggregationFlowRecord{
@@ -592,11 +627,11 @@ func TestDeleteFlowKeyFromMapWithoutLock(t *testing.T) {
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 }
 
-func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1, record2 entities.Record, isIPv6, isIntraNode bool) {
+func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1, record2 entities.Record, isIPv6, isIntraNode, isToExternal bool) {
 	flowKey1, _ := getFlowKeyFromRecord(record1)
 	err := ap.addOrUpdateRecordInMap(flowKey1, record1)
 	assert.NoError(t, err)
-	if !isIntraNode {
+	if !isIntraNode && !isToExternal {
 		flowKey2, _ := getFlowKeyFromRecord(record2)
 		assert.Equalf(t, *flowKey1, *flowKey2, "flow keys should be equal.")
 		err = ap.addOrUpdateRecordInMap(flowKey2, record2)

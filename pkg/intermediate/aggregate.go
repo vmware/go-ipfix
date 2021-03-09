@@ -40,8 +40,8 @@ type AggregationProcess struct {
 	workerNum int
 	// workerList is the list of workers
 	workerList []*worker
-	// correlateFields are the fields to be filled when correlating records from
-	// two nodes.
+	// correlateFields are the fields to be filled when correlating records of the
+	// flow whose type is registry.InterNode(pkg/registry/registry.go).
 	correlateFields []string
 	// aggregateElements consists of stats and non-stats elements that need to be
 	// updated. In addition, new aggregation elements that has to be added to record
@@ -60,8 +60,9 @@ type AggregationInput struct {
 	AggregateElements *AggregationElements
 }
 
-// InitAggregationProcess takes in message channel (e.g. from collector) as input channel, workerNum(number of workers to process message)
-// and correlateFields (fields to be correlated and filled).
+// InitAggregationProcess takes in message channel (e.g. from collector) as input
+// channel, workerNum(number of workers to process message), and
+// correlateFields(fields to be correlated and filled).
 func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error) {
 	if input.MessageChan == nil {
 		return nil, fmt.Errorf("cannot create AggregationProcess process without message channel")
@@ -168,9 +169,22 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
+	correlationRequired := false
+	// Get Antrea flowType from the record that will help to determine if correlation
+	// is required or not.
+	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
+		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
+			// Correlation is required for only InterNode flow type defined in
+			// pkg/registry/registry.go.
+			if recordFlowType == registry.InterNode {
+				correlationRequired = true
+			}
+		}
+	}
+
 	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
 	if exist {
-		if !isRecordIntraNode(record) {
+		if correlationRequired {
 			// Do correlation of records if record belongs to inter-node flow and
 			// records from source and destination node are not received.
 			if !aggregationRecord.ReadyToSend && !areRecordsFromSameNode(record, aggregationRecord.Record) {
@@ -189,16 +203,15 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 				}
 			}
 		} else {
-			// For intra-node flows, just do aggregation of the flow record with
-			// existing record by updating the stats and flow timestamps. Correlation
-			// is not required.
+			// For flows that do not need correlation, just do aggregation of the
+			// flow record with existing record by updating the stats and flow timestamps.
 			if err := a.aggregateRecords(record, aggregationRecord.Record, true, true); err != nil {
 				return err
 			}
 		}
 	} else {
 		// Add all the new stat fields and initialize them.
-		if !isRecordIntraNode(record) {
+		if correlationRequired {
 			if isRecordFromSrc(record) {
 				if err := a.addFieldsForStatsAggregation(record, true, false); err != nil {
 					return err
@@ -218,7 +231,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			false,
 			true,
 		}
-		if isRecordIntraNode(record) {
+		if !correlationRequired {
 			aggregationRecord.ReadyToSend = true
 		}
 	}
@@ -228,7 +241,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 }
 
 // correlateRecords correlate the incomingRecord with existingRecord using correlation
-// fields.
+// fields. This is called for records whose flowType is InterNode(pkg/registry/registry.go).
 func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord entities.Record) {
 	for _, field := range a.correlateFields {
 		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(field); exist {
@@ -393,16 +406,6 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 	return nil
 }
 
-// isRecordIntraNode returns true if record belongs to intra-node flow.
-func isRecordIntraNode(record entities.Record) bool {
-	if srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName"); exist && srcIEWithValue.Value != "" {
-		if dstIEWithValue, exist := record.GetInfoElementWithValue("destinationPodName"); exist && dstIEWithValue.Value != "" {
-			return true
-		}
-	}
-	return false
-}
-
 // isRecordFromSrc returns true if record belongs to inter-node flow and from source node.
 func isRecordFromSrc(record entities.Record) bool {
 	srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
@@ -430,15 +433,11 @@ func isRecordFromDst(record entities.Record) bool {
 }
 
 func areRecordsFromSameNode(record1 entities.Record, record2 entities.Record) bool {
-	// If records belong to intra-node flow, then send true.
-	if isRecordIntraNode(record1) && isRecordIntraNode(record2) {
-		return true
-	}
-	// If records belong to inter-node flow and are from source node, then send true.
+	// If both records of inter-node flow are from source node, then send true.
 	if isRecordFromSrc(record1) && isRecordFromSrc(record2) {
 		return true
 	}
-	// If records belong to inter-node flow and are from destination node, then send true.
+	// If both records of inter-node flow are from destination node, then send true.
 	if isRecordFromDst(record1) && isRecordFromDst(record2) {
 		return true
 	}

@@ -36,3 +36,4 @@ ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,R
 134,reversePacketDeltaCountFromDestinationNode,unsigned64,,current,,,,,,,,56506,
 135,reverseOctetDeltaCountFromDestinationNode,unsigned64,,current,,,,,,,,56506,
 136,tcpState,string,,current,,,,,,,,56506,
+137,flowType,unsigned8,,current,,,,,,,,56506,
