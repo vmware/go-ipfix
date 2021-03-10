@@ -295,14 +295,19 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	if a.aggregateElements == nil {
 		return nil
 	}
-
 	for _, element := range a.aggregateElements.NonStatsElements {
 		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(element); exist {
+			existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(element)
 			switch ieWithValue.Element.Name {
 			case "flowEndSeconds":
-				existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(element)
 				// Update flow end timestamp if it is latest.
 				if ieWithValue.Value.(uint32) > existingIeWithValue.Value.(uint32) {
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case "flowEndReason":
+				// If the aggregated flow is set with flowEndReason as "EndOfFlowReason",
+				// then we do not have to set again.
+				if existingIeWithValue.Value.(uint8) != registry.EndOfFlowReason {
 					existingIeWithValue.Value = ieWithValue.Value
 				}
 			default:

@@ -29,6 +29,7 @@ var (
 	}
 	nonStatsElementList = []string{
 		"flowEndSeconds",
+		"flowEndReason",
 	}
 	statsElementList = []string{
 		"packetTotalCount",
@@ -114,6 +115,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	svcAddr := new(bytes.Buffer)
 	flowEndTime := new(bytes.Buffer)
 	antreaFlowType := new(bytes.Buffer)
+	flowEndReason := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -150,11 +152,13 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 
 	if !isUpdatedRecord {
 		util.Encode(flowEndTime, binary.BigEndian, uint32(1))
+		util.Encode(flowEndReason, binary.BigEndian, registry.ActiveTimeoutReason)
 	} else {
 		util.Encode(flowEndTime, binary.BigEndian, uint32(10))
+		util.Encode(flowEndReason, binary.BigEndian, registry.EndOfFlowReason)
 	}
-	element, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
-	ie10 := entities.NewInfoElementWithValue(element, flowEndTime)
+	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
+	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
 	if isToExternal {
 		util.Encode(antreaFlowType, binary.BigEndian, registry.ToExternal)
 	} else if !isIntraNode {
@@ -163,8 +167,10 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		util.Encode(antreaFlowType, binary.BigEndian, registry.IntraNode)
 	}
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
+	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
+	ie12 := entities.NewInfoElementWithValue(tmpElement, flowEndReason)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -227,6 +233,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	svcAddr := new(bytes.Buffer)
 	flowEndTime := new(bytes.Buffer)
 	antreaFlowType := new(bytes.Buffer)
+	flowEndReason := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -265,21 +272,25 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
 		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
 	}
-
 	if !isUpdatedRecord {
 		util.Encode(flowEndTime, binary.BigEndian, uint32(1))
+		util.Encode(flowEndReason, binary.BigEndian, registry.ActiveTimeoutReason)
 	} else {
-		util.Encode(flowEndTime, binary.BigEndian, uint32(20))
+		util.Encode(flowEndTime, binary.BigEndian, uint32(10))
+		util.Encode(flowEndReason, binary.BigEndian, registry.EndOfFlowReason)
 	}
-	element, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
-	ie10 := entities.NewInfoElementWithValue(element, flowEndTime)
+	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
+	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
 	if !isIntraNode {
 		util.Encode(antreaFlowType, binary.BigEndian, registry.InterNode)
 	} else {
 		util.Encode(antreaFlowType, binary.BigEndian, registry.IntraNode)
 	}
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11)
+	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
+	ie12 := entities.NewInfoElementWithValue(tmpElement, flowEndReason)
+
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
