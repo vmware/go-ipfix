@@ -30,6 +30,14 @@ const (
 	IANAReversedEnterpriseID uint32 = 29305
 )
 
+// enum for flowType field in Antrea registry.
+const (
+	IntraNode    = uint8(1)
+	InterNode    = uint8(2)
+	ToExternal   = uint8(3)
+	FromExternal = uint8(4)
+)
+
 var (
 	// globalRegistryByID shows mapping EnterpriseID -> Info Element ID -> Info Element
 	globalRegistryByID map[uint32]map[uint16]*entities.InfoElement
