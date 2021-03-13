@@ -38,6 +38,14 @@ const (
 	FromExternal = uint8(4)
 )
 
+// enum for flowEndReason field in IANA registry.
+// List of RFC supported reasons: https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-flow-end-reason
+const (
+	IdleTimeoutReason   = uint8(0x01)
+	ActiveTimeoutReason = uint8(0x02)
+	EndOfFlowReason     = uint8(0x03)
+)
+
 var (
 	// globalRegistryByID shows mapping EnterpriseID -> Info Element ID -> Info Element
 	globalRegistryByID map[uint32]map[uint16]*entities.InfoElement
