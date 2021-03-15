@@ -30,6 +30,7 @@ var (
 	nonStatsElementList = []string{
 		"flowEndSeconds",
 		"flowEndReason",
+		"tcpState",
 	}
 	statsElementList = []string{
 		"packetTotalCount",
@@ -116,6 +117,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	flowEndTime := new(bytes.Buffer)
 	antreaFlowType := new(bytes.Buffer)
 	flowEndReason := new(bytes.Buffer)
+	tcpState := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -153,9 +155,11 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	if !isUpdatedRecord {
 		util.Encode(flowEndTime, binary.BigEndian, uint32(1))
 		util.Encode(flowEndReason, binary.BigEndian, registry.ActiveTimeoutReason)
+		util.Encode(tcpState, binary.BigEndian, "ESTABLISHED")
 	} else {
 		util.Encode(flowEndTime, binary.BigEndian, uint32(10))
 		util.Encode(flowEndReason, binary.BigEndian, registry.EndOfFlowReason)
+		util.Encode(tcpState, binary.BigEndian, "TIME_WAIT")
 	}
 	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
@@ -169,8 +173,10 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
 	ie12 := entities.NewInfoElementWithValue(tmpElement, flowEndReason)
+	tmpElement, _ = registry.GetInfoElement("tcpState", registry.AntreaEnterpriseID)
+	ie13 := entities.NewInfoElementWithValue(tmpElement, tcpState)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -234,6 +240,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	flowEndTime := new(bytes.Buffer)
 	antreaFlowType := new(bytes.Buffer)
 	flowEndReason := new(bytes.Buffer)
+	tcpState := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -275,9 +282,11 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	if !isUpdatedRecord {
 		util.Encode(flowEndTime, binary.BigEndian, uint32(1))
 		util.Encode(flowEndReason, binary.BigEndian, registry.ActiveTimeoutReason)
+		util.Encode(tcpState, binary.BigEndian, "ESTABLISHED")
 	} else {
 		util.Encode(flowEndTime, binary.BigEndian, uint32(10))
 		util.Encode(flowEndReason, binary.BigEndian, registry.EndOfFlowReason)
+		util.Encode(tcpState, binary.BigEndian, "TIME_WAIT")
 	}
 	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
@@ -289,8 +298,10 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
 	ie12 := entities.NewInfoElementWithValue(tmpElement, flowEndReason)
+	tmpElement, _ = registry.GetInfoElement("tcpState", registry.AntreaEnterpriseID)
+	ie13 := entities.NewInfoElementWithValue(tmpElement, tcpState)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
