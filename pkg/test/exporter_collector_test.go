@@ -167,21 +167,23 @@ JSnRKkDuZ/d5wYR59eIld9FsJPFWPCQth2cKnBsM
 )
 
 type testRecord struct {
-	srcIP        net.IP
-	dstIP        net.IP
-	srcPort      uint16
-	dstPort      uint16
-	proto        uint8
-	flowEnd      uint32
-	pktCount     uint64
-	pktDelta     uint64
-	srcPod       string
-	dstPod       string
-	dstClusterIP net.IP
-	dstSvcPort   uint16
-	revPktCount  uint64
-	revPktDelta  uint64
-	flowType     uint8
+	srcIP         net.IP
+	dstIP         net.IP
+	srcPort       uint16
+	dstPort       uint16
+	proto         uint8
+	flowEnd       uint32
+	pktCount      uint64
+	pktDelta      uint64
+	srcPod        string
+	dstPod        string
+	dstClusterIP  net.IP
+	dstSvcPort    uint16
+	revPktCount   uint64
+	revPktDelta   uint64
+	flowType      uint8
+	flowEndReason uint8
+	tcpState      string
 }
 
 var (
@@ -190,6 +192,7 @@ var (
 		"destinationTransportPort",
 		"protocolIdentifier",
 		"flowEndSeconds",
+		"flowEndReason",
 		"packetTotalCount",
 		"packetDeltaCount",
 	}
@@ -206,6 +209,7 @@ var (
 		"destinationPodName",
 		"destinationServicePort",
 		"flowType",
+		"tcpState",
 	}
 	antreaIPv4 = []string{
 		"destinationClusterIPv4",
@@ -399,10 +403,12 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 // getTestRecord outputs required testRecords with hardcoded values.
 func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 	record := testRecord{
-		srcPort:  uint16(1234),
-		dstPort:  uint16(5678),
-		proto:    uint8(6),
-		flowType: registry.InterNode,
+		srcPort:       uint16(1234),
+		dstPort:       uint16(5678),
+		proto:         uint8(6),
+		flowType:      registry.InterNode,
+		flowEndReason: registry.ActiveTimeoutReason,
+		tcpState:      "ESTABLISHED",
 	}
 	if !isIPv6 {
 		record.srcIP = net.ParseIP("10.0.0.1").To4()
@@ -470,6 +476,8 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 			assert.Equal(t, testRec.pktDelta, element.Value)
 		case "flowEndSeconds":
 			assert.Equal(t, testRec.flowEnd, element.Value)
+		case "flowEndReason":
+			assert.Equal(t, testRec.flowEndReason, element.Value)
 		}
 	}
 	for _, name := range antreaCommonFields {
@@ -486,6 +494,8 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 			assert.Equal(t, testRec.dstSvcPort, element.Value)
 		case "flowType":
 			assert.Equal(t, testRec.flowType, element.Value)
+		case "tcpState":
+			assert.Equal(t, testRec.tcpState, element.Value)
 		}
 	}
 	for _, name := range reverseFields {
@@ -528,6 +538,8 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []*entities.InfoElementWithVa
 			ie = entities.NewInfoElementWithValue(element, testRec.pktDelta)
 		case "flowEndSeconds":
 			ie = entities.NewInfoElementWithValue(element, testRec.flowEnd)
+		case "flowEndReason":
+			ie = entities.NewInfoElementWithValue(element, testRec.flowEndReason)
 		}
 		elements = append(elements, ie)
 	}
@@ -551,6 +563,8 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []*entities.InfoElementWithVa
 			ie = entities.NewInfoElementWithValue(element, testRec.dstSvcPort)
 		case "flowType":
 			ie = entities.NewInfoElementWithValue(element, testRec.flowType)
+		case "tcpState":
+			ie = entities.NewInfoElementWithValue(element, testRec.tcpState)
 		}
 		elements = append(elements, ie)
 	}
