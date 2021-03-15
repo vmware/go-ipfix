@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.4.7 03-15-2021
+### Added
+- Added new field flowType in Antrea registry. (#148, @stati)
+### Changed
+- Modify aggregation process to consume flow end reason. (#150, @stati)
+- Support consuming tcpState in aggregation process. (#151, @zyiou)
 ## 0.4.6 02-25-2021
 ### Added
 - Added tcpState information element for Antrea registry. (#145, @zyiou)
