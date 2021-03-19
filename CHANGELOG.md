@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.4.8 03-19-2021
+### Changed
+- Move from klog to klog/v2. (#155, @zyiou)
 ## 0.4.7 03-15-2021
 ### Added
 - Added new field flowType in Antrea registry. (#148, @stati)
