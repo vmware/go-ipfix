@@ -1,7 +1,7 @@
 package intermediate
 
 import (
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
