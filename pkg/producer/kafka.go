@@ -20,7 +20,7 @@ import (
 
 	"github.com/Shopify/sarama"
 	"google.golang.org/protobuf/proto"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/producer/protobuf"
