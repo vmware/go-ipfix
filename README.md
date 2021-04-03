@@ -6,6 +6,35 @@ go-ipfix is an IPFIX library that can be used to implement an IPFIX exporter, wh
 ## Try it out
 This IPFIX library can be used to build an exporter. Please check out the [exporter tests](https://github.com/vmware/go-ipfix/blob/main/pkg/exporter/process_test.go) to get an idea on how to build exporter on top of TCP and UDP transport protocols given a IPFIX collector.
 
+### Deploy stand alone IPFIX collector
+To deploy a released version of go-ipfix collector, which is used to decode and log the IPFIX records, please choose one deployment manifest from the list of releases. For any given release <TAG> (e.g. v0.1.0), you can deploy the collector as follows:
+
+```
+kubectl apply -f https://github.com/vmware/go-ipfix/releases/download/<TAG>/ipfix-collector.yaml
+```
+To deploy the latest version of collector (built from the main branch), use the command below: 
+```
+cd <directory containing this README file>/build/yamls
+kubectl apply -f ./ipfix-collector.yaml
+```
+
+While deploying the latest version of collector, the port and protocol can be configured by using the command:
+
+```
+cd <directory containing this README file>/hack
+./generate-manifest-collector.sh --mode dev --port <port> --proto (tcp|udp) > ../build/yamls/ipfix-collector.yaml
+```
+
+Parameter ```--mode dev``` will build the collector from the docker image with the "latest" tag.  
+Use ```--port <port>``` to specify the port used by the collector. Default is 4739.  
+Use  ```--proto (tcp|udp)``` to specify the protocol used by the collector. Default is tcp.  
+For example:
+
+```
+./generate-manifest-collector.sh --mode dev --port 4739 --proto tcp > ../build/yamls/ipfix-collector.yaml
+
+```
+
 ## Build Registry
 To build the registry from [IANA registry](https://www.iana.org/assignments/ipfix/ipfix.xhtml) or [Antrea registry](pkg/registry/registry_antrea.csv), run following commands:
 ```
