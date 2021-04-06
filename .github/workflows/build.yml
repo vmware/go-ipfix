@@ -19,7 +19,7 @@ jobs:
       - name: Build ipfix-collector Docker image
         run: make docker-collector
       - name: Push ipfix-collector Docker image to Antrea Docker registry
-        if: ${{ github.repository == 'vmware/go-ipfix' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        if: ${{ github.repository == 'vmware/go-ipfix' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
