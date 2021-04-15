@@ -148,32 +148,19 @@ func (a *AggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) 
 	return nil
 }
 
-// GetLastUpdatedTimeOfFlow provides the last updated time in the format of IPFIX
-// field "flowEndSeconds".
-func (a *AggregationProcess) GetLastUpdatedTimeOfFlow(flowKey FlowKey) (uint32, error) {
+func (a *AggregationProcess) DeleteFlowKeyFromMapWithLock(flowKey FlowKey) {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	record, exists := a.flowKeyRecordMap[flowKey]
-	if !exists {
-		return 0, fmt.Errorf("flow key is not present in the map")
-	}
-	flowEndField, exists := record.Record.GetInfoElementWithValue("flowEndSeconds")
-	if exists {
-		return flowEndField.Value.(uint32), nil
-	} else {
-		return 0, fmt.Errorf("flowEndSeconds field is not present in the record")
-	}
+	delete(a.flowKeyRecordMap, flowKey)
 }
 
-func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) error {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
-	_, exists := a.flowKeyRecordMap[flowKey]
-	if !exists {
-		return fmt.Errorf("flow key is not present in the map")
-	}
+// DeleteFlowKeyFromMapWithoutLock need to be used only when the caller has already
+// acquired the lock. For example, this can be used in a callback of ForAllRecordsDo
+// function.
+// TODO:Remove this when there is notion of invalid flows supported in aggregation
+// process.
+func (a *AggregationProcess) DeleteFlowKeyFromMapWithoutLock(flowKey FlowKey) {
 	delete(a.flowKeyRecordMap, flowKey)
-	return nil
 }
 
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
