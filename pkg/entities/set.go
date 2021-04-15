@@ -83,7 +83,8 @@ func (s *set) PrepareSet(setType ContentType, templateID uint16) error {
 func (s *set) ResetSet() {
 	s.buffer.Reset()
 	s.setType = Undefined
-	s.records = s.records[:0]
+	s.records = nil
+	s.records = make([]Record, 0)
 }
 
 func (s *set) GetBuffer() *bytes.Buffer {
