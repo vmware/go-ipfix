@@ -27,7 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/component-base/logs"
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/entities"

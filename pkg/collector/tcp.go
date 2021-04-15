@@ -8,7 +8,7 @@ import (
 	"io"
 	"net"
 
-	"k8s.io/klog/v2"
+	"k8s.io/klog"
 )
 
 func (cp *CollectingProcess) startTCPServer() {
