@@ -32,10 +32,10 @@ const (
 
 // enum for flowType field in Antrea registry.
 const (
-	IntraNode    = uint8(1)
-	InterNode    = uint8(2)
-	ToExternal   = uint8(3)
-	FromExternal = uint8(4)
+	FlowTypeIntraNode    = uint8(1)
+	FlowTypeInterNode    = uint8(2)
+	FlowTypeToExternal   = uint8(3)
+	FlowTypeFromExternal = uint8(4)
 )
 
 // enum for ingressNetworkPolicyRuleAction and egressNetworkPolicyRuleAction field in Antrea registry.

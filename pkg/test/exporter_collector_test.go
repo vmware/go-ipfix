@@ -406,7 +406,7 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 		srcPort:       uint16(1234),
 		dstPort:       uint16(5678),
 		proto:         uint8(6),
-		flowType:      registry.InterNode,
+		flowType:      registry.FlowTypeInterNode,
 		flowEndReason: registry.ActiveTimeoutReason,
 		tcpState:      "ESTABLISHED",
 	}
