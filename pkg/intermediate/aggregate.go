@@ -189,7 +189,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
 			// Correlation is required for only InterNode flow type defined in
 			// pkg/registry/registry.go.
-			if recordFlowType == registry.InterNode {
+			if recordFlowType == registry.FlowTypeInterNode {
 				correlationRequired = true
 			}
 		}

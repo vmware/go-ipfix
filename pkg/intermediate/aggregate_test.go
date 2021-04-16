@@ -164,11 +164,11 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
 	if isToExternal {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.ToExternal)
+		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeToExternal)
 	} else if !isIntraNode {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.InterNode)
+		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeInterNode)
 	} else {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.IntraNode)
+		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeIntraNode)
 	}
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
@@ -291,9 +291,9 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
 	if !isIntraNode {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.InterNode)
+		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeInterNode)
 	} else {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.IntraNode)
+		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeIntraNode)
 	}
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
