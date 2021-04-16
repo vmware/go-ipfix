@@ -92,7 +92,8 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 					client.errChan <- true
 					break out
 				}
-				klog.V(4).Info(message)
+				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
+					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
 				buff = buff[length:]
 			}
 		}

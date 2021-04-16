@@ -36,7 +36,8 @@ func (w *worker) start() {
 				if err != nil {
 					klog.Error(err)
 				}
-				klog.V(4).Info(message)
+				klog.V(4).Infof("Processed message from collector %v, number of records: %v, observation domain ID: %v",
+					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
 			}
 		}
 	}()
