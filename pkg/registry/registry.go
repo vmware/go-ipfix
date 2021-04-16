@@ -38,6 +38,13 @@ const (
 	FromExternal = uint8(4)
 )
 
+// enum for ingressNetworkPolicyRuleAction and egressNetworkPolicyRuleAction field in Antrea registry.
+const (
+	NetworkPolicyRuleActionAllow  = uint8(1)
+	NetworkPolicyRuleActionDrop   = uint8(2)
+	NetworkPolicyRuleActionReject = uint8(3)
+)
+
 // enum for flowEndReason field in IANA registry.
 // List of RFC supported reasons: https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-flow-end-reason
 const (
