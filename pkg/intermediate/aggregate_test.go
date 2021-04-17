@@ -515,20 +515,21 @@ func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, record1, record2, false, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	err := ap.DeleteFlowKeyFromMap(*flowKey1)
-	assert.NoError(t, err)
+	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 	// Test the scenario, where record2 is added first and then record1.
 	record1 = createDataMsgForSrc(t, false, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, false, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record2, record1, false, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
-	err = ap.DeleteFlowKeyFromMap(*flowKey1)
-	assert.NoError(t, err)
+	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
+
 	// Test IPv6 fields.
 	// Test the scenario, where record1 is added first and then record2.
 	record1 = createDataMsgForSrc(t, true, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, true, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, record2, true, false, false)
+	// Cleanup the flowKeyMap in aggregation process.
+	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 	// Test the scenario, where record2 is added first and then record1.
 	record1 = createDataMsgForSrc(t, true, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, true, false, false).GetSet().GetRecords()[0]
@@ -548,8 +549,7 @@ func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	err := ap.DeleteFlowKeyFromMap(*flowKey1)
-	assert.NoError(t, err)
+	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 	// Test IPv6 fields.
 	record1 = createDataMsgForSrc(t, true, true, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, nil, true, true, false)
@@ -568,8 +568,7 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, true)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	err := ap.DeleteFlowKeyFromMap(*flowKey1)
-	assert.NoError(t, err)
+	ap.DeleteFlowKeyFromMapWithLock(*flowKey1)
 	// Test IPv6 fields.
 	record1 = createDataMsgForSrc(t, true, true, false, true).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, nil, true, true, true)
@@ -617,15 +616,13 @@ func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 	}
 	aggregationProcess.flowKeyRecordMap[flowKey1] = aggFlowRecord
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
-	err := aggregationProcess.DeleteFlowKeyFromMap(flowKey2)
-	assert.Error(t, err)
+	aggregationProcess.DeleteFlowKeyFromMapWithLock(flowKey2)
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
-	err = aggregationProcess.DeleteFlowKeyFromMap(flowKey1)
-	assert.NoError(t, err)
+	aggregationProcess.DeleteFlowKeyFromMapWithLock(flowKey1)
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 }
 
-func TestAggregationProcess_GetLastUpdatedTimeOfFlow(t *testing.T) {
+func TestDeleteFlowKeyFromMapWithoutLock(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{
 		MessageChan:     messageChan,
@@ -635,13 +632,22 @@ func TestAggregationProcess_GetLastUpdatedTimeOfFlow(t *testing.T) {
 	aggregationProcess, _ := InitAggregationProcess(input)
 	message := createDataMsgForSrc(t, false, false, false, false)
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
-	_, err := aggregationProcess.GetLastUpdatedTimeOfFlow(flowKey1)
-	assert.Error(t, err)
-	err = aggregationProcess.addOrUpdateRecordInMap(&flowKey1, message.GetSet().GetRecords()[0])
-	assert.NoError(t, err)
-	flowUpdatedTime, err := aggregationProcess.GetLastUpdatedTimeOfFlow(flowKey1)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), flowUpdatedTime)
+	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
+	aggFlowRecord := AggregationFlowRecord{
+		message.GetSet().GetRecords()[0],
+		true,
+		true,
+	}
+	aggregationProcess.flowKeyRecordMap[flowKey1] = aggFlowRecord
+	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	aggregationProcess.mutex.Lock()
+	aggregationProcess.DeleteFlowKeyFromMapWithoutLock(flowKey2)
+	aggregationProcess.mutex.Unlock()
+	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	aggregationProcess.mutex.Lock()
+	aggregationProcess.DeleteFlowKeyFromMapWithoutLock(flowKey1)
+	aggregationProcess.mutex.Unlock()
+	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 }
 
 func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1, record2 entities.Record, isIPv6, isIntraNode, isToExternal bool) {
