@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.0 04-16-2020
+Includes all the bug fixes from [0.4.1](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#041-12-09-2020),
+[0.4.2](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#042-12-15-2020),
+[0.4.3](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#043-02-04-2021),
+[0.4.4](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#044-02-10-2021),
+[0.4.5](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#045-02-17-2021),
+[0.4.6](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#046-02-25-2021),
+[0.4.7](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#047-03-15-2021),
+and [0.4.8](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#048-03-19-2021).
+### Added
+- Added Kafka Producer that is initialized given the address of Kafka broker
+  system. It gathers the IPFIX messages from the collecting process
+  and turns them into Kafka messages. (#88, @stati)
+- Demonstrate the ability to support multiple proto schemas in Kafka Producer. (#99, @stati)
+- Add new fields to Antrea Registry for enhancing network policy info and adding
+  all the tcp states of the connection. (#165, @zyiou)
+### Changed
+- Change the name of master branch to main. (#144, @zyiou)
+- Change the names of Flow Types. (#171, @zyiou)
+- Enhance the debug logs with useful info. (#170, @zyiou)
+### Fixed
+- Fix the default expirtation time of TLS certificates in tests by increasing it
+  from one month to one year. (#127, @zyiou)
+- Fix the code in pkg/producer when cherrypicking commits from v0.4.5 release. (#143, @stati)
+- Fix the branch name in go-ipfix collector image workflow. (#160, @stati)
+- Fix an issue of cleaning up slice in the IPFIX set Reset method. (#163, @stati)
 ## 0.4.8 03-19-2021
 ### Changed
 - Move from klog to klog/v2. (#155, @zyiou)
