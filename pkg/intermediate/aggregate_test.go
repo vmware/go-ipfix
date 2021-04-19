@@ -31,6 +31,7 @@ var (
 		"flowEndSeconds",
 		"flowEndReason",
 		"tcpState",
+		"ingressNetworkPolicyRuleAction",
 	}
 	statsElementList = []string{
 		"packetTotalCount",
@@ -82,7 +83,8 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	}
 	ie10 := entities.NewInfoElementWithValue(entities.NewInfoElement("flowEndSeconds", 151, 14, 0, 4), nil)
 	ie11 := entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), nil)
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11)
+	ie12 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRuleAction", 139, 1, registry.AntreaEnterpriseID, 1), nil)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12)
 	set.AddRecord(elements, 256)
 
 	message := entities.NewMessage(true)
@@ -118,11 +120,13 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	antreaFlowType := new(bytes.Buffer)
 	flowEndReason := new(bytes.Buffer)
 	tcpState := new(bytes.Buffer)
+	ingressNetworkPolicyRuleAction := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
 	util.Encode(proto, binary.BigEndian, uint8(6))
 	util.Encode(svcPort, binary.BigEndian, uint16(4739))
+	util.Encode(ingressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionNoAction)
 	srcPod.WriteString("pod1")
 	if !isIntraNode {
 		dstPod.WriteString("")
@@ -175,8 +179,9 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie12 := entities.NewInfoElementWithValue(tmpElement, flowEndReason)
 	tmpElement, _ = registry.GetInfoElement("tcpState", registry.AntreaEnterpriseID)
 	ie13 := entities.NewInfoElementWithValue(tmpElement, tcpState)
+	ie14 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRuleAction", 139, 1, registry.AntreaEnterpriseID, 1), ingressNetworkPolicyRuleAction)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -241,10 +246,12 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	antreaFlowType := new(bytes.Buffer)
 	flowEndReason := new(bytes.Buffer)
 	tcpState := new(bytes.Buffer)
+	ingressNetworkPolicyRuleAction := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
 	util.Encode(proto, binary.BigEndian, uint8(6))
+	util.Encode(ingressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionDrop)
 	if !isIntraNode {
 		util.Encode(svcPort, binary.BigEndian, uint16(0))
 		srcPod.WriteString("")
@@ -300,8 +307,9 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie12 := entities.NewInfoElementWithValue(tmpElement, flowEndReason)
 	tmpElement, _ = registry.GetInfoElement("tcpState", registry.AntreaEnterpriseID)
 	ie13 := entities.NewInfoElementWithValue(tmpElement, tcpState)
+	ie14 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRuleAction", 139, 1, registry.AntreaEnterpriseID, 1), ingressNetworkPolicyRuleAction)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -701,6 +709,8 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 	assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, ieWithValue.Value)
 	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 	assert.Equal(t, uint16(4739), ieWithValue.Value)
+	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
+	assert.Equal(t, registry.NetworkPolicyRuleActionDrop, ieWithValue.Value)
 	for _, e := range nonStatsElementList {
 		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue(e)
 		expectedIE, _ := dstRecordLatest.GetInfoElementWithValue(e)

@@ -40,9 +40,10 @@ const (
 
 // enum for ingressNetworkPolicyRuleAction and egressNetworkPolicyRuleAction field in Antrea registry.
 const (
-	NetworkPolicyRuleActionAllow  = uint8(1)
-	NetworkPolicyRuleActionDrop   = uint8(2)
-	NetworkPolicyRuleActionReject = uint8(3)
+	NetworkPolicyRuleActionNoAction = uint8(0)
+	NetworkPolicyRuleActionAllow    = uint8(1)
+	NetworkPolicyRuleActionDrop     = uint8(2)
+	NetworkPolicyRuleActionReject   = uint8(3)
 )
 
 // enum for flowEndReason field in IANA registry.

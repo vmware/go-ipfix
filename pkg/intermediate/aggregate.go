@@ -175,9 +175,17 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
 		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
 			// Correlation is required for only InterNode flow type defined in
-			// pkg/registry/registry.go.
+			// pkg/registry/registry.go. If egress network policy rule action is
+			// deny (drop/reject), the correlation is not required.
 			if recordFlowType == registry.FlowTypeInterNode {
 				correlationRequired = true
+				if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
+					if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
+						if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
+							correlationRequired = false
+						}
+					}
+				}
 			}
 		}
 	}
@@ -321,6 +329,11 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			case "tcpState":
 				// Update tcpState when flow end timestamp is the latest
 				if isLatest {
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case "ingressNetworkPolicyRuleAction":
+				// update ingressNetworkPolicyRuleAction when no action is assigned.
+				if existingIeWithValue.Value.(uint8) == registry.NetworkPolicyRuleActionNoAction {
 					existingIeWithValue.Value = ieWithValue.Value
 				}
 			default:
