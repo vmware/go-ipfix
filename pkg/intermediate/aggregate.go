@@ -606,8 +606,9 @@ func validateDataRecord(record entities.Record) bool {
 	return true
 }
 
-// isCorrelationRequired returns true when flowType is InterNode and
-// egressNetworkPolicyRuleAction is not deny (drop/reject).
+// isCorrelationRequired returns true for InterNode flowType when
+// either the egressNetworkPolicyRuleAction is not deny (drop/reject) or
+// the ingressNetworkPolicyRuleAction is not reject.
 func isCorrelationRequired(record entities.Record) bool {
 	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
 		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
@@ -615,6 +616,13 @@ func isCorrelationRequired(record entities.Record) bool {
 				if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
 					if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
 						if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
+							return false
+						}
+					}
+				}
+				if ingressRuleActionIe, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
+					if ingressRuleAction, ok := ingressRuleActionIe.Value.(uint8); ok {
+						if ingressRuleAction == registry.NetworkPolicyRuleActionReject {
 							return false
 						}
 					}
