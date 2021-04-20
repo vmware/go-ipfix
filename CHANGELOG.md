@@ -25,7 +25,7 @@ and [0.4.8](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#048-03-19-
 - Change the names of Flow Types. (#171, @zyiou)
 - Enhance the debug logs with useful info. (#170, @zyiou)
 ### Fixed
-- Fix the default expirtation time of TLS certificates in tests by increasing it
+- Fix the default expiration time of TLS certificates in tests by increasing it
   from one month to one year. (#127, @zyiou)
 - Fix the code in pkg/producer when cherrypicking commits from v0.4.5 release. (#143, @stati)
 - Fix the branch name in go-ipfix collector image workflow. (#160, @stati)
