@@ -26,12 +26,12 @@ var (
 		"destinationClusterIPv4",
 		"destinationClusterIPv6",
 		"destinationServicePort",
+		"ingressNetworkPolicyRuleAction",
 	}
 	nonStatsElementList = []string{
 		"flowEndSeconds",
 		"flowEndReason",
 		"tcpState",
-		"ingressNetworkPolicyRuleAction",
 	}
 	statsElementList = []string{
 		"packetTotalCount",

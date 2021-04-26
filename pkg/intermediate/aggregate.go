@@ -169,26 +169,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	correlationRequired := false
-	// Get Antrea flowType from the record that will help to determine if correlation
-	// is required or not.
-	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
-		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
-			// Correlation is required for only InterNode flow type defined in
-			// pkg/registry/registry.go. If egress network policy rule action is
-			// deny (drop/reject), the correlation is not required.
-			if recordFlowType == registry.FlowTypeInterNode {
-				correlationRequired = true
-				if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
-					if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
-						if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
-							correlationRequired = false
-						}
-					}
-				}
-			}
-		}
-	}
+	correlationRequired := isCorrelationRequired(record)
 
 	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
 	if exist {
@@ -262,6 +243,14 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
+			case entities.Unsigned8:
+				if ieWithValue.Value != uint8(0) {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					if existingIeWithValue.Value != uint8(0) {
+						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
 			case entities.Unsigned16:
 				if ieWithValue.Value != uint16(0) {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
@@ -329,11 +318,6 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			case "tcpState":
 				// Update tcpState when flow end timestamp is the latest
 				if isLatest {
-					existingIeWithValue.Value = ieWithValue.Value
-				}
-			case "ingressNetworkPolicyRuleAction":
-				// update ingressNetworkPolicyRuleAction when no action is assigned.
-				if existingIeWithValue.Value.(uint8) == registry.NetworkPolicyRuleActionNoAction {
 					existingIeWithValue.Value = ieWithValue.Value
 				}
 			default:
@@ -620,4 +604,24 @@ func validateDataRecord(record entities.Record) bool {
 		}
 	}
 	return true
+}
+
+// isCorrelationRequired returns true when flowType is InterNode and
+// egressNetworkPolicyRuleAction is not deny (drop/reject).
+func isCorrelationRequired(record entities.Record) bool {
+	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
+		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
+			if recordFlowType == registry.FlowTypeInterNode {
+				if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
+					if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
+						if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
+							return false
+						}
+					}
+				}
+				return true
+			}
+		}
+	}
+	return false
 }
