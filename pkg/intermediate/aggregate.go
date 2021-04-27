@@ -169,18 +169,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	correlationRequired := false
-	// Get Antrea flowType from the record that will help to determine if correlation
-	// is required or not.
-	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
-		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
-			// Correlation is required for only InterNode flow type defined in
-			// pkg/registry/registry.go.
-			if recordFlowType == registry.FlowTypeInterNode {
-				correlationRequired = true
-			}
-		}
-	}
+	correlationRequired := isCorrelationRequired(record)
 
 	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
 	if exist {
@@ -250,6 +239,14 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 				if ieWithValue.Value != "" {
 					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
 					if existingIeWithValue.Value != "" {
+						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
+			case entities.Unsigned8:
+				if ieWithValue.Value != uint8(0) {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					if existingIeWithValue.Value != uint8(0) {
 						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
@@ -607,4 +604,24 @@ func validateDataRecord(record entities.Record) bool {
 		}
 	}
 	return true
+}
+
+// isCorrelationRequired returns true when flowType is InterNode and
+// egressNetworkPolicyRuleAction is not deny (drop/reject).
+func isCorrelationRequired(record entities.Record) bool {
+	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
+		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
+			if recordFlowType == registry.FlowTypeInterNode {
+				if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
+					if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
+						if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
+							return false
+						}
+					}
+				}
+				return true
+			}
+		}
+	}
+	return false
 }
