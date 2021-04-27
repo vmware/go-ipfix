@@ -94,22 +94,23 @@ fi
 
 cd $THIS_DIR/../build/yamls/collector
 
-
 if [ "$MODE" == "dev" ]; then
-    sed -i '' -e "s/^image_tag.*/image_tag: latest/g" values.yaml
+    sed -i.bak -e "s/^image_tag.*/image_tag: latest/g" values.yaml
     if [[ $PORT != "" ]]; then
-        sed -i '' -e "s/^port.*/port: $PORT/g" values.yaml
+        sed -i.bak -e "s/^port.*/port: $PORT/g" values.yaml
     fi
     if [[ $PROTO != "" ]]; then
-        sed -i '' -e "s/^protocol.*/protocol: $PROTO/g" values.yaml
+        sed -i.bak -e "s/^protocol.*/protocol: $PROTO/g" values.yaml
     fi
     $HELM template "." -f "./templates/ipfix-collector.yaml"
+    rm values.yaml.bak
 fi
 
 if [ "$MODE" == "release" ]; then
     # update the Chart version by the newest release version
-    sed -i '' -e "s/^version.*/version: ${IMG_TAG:1}/g" Chart.yaml
-    # replace the line starting with "image_tag", and create a backup
+    sed -i.bak -e "s/^version.*/version: ${IMG_TAG:1}/g" Chart.yaml
+    rm "Chart.yaml.bak"
+    # replace the line starting with "image_tag", and create a backup of the original one
     sed -i.bak -e "s/^image_tag.*/image_tag: $IMG_TAG/g" values.yaml
 
     $HELM template "." -f "./templates/ipfix-collector.yaml"
