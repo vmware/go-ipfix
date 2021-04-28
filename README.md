@@ -7,18 +7,18 @@ go-ipfix is an IPFIX library that can be used to implement an IPFIX exporter, wh
 This IPFIX library can be used to build an exporter. Please check out the [exporter tests](https://github.com/vmware/go-ipfix/blob/main/pkg/exporter/process_test.go) to get an idea on how to build exporter on top of TCP and UDP transport protocols given a IPFIX collector.
 
 ### Deploy stand alone IPFIX collector
-To deploy a released version of go-ipfix collector, which is used to decode and log the IPFIX records, please choose one deployment manifest from the list of releases. For any given release <TAG> (e.g. v0.1.0), you can deploy the collector as follows:
+To deploy a released version of the go-ipfix collector, which is used to collect, decode and log the IPFIX records, please choose one deployment manifest from the list of releases. For any given release <TAG> (e.g. v0.1.0), you can deploy the collector as follows:
 
 ```
 kubectl apply -f https://github.com/vmware/go-ipfix/releases/download/<TAG>/ipfix-collector.yaml
 ```
-To deploy the latest version of collector (built from the main branch), use the command below: 
+To deploy the latest version of the go-ipfix collector (built from the main branch), use the command below: 
 ```
 cd <directory containing this README file>/build/yamls
 kubectl apply -f ./ipfix-collector.yaml
 ```
 
-While deploying the latest version of collector, the port and protocol can be configured by using the command:
+While deploying the latest version of the go-ipfix collector, port and protocol can be configured by using the command:
 
 ```
 cd <directory containing this README file>/hack

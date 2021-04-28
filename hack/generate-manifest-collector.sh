@@ -20,6 +20,14 @@ function echoerr {
     >&2 echo "$@"
 }
 
+function print_usage {
+    echoerr "$_usage"
+}
+
+function print_help {
+    echoerr "Try '$0 --help' for more information."
+}
+
 MODE="dev"
 
 _usage="Usage: $0 [--mode (dev|release)] [--help|-h]
@@ -107,8 +115,9 @@ if [ "$MODE" == "dev" ]; then
 fi
 
 if [ "$MODE" == "release" ]; then
-    # update the Chart version by the newest release version
-    sed -i.bak -e "s/^version.*/version: ${IMG_TAG:1}/g" Chart.yaml
+    # update the Chart version
+    version=$(sed -n 's/v\(.*\)-dev/\1/p' $THIS_DIR/../VERSION)
+    sed -i.bak -e "s/^version.*/version: ${version}/g" Chart.yaml
     rm "Chart.yaml.bak"
     # replace the line starting with "image_tag", and create a backup of the original one
     sed -i.bak -e "s/^image_tag.*/image_tag: $IMG_TAG/g" values.yaml
