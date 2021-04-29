@@ -263,9 +263,14 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 
 func TestKafkaProducer_Publish(t *testing.T) {
 	kafkaConfig := sarama.NewConfig()
-	kafkaConfig.Version = producer.KafkaConfigVersion
+	kafkaConfig.Version = sarama.DefaultVersion
 	kafkaConfig.Producer.Return.Successes = true
 	kafkaConfig.Producer.Return.Errors = true
+
+	testInput := producer.ProducerInput{
+		KafkaLogSuccesses: false,
+		KafkaTopic:        "test-flow-msgs",
+	}
 
 	tests := []struct {
 		name         string
@@ -288,11 +293,13 @@ func TestKafkaProducer_Publish(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			mockProducer := saramamock.NewAsyncProducer(t, kafkaConfig)
-			kafkaProducer := producer.NewKafkaProducer(mockProducer, "test-flow-msgs", tt.protoSchema)
+			mockSaramaProducer := saramamock.NewAsyncProducer(t, kafkaConfig)
+			testInput.KafkaProtoSchema = tt.protoSchema
+			kafkaProducer := producer.NewKafkaProducer(testInput)
+			kafkaProducer.SetSaramaProducer(mockSaramaProducer)
 
-			mockProducer.ExpectInputAndSucceed()
-			mockProducer.ExpectInputAndSucceed()
+			mockSaramaProducer.ExpectInputAndSucceed()
+			mockSaramaProducer.ExpectInputAndSucceed()
 			messageChan := make(chan *entities.Message)
 			go func() {
 				messageChan <- createMsgwithDataSet(t, false)
@@ -302,14 +309,14 @@ func TestKafkaProducer_Publish(t *testing.T) {
 
 			kafkaProducer.Publish(messageChan)
 
-			kafkaMsg1 := <-mockProducer.Successes()
+			kafkaMsg1 := <-mockSaramaProducer.Successes()
 			kafkaMsg1InBytes, _ := kafkaMsg1.Value.Encode()
 			assert.Equalf(t, tt.expectedMsg1, kafkaMsg1InBytes, "kafka msg should be equal to expected bytes")
-			kafkaMsg2 := <-mockProducer.Successes()
+			kafkaMsg2 := <-mockSaramaProducer.Successes()
 			kafkaMsg2InBytes, _ := kafkaMsg2.Value.Encode()
 			assert.Equalf(t, tt.expectedMsg2, kafkaMsg2InBytes, "kafka msg should be equal to expected bytes")
 
-			if err := mockProducer.Close(); err != nil {
+			if err := mockSaramaProducer.Close(); err != nil {
 				t.Fatal(err)
 			}
 		})

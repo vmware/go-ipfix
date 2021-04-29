@@ -72,12 +72,18 @@ func TestCollectorToProducer(t *testing.T) {
 	cp, _ := collector.InitCollectingProcess(cpInput)
 	// Create a mock Kafka producer
 	kafkaConfig := sarama.NewConfig()
-	kafkaConfig.Version = producer.KafkaConfigVersion
+	kafkaConfig.Version = sarama.DefaultVersion
 	kafkaConfig.Producer.Return.Successes = true
 	kafkaConfig.Producer.Return.Errors = true
 
-	mockProducer := saramamock.NewAsyncProducer(t, kafkaConfig)
-	kafkaProducer := producer.NewKafkaProducer(mockProducer, "test-flow-msgs", convertortest.FlowType1)
+	testInput := producer.ProducerInput{
+		KafkaLogSuccesses: false,
+		KafkaTopic:        "test-flow-msgs",
+		KafkaProtoSchema:  convertortest.FlowType1,
+	}
+	mockSaramaProducer := saramamock.NewAsyncProducer(t, kafkaConfig)
+	kafkaProducer := producer.NewKafkaProducer(testInput)
+	kafkaProducer.SetSaramaProducer(mockSaramaProducer)
 
 	go cp.Start()
 	waitForCollectorReady(t, cp)
@@ -94,20 +100,20 @@ func TestCollectorToProducer(t *testing.T) {
 	}()
 
 	go func() {
-		mockProducer.ExpectInputAndSucceed()
-		mockProducer.ExpectInputAndSucceed()
+		mockSaramaProducer.ExpectInputAndSucceed()
+		mockSaramaProducer.ExpectInputAndSucceed()
 		kafkaProducer.Publish(cp.GetMsgChan())
 	}()
 
-	kafkaMsg1 := <-mockProducer.Successes()
+	kafkaMsg1 := <-mockSaramaProducer.Successes()
 	kafkaMsg1InBytes, _ := kafkaMsg1.Value.Encode()
 	assert.Equalf(t, msg1InBytes, kafkaMsg1InBytes, "kafka msg should be equal to expected bytes")
-	kafkaMsg2 := <-mockProducer.Successes()
+	kafkaMsg2 := <-mockSaramaProducer.Successes()
 	kafkaMsg2InBytes, _ := kafkaMsg2.Value.Encode()
 	assert.Equalf(t, msg2InBytes, kafkaMsg2InBytes, "kafka msg should be equal to expected bytes")
 
 	cp.Stop()
-	if err := mockProducer.Close(); err != nil {
+	if err := mockSaramaProducer.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
