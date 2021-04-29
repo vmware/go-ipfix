@@ -1,4 +1,4 @@
-// Copyright 2020 VMware, Inc.
+// Copyright 2021 VMware, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,13 @@
 package producer
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"os"
 
 	"github.com/Shopify/sarama"
 	"google.golang.org/protobuf/proto"
@@ -26,47 +32,110 @@ import (
 	"github.com/vmware/go-ipfix/pkg/producer/protobuf"
 )
 
-var (
-	KafkaConfigVersion sarama.KafkaVersion
-)
+type ProducerInput struct {
+	// KafkaBrokers is a string of addresses of Kafka broker systems
+	KafkaBrokers         []string
+	KafkaVersion         sarama.KafkaVersion
+	KafkaTopic           string
+	KafkaProtoSchema     string
+	KafkaTLSEnabled      bool
+	KafkaCAFile          string
+	KafkaTLSCertFile     string
+	KafkaTLSKeyFile      string
+	KafkaTLSSkipVerify   bool
+	KafkaLogErrors       bool
+	KafkaLogSuccesses    bool
+	EnableSaramaDebugLog bool
+}
 
 type KafkaProducer struct {
 	producer             sarama.AsyncProducer
-	topic                string
+	input                ProducerInput
 	protoSchemaConvertor convertor.IPFIXToKafkaConvertor
 }
 
-func NewKafkaProducer(asyncProducer sarama.AsyncProducer, topic string, schemaType string) *KafkaProducer {
+func NewKafkaProducer(input ProducerInput) *KafkaProducer {
 	return &KafkaProducer{
-		producer:             asyncProducer,
-		topic:                topic,
-		protoSchemaConvertor: convertor.ProtoSchemaConvertor[schemaType](),
+		input:                input,
+		protoSchemaConvertor: convertor.ProtoSchemaConvertor[input.KafkaProtoSchema](),
 	}
 }
 
-// InitKafkaProducer with broker addresses and other Kafka config parameters.
-func InitKafkaProducer(addrs []string, topic string, protoSchema string, logErrors bool) (*KafkaProducer, error) {
+func (kp *KafkaProducer) InitSaramaProducer() error {
 	kafkaConfig := sarama.NewConfig()
-	kafkaConfig.Version = KafkaConfigVersion
-	kafkaConfig.Producer.Return.Successes = false
-	kafkaConfig.Producer.Return.Errors = logErrors
+	kafkaConfig.Version = kp.input.KafkaVersion
+	kafkaConfig.Producer.Return.Successes = kp.input.KafkaLogSuccesses
+	kafkaConfig.Producer.Return.Errors = kp.input.KafkaLogErrors
 
-	asyncProducer, err := sarama.NewAsyncProducer(addrs, kafkaConfig)
-	if err != nil {
-		return nil, err
+	if kp.input.KafkaTLSEnabled {
+		tlsConfig, err := setupTLSConfig(kp.input.KafkaCAFile, kp.input.KafkaTLSCertFile, kp.input.KafkaTLSKeyFile, kp.input.KafkaTLSSkipVerify)
+		if err != nil {
+			return err
+		}
+		kafkaConfig.Net.TLS.Config = tlsConfig
+		kafkaConfig.Net.TLS.Enable = true
 	}
-	producer := NewKafkaProducer(asyncProducer, topic, protoSchema)
+
+	if kp.input.EnableSaramaDebugLog {
+		sarama.Logger = log.New(os.Stderr, "[sarama] ", log.LstdFlags)
+	}
+
+	var err error
+	kp.producer, err = sarama.NewAsyncProducer(kp.input.KafkaBrokers, kafkaConfig)
+	if err != nil {
+		return err
+	}
 
 	// Capturing errors from Kafka sarama client
-	if logErrors {
+	if kp.input.KafkaLogErrors {
 		go func() {
-			for msg := range asyncProducer.Errors() {
+			for msg := range kp.producer.Errors() {
 				klog.Error(msg)
 			}
 		}()
 	}
 
-	return producer, nil
+	return nil
+}
+
+// SetSaramaProducer is needed for only tests for setting the sarama producer as
+// mock producer
+func (kp *KafkaProducer) SetSaramaProducer(producer sarama.AsyncProducer) {
+	kp.producer = producer
+}
+
+func setupTLSConfig(caFile, tlsCertFile, tlsKeyFile string, kafkaTLSSkipVerify bool) (*tls.Config, error) {
+	var t *tls.Config
+
+	if tlsCertFile != "" || tlsKeyFile != "" || caFile != "" {
+		cert, err := tls.LoadX509KeyPair(tlsCertFile, tlsKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("kafka TLS load X509 key pair error: %v", err)
+		}
+
+		caCert, err := ioutil.ReadFile(caFile)
+		if err != nil {
+			return nil, fmt.Errorf("kafka TLS CA file error: %v", err)
+		}
+
+		caCertPool := x509.NewCertPool()
+		caCertPool.AppendCertsFromPEM(caCert)
+
+		if kafkaTLSSkipVerify {
+			klog.V(4).Info("kafka client TLS enabled (server certificate didn't validate)")
+		} else {
+			klog.V(4).Info("kafka client TLS enabled")
+		}
+		t = &tls.Config{
+			Certificates: []tls.Certificate{cert},
+			RootCAs:      caCertPool,
+			MinVersion:   tls.VersionTLS12,
+		}
+		// #nosec G402: only applicable for testing purpose
+		t.InsecureSkipVerify = kafkaTLSSkipVerify
+	}
+
+	return t, nil
 }
 
 // SendFlowMessage takes in the flow message in proto schema, encodes it and sends
@@ -85,9 +154,14 @@ func (kp *KafkaProducer) SendFlowMessage(msg *protobuf.FlowMessage, kafkaDelimit
 	}
 
 	kp.producer.Input() <- &sarama.ProducerMessage{
-		Topic: kp.topic,
+		Topic: kp.input.KafkaTopic,
 		Value: sarama.ByteEncoder(bytes),
 	}
+	if kp.input.KafkaLogSuccesses {
+		kafkaMsg := <-kp.producer.Successes()
+		klog.V(2).Infof("Sent the message successfully: %v", kafkaMsg)
+	}
+
 }
 
 // Publish takes in a message channel as input and converts all the messages on
