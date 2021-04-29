@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    app: ipfix-collector
+  name: ipfix
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ipfix-collector
+  name: ipfix-collector
+  namespace: ipfix
+spec:
+  selector:
+    app: ipfix-collector
+  ports:
+  - name: ipfix-udp
+    port: 4739
+    protocol: UDP
+    targetPort: {{ .Values.port }}
+  - name: ipfix-tcp
+    port: 4739
+    protocol: TCP
+    targetPort: {{ .Values.port }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ipfix-collector
+  name: ipfix-collector
+  namespace: ipfix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ipfix-collector
+  template:
+    metadata:
+      labels:
+        app: ipfix-collector
+    spec:
+      containers:
+      - args:
+        - --v=0
+        - --ipfix.port={{ .Values.port }}
+        - --ipfix.transport={{ .Values.protocol }}
+        image: projects.registry.vmware.com/antrea/ipfix-collector:{{ .Values.image_tag }}
+        imagePullPolicy: IfNotPresent
+        name: ipfix-collector
+        ports:
+        - containerPort: {{ .Values.port }}
+      nodeSelector:
+        kubernetes.io/os: linux
+        kubernetes.io/arch: amd64

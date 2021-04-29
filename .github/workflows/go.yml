@@ -79,6 +79,23 @@ jobs:
       run: ./ci/check_codegen.sh
 
 
+  manifest:
+    name: Check manifest
+    runs-on: [ubuntu-latest]
+    steps:
+
+    - name: Set up Go 1.15
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.15
+
+    - name: Check-out code
+      uses: actions/checkout@v2
+
+    - name: Check manifest
+      run: ./ci/check_manifest.sh
+
+
   golangci-lint:
     name: Golangci-lint
     runs-on: [ubuntu-18.04]

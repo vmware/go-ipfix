@@ -39,3 +39,8 @@ collector:
 docker-collector:
 	@echo "===> Building antrea/ipfix-collector Docker image <==="
 	docker build --pull -t antrea/ipfix-collector -f build/images/Dockerfile.build.collector .
+
+.PHONY: manifest
+manifest:
+	@echo "===> Generating dev manifest for Go-ipfix <==="
+	$(CURDIR)/hack/generate-manifest-collector.sh --mode dev > build/yamls/ipfix-collector.yaml

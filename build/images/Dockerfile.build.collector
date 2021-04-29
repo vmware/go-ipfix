@@ -16,4 +16,4 @@ LABEL maintainer="go-ipfix"
 LABEL description="A Docker image based on Ubuntu 18.04 which contains a IPFIX collector"
 
 COPY --from=go-ipfix-build /go-ipfix/bin/collector /usr/local/bin/
-ENTRYPOINT "collector"
+ENTRYPOINT ["collector"]
