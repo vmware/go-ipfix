@@ -46,6 +46,18 @@ const (
 	NetworkPolicyRuleActionReject   = uint8(3)
 )
 
+// enum for ingressNetworkPolicyType and egressNetworkPolicyType field in Antrea registry.
+const (
+	PolicyTypeK8sNetworkPolicy           = uint8(1)
+	PolicyTypeAntreaNetworkPolicy        = uint8(2)
+	PolicyTypeAntreaClusterNetworkPolicy = uint8(3)
+)
+
+// placeholder of NetworkPolicyRulePriority for K8s Network Policy.
+const (
+	K8sNetworkPolicyRulePriority = int16(-1)
+)
+
 // enum for flowEndReason field in IANA registry.
 // List of RFC supported reasons: https://www.iana.org/assignments/ipfix/ipfix.xhtml#ipfix-flow-end-reason
 const (
