@@ -1,4 +1,4 @@
-// Copyright 2020 VMware, Inc.
+// Copyright 2021 VMware, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,10 +37,10 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyNamespace", 113, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyUID", 114, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyType", 115, 1, 56506, 1), 56506)
-	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 6, 56506, 2), 56506)
+	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, 56506, 4), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyUID", 117, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyType", 118, 1, 56506, 1), 56506)
-	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyRulePriority", 119, 6, 56506, 2), 56506)
+	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyRulePriority", 119, 7, 56506, 4), 56506)
 	registerInfoElement(*entities.NewInfoElement("packetTotalCountFromSourceNode", 120, 4, 56506, 8), 56506)
 	registerInfoElement(*entities.NewInfoElement("octetTotalCountFromSourceNode", 121, 4, 56506, 8), 56506)
 	registerInfoElement(*entities.NewInfoElement("packetDeltaCountFromSourceNode", 122, 4, 56506, 8), 56506)
