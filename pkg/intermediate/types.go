@@ -26,14 +26,13 @@ type FlowKey struct {
 
 type AggregationFlowRecord struct {
 	Record entities.Record
+	// Flow record contains mapping to its reference in priority queue.
+	PriorityQueueItem *ItemToExpire
 	// ReadyToSend is an indicator that we received all required records for the
 	// given flow, i.e., records from source and destination nodes for the case
 	// inter-node flow and record from the node for the case of intra-node flow.
-	ReadyToSend bool
-	// IsActive is a flag that indicates whether the flow is active or not. If
-	// aggregation process stop receiving flows from collector process, we deem
-	// the flow as inactive.
-	IsActive bool
+	ReadyToSend               bool
+	waitForReadyToSendRetries int
 }
 
 type AggregationElements struct {
