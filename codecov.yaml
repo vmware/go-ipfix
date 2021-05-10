@@ -1,5 +1,4 @@
 codecov:
-  token: 61ef0651-a3c3-4b71-8ca6-f82630f39579
   require_ci_to_pass: no
 
 comment:
