@@ -23,7 +23,7 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2"
-	"k8s.io/klog"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
