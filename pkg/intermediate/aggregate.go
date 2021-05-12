@@ -16,11 +16,13 @@ package intermediate
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/binary"
 	"fmt"
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"k8s.io/klog/v2"
 
@@ -29,9 +31,17 @@ import (
 	"github.com/vmware/go-ipfix/pkg/util"
 )
 
+var (
+	MaxRetries    = 5
+	MinExpiryTime = 100 * time.Millisecond
+)
+
 type AggregationProcess struct {
 	// flowKeyRecordMap maps each connection (5-tuple) with its records
 	flowKeyRecordMap map[FlowKey]AggregationFlowRecord
+	// expirePriorityQueue helps to maintain a priority queue for the records given
+	// active expiry and inactive expiry timeouts.
+	expirePriorityQueue TimeToExpirePriorityQueue
 	// mutex allows multiple readers or one writer at the same time
 	mutex sync.RWMutex
 	// messageChan is the channel to receive the message
@@ -49,15 +59,26 @@ type AggregationProcess struct {
 	// TODO: Add checks to validate the lists inside such as no duplicates, order
 	// of stats etc.
 	aggregateElements *AggregationElements
+	// activeExpiryTimeout helps in identifying records that elapsed active expiry
+	// timeout. Active expiry timeout is a periodic expiry interval for every flow
+	// record in the aggregation record map.
+	activeExpiryTimeout time.Duration
+	// inactiveExpiryTimeout helps in identifying records that elapsed inactive expiry
+	// timeout. Inactive expiry timeout is an expiry interval that gets reset every
+	// time a new record is received for the existing record in the aggregation
+	// record map.
+	inactiveExpiryTimeout time.Duration
 	// stopChan is the channel to receive stop message
 	stopChan chan bool
 }
 
 type AggregationInput struct {
-	MessageChan       chan *entities.Message
-	WorkerNum         int
-	CorrelateFields   []string
-	AggregateElements *AggregationElements
+	MessageChan           chan *entities.Message
+	WorkerNum             int
+	CorrelateFields       []string
+	AggregateElements     *AggregationElements
+	ActiveExpiryTimeout   time.Duration
+	InactiveExpiryTimeout time.Duration
 }
 
 // InitAggregationProcess takes in message channel (e.g. from collector) as input
@@ -69,14 +90,22 @@ func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error)
 	} else if input.WorkerNum <= 0 {
 		return nil, fmt.Errorf("worker number cannot be <= 0")
 	}
+	if input.AggregateElements != nil {
+		if (len(input.AggregateElements.StatsElements) != len(input.AggregateElements.AggregatedSourceStatsElements)) || (len(input.AggregateElements.StatsElements) != len(input.AggregateElements.AggregatedDestinationStatsElements)) {
+			return nil, fmt.Errorf("stats elements, source stats elements and destination stats elemenst length should be equal")
+		}
+	}
 	return &AggregationProcess{
 		make(map[FlowKey]AggregationFlowRecord),
+		make(TimeToExpirePriorityQueue, 0),
 		sync.RWMutex{},
 		input.MessageChan,
 		input.WorkerNum,
 		make([]*worker, 0),
 		input.CorrelateFields,
 		input.AggregateElements,
+		input.ActiveExpiryTimeout,
+		input.InactiveExpiryTimeout,
 		make(chan bool),
 	}, nil
 }
@@ -148,31 +177,93 @@ func (a *AggregationProcess) ForAllRecordsDo(callback FlowKeyRecordMapCallBack) 
 	return nil
 }
 
-// GetLastUpdatedTimeOfFlow provides the last updated time in the format of IPFIX
-// field "flowEndSeconds".
-func (a *AggregationProcess) GetLastUpdatedTimeOfFlow(flowKey FlowKey) (uint32, error) {
+func (a *AggregationProcess) deleteFlowKeyFromMap(flowKey FlowKey) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
-	record, exists := a.flowKeyRecordMap[flowKey]
-	if !exists {
-		return 0, fmt.Errorf("flow key is not present in the map")
-	}
-	flowEndField, exists := record.Record.GetInfoElementWithValue("flowEndSeconds")
-	if exists {
-		return flowEndField.Value.(uint32), nil
-	} else {
-		return 0, fmt.Errorf("flowEndSeconds field is not present in the record")
-	}
+	return a.deleteFlowKeyFromMapWithoutLock(flowKey)
 }
 
-func (a *AggregationProcess) DeleteFlowKeyFromMap(flowKey FlowKey) error {
-	a.mutex.Lock()
-	defer a.mutex.Unlock()
+func (a *AggregationProcess) deleteFlowKeyFromMapWithoutLock(flowKey FlowKey) error {
 	_, exists := a.flowKeyRecordMap[flowKey]
 	if !exists {
-		return fmt.Errorf("flow key is not present in the map")
+		return fmt.Errorf("flow key %v is not present in the map", flowKey)
 	}
 	delete(a.flowKeyRecordMap, flowKey)
+	return nil
+}
+
+// GetExpiryFromExpirePriorityQueue returns the earliest timestamp (active expiry
+// or inactive expiry) from expire priority queue.
+func (a *AggregationProcess) GetExpiryFromExpirePriorityQueue() time.Duration {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	currTime := time.Now()
+	if a.expirePriorityQueue.Len() > 0 {
+		// Get the minExpireTime of the top item in expirePriorityQueue.
+		expiryDuration := MinExpiryTime + a.expirePriorityQueue.minExpireTime(0).Sub(currTime)
+		if expiryDuration < 0 {
+			return MinExpiryTime
+		}
+		return expiryDuration
+	}
+	if a.activeExpiryTimeout < a.inactiveExpiryTimeout {
+		return a.activeExpiryTimeout
+	}
+	return a.inactiveExpiryTimeout
+}
+
+func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMapCallBack) error {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	if a.expirePriorityQueue.Len() == 0 {
+		return nil
+	}
+	currTime := time.Now()
+	for a.expirePriorityQueue.Len() > 0 {
+		topItem := a.expirePriorityQueue.Peek()
+		if topItem.activeExpireTime.After(currTime) && topItem.inactiveExpireTime.After(currTime) {
+			// We do not have to check other items anymore.
+			break
+		}
+		// Pop the record item from the priority queue
+		pqItem := heap.Pop(&a.expirePriorityQueue).(*ItemToExpire)
+		if !pqItem.flowRecord.ReadyToSend {
+			// Reset the timeouts and add the record to priority queue.
+			// Delete the record after max retries.
+			pqItem.flowRecord.waitForReadyToSendRetries = pqItem.flowRecord.waitForReadyToSendRetries + 1
+			if pqItem.flowRecord.waitForReadyToSendRetries > MaxRetries {
+				klog.V(2).Infof("Deleting the record after waiting for ready to send with key: %v record: %v", pqItem.flowKey, pqItem.flowRecord)
+				if err := a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey); err != nil {
+					return fmt.Errorf("error while deleting flow record after max retries: %v", err)
+				}
+			} else {
+				pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+				pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
+				heap.Push(&a.expirePriorityQueue, pqItem)
+			}
+			continue
+		}
+		err := callback(*pqItem.flowKey, *pqItem.flowRecord)
+		if err != nil {
+			return fmt.Errorf("callback execution failed for popped flow record with key: %v, record: %v, error: %v", pqItem.flowKey, pqItem.flowRecord, err)
+		}
+		// Delete the flow record if it is expired because of inactive expiry timeout.
+		if pqItem.inactiveExpireTime.Before(currTime) {
+			if err = a.deleteFlowKeyFromMapWithoutLock(*pqItem.flowKey); err != nil {
+				return fmt.Errorf("error while deleting flow record after inactive expiry: %v", err)
+			}
+			continue
+		}
+		// Reset the expireTime for the popped item and push it to the priority queue.
+		if pqItem.activeExpireTime.Before(currTime) {
+			// Reset the active expire timeout and push the record into priority
+			// queue.
+			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+			heap.Push(&a.expirePriorityQueue, pqItem)
+		}
+	}
 	return nil
 }
 
@@ -184,6 +275,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 
 	correlationRequired := isCorrelationRequired(record)
 
+	currTime := time.Now()
 	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
 	if exist {
 		if correlationRequired {
@@ -211,6 +303,10 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 				return err
 			}
 		}
+		// Reset the inactive expiry time in the queue item with updated aggregate
+		// record.
+		a.expirePriorityQueue.Update(aggregationRecord.PriorityQueueItem,
+			flowKey, &aggregationRecord, aggregationRecord.PriorityQueueItem.activeExpireTime, currTime.Add(a.inactiveExpiryTimeout))
 	} else {
 		// Add all the new stat fields and initialize them.
 		if correlationRequired {
@@ -229,15 +325,24 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			}
 		}
 		aggregationRecord = AggregationFlowRecord{
-			record,
-			false,
-			true,
+			Record:                    record,
+			ReadyToSend:               false,
+			waitForReadyToSendRetries: 0,
 		}
 		if !correlationRequired {
 			aggregationRecord.ReadyToSend = true
 		}
-	}
+		// Push the record to the priority queue.
+		pqItem := &ItemToExpire{
+			flowKey: flowKey,
+		}
+		aggregationRecord.PriorityQueueItem = pqItem
 
+		pqItem.flowRecord = &aggregationRecord
+		pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+		pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
+		heap.Push(&a.expirePriorityQueue, pqItem)
+	}
 	a.flowKeyRecordMap[*flowKey] = aggregationRecord
 	return nil
 }
@@ -398,6 +503,33 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	return nil
 }
 
+// ResetStatElementsInRecord is called by the user after the aggregation record
+// is sent after its expiry either by active or inactive expiry interval. This should
+// be called by user after acquiring the mutex in the Aggregation process.
+func (a *AggregationProcess) ResetStatElementsInRecord(record entities.Record) error {
+	statsElementList := a.aggregateElements.StatsElements
+	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
+	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
+	for i, element := range statsElementList {
+		if ieWithValue, exist := record.GetInfoElementWithValue(element); exist {
+			ieWithValue.Value = uint64(0)
+		} else {
+			return fmt.Errorf("element with name %v in statsElements is not present in the record", element)
+		}
+		if ieWithValue, exist := record.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
+			ieWithValue.Value = uint64(0)
+		} else {
+			return fmt.Errorf("element with name %v in statsElements is not present in the record", antreaSourceStatsElements[i])
+		}
+		if ieWithValue, exist := record.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
+			ieWithValue.Value = uint64(0)
+		} else {
+			return fmt.Errorf("element with name %v in statsElements is not present in the record", antreaDestinationStatsElements[i])
+		}
+	}
+	return nil
+}
+
 func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record, fillSrcStats, fillDstStats bool) error {
 	if a.aggregateElements == nil {
 		return nil
@@ -408,8 +540,6 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 	antreaElements := append(antreaSourceStatsElements, antreaDestinationStatsElements...)
 
 	for _, element := range antreaElements {
-		// Get the new info element from Antrea registry.
-		// TODO: Take antrea registry enterpriseID as input to make this generic.
 		ie, err := registry.GetInfoElement(element, registry.AntreaEnterpriseID)
 		if err != nil {
 			return err
