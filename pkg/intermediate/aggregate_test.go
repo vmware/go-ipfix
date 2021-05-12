@@ -1,7 +1,22 @@
+// Copyright 2021 VMware, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package intermediate
 
 import (
 	"bytes"
+	"container/heap"
 	"encoding/binary"
 	"net"
 	"strings"
@@ -56,10 +71,15 @@ var (
 
 func init() {
 	registry.LoadRegistry()
+	MaxRetries = 1
+	MinExpiryTime = 0
 }
 
 const (
-	testTemplateID = uint16(256)
+	testTemplateID     = uint16(256)
+	testActiveExpiry   = 100 * time.Millisecond
+	testInactiveExpiry = 150 * time.Millisecond
+	testMaxRetries     = 2
 )
 
 func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
@@ -405,9 +425,11 @@ func TestGetTupleRecordMap(t *testing.T) {
 func TestAggregateMsgByFlowKey(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{
-		MessageChan:     messageChan,
-		WorkerNum:       2,
-		CorrelateFields: fields,
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
 	}
 	aggregationProcess, _ := InitAggregationProcess(input)
 	// Template records with IPv4 fields should be ignored
@@ -415,14 +437,18 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	err := aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
+	assert.Empty(t, aggregationProcess.expirePriorityQueue.Len())
 	// Data records should be processed and stored with corresponding flow key
 	message = createDataMsgForSrc(t, false, false, false, false, false)
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
 	assert.NotZero(t, len(aggregationProcess.flowKeyRecordMap))
+	assert.NotZero(t, aggregationProcess.expirePriorityQueue.Len())
 	flowKey := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	aggRecord := aggregationProcess.flowKeyRecordMap[flowKey]
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
+	item := aggregationProcess.expirePriorityQueue.Peek()
+	assert.NotNil(t, item)
 	ieWithValue, exist := aggRecord.Record.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ieWithValue.Value)
@@ -434,11 +460,13 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	assert.NoError(t, err)
 	// It should have only data record with IPv4 fields that is added before.
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
+	assert.Equal(t, 1, aggregationProcess.expirePriorityQueue.Len())
 	// Data record with IPv6 addresses should be processed and stored correctly
 	message = createDataMsgForSrc(t, true, false, false, false, false)
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(aggregationProcess.flowKeyRecordMap))
+	assert.Equal(t, 2, aggregationProcess.expirePriorityQueue.Len())
 	flowKey = FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
 	aggRecord = aggregationProcess.flowKeyRecordMap[flowKey]
@@ -530,9 +558,11 @@ func TestAddOriginalExporterInfoIPv6(t *testing.T) {
 func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{
-		MessageChan:     messageChan,
-		WorkerNum:       2,
-		CorrelateFields: fields,
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
 	}
 	ap, _ := InitAggregationProcess(input)
 	// Test IPv4 fields.
@@ -542,25 +572,27 @@ func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, record1, record2, false, false, true)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	err := ap.DeleteFlowKeyFromMap(*flowKey1)
+	err := ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
+	heap.Pop(&ap.expirePriorityQueue)
 	// Test the scenario, where record2 is added first and then record1.
 	record1 = createDataMsgForSrc(t, false, false, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, false, false, false, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record2, record1, false, false, true)
 	// Cleanup the flowKeyMap in aggregation process.
-	err = ap.DeleteFlowKeyFromMap(*flowKey1)
+	err = ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
+	heap.Pop(&ap.expirePriorityQueue)
 	// Test IPv6 fields.
 	// Test the scenario, where record1 is added first and then record2.
 	record1 = createDataMsgForSrc(t, true, false, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, record2, true, false, true)
 	// Cleanup the flowKeyMap in aggregation process.
-	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ = getFlowKeyFromRecord(record1)
-	err = ap.DeleteFlowKeyFromMap(*flowKey1)
+	err = ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
+	heap.Pop(&ap.expirePriorityQueue)
 	// Test the scenario, where record2 is added first and then record1.
 	record1 = createDataMsgForSrc(t, true, false, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
@@ -580,27 +612,31 @@ func TestCorrelateRecordsForInterNodeDenyFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	ap.DeleteFlowKeyFromMap(*flowKey1)
+	ap.deleteFlowKeyFromMap(*flowKey1)
+	heap.Pop(&ap.expirePriorityQueue)
 	// Test the scenario, where dst record has ingress reject rule
 	record2 := createDataMsgForDst(t, false, false, false, true, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record2, nil, false, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
-	ap.DeleteFlowKeyFromMap(*flowKey1)
+	ap.deleteFlowKeyFromMap(*flowKey1)
+	heap.Pop(&ap.expirePriorityQueue)
 	// Test the scenario, where dst record has ingress drop rule
 	record1 = createDataMsgForSrc(t, false, false, false, false, false).GetSet().GetRecords()[0]
 	record2 = createDataMsgForDst(t, false, false, false, false, true).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, record2, false, false, true)
 	// Cleanup the flowKeyMap in aggregation process.
-	ap.DeleteFlowKeyFromMap(*flowKey1)
+	ap.deleteFlowKeyFromMap(*flowKey1)
 
 }
 
 func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{
-		MessageChan:     messageChan,
-		WorkerNum:       2,
-		CorrelateFields: fields,
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
 	}
 	ap, _ := InitAggregationProcess(input)
 	// Test IPv4 fields.
@@ -608,8 +644,9 @@ func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	err := ap.DeleteFlowKeyFromMap(*flowKey1)
+	err := ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
+	heap.Pop(&ap.expirePriorityQueue)
 	// Test IPv6 fields.
 	record1 = createDataMsgForSrc(t, true, true, false, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, nil, true, true, false)
@@ -618,9 +655,11 @@ func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
 func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{
-		MessageChan:     messageChan,
-		WorkerNum:       2,
-		CorrelateFields: fields,
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
 	}
 	ap, _ := InitAggregationProcess(input)
 	// Test IPv4 fields.
@@ -628,8 +667,9 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, false)
 	// Cleanup the flowKeyMap in aggregation process.
 	flowKey1, _ := getFlowKeyFromRecord(record1)
-	err := ap.DeleteFlowKeyFromMap(*flowKey1)
+	err := ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
+	heap.Pop(&ap.expirePriorityQueue)
 	// Test IPv6 fields.
 	record1 = createDataMsgForSrc(t, true, true, false, true, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, nil, true, true, false)
@@ -644,10 +684,12 @@ func TestAggregateRecordsForInterNodeFlow(t *testing.T) {
 		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
 	}
 	input := AggregationInput{
-		MessageChan:       messageChan,
-		WorkerNum:         2,
-		CorrelateFields:   fields,
-		AggregateElements: aggElements,
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		AggregateElements:     aggElements,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
 	}
 	ap, _ := InitAggregationProcess(input)
 
@@ -672,42 +714,179 @@ func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	aggFlowRecord := AggregationFlowRecord{
 		message.GetSet().GetRecords()[0],
+		&ItemToExpire{},
 		true,
-		true,
+		0,
 	}
 	aggregationProcess.flowKeyRecordMap[flowKey1] = aggFlowRecord
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
-	err := aggregationProcess.DeleteFlowKeyFromMap(flowKey2)
+	err := aggregationProcess.deleteFlowKeyFromMap(flowKey2)
 	assert.Error(t, err)
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
-	err = aggregationProcess.DeleteFlowKeyFromMap(flowKey1)
+	err = aggregationProcess.deleteFlowKeyFromMap(flowKey1)
 	assert.NoError(t, err)
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
 }
 
-func TestAggregationProcess_GetLastUpdatedTimeOfFlow(t *testing.T) {
+func TestGetExpiryFromExpirePriorityQueue(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{
-		MessageChan:     messageChan,
-		WorkerNum:       2,
-		CorrelateFields: fields,
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
 	}
-	aggregationProcess, _ := InitAggregationProcess(input)
-	message := createDataMsgForSrc(t, false, false, false, false, false)
-	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
-	_, err := aggregationProcess.GetLastUpdatedTimeOfFlow(flowKey1)
-	assert.Error(t, err)
-	err = aggregationProcess.addOrUpdateRecordInMap(&flowKey1, message.GetSet().GetRecords()[0])
-	assert.NoError(t, err)
-	flowUpdatedTime, err := aggregationProcess.GetLastUpdatedTimeOfFlow(flowKey1)
-	assert.NoError(t, err)
-	assert.Equal(t, uint32(1), flowUpdatedTime)
+	ap, _ := InitAggregationProcess(input)
+	// Add records with IPv4 fields.
+	recordIPv4Src := createDataMsgForSrc(t, false, false, false, false, false).GetSet().GetRecords()[0]
+	recordIPv4Dst := createDataMsgForDst(t, false, false, false, false, false).GetSet().GetRecords()[0]
+	// Add records with IPv6 fields.
+	recordIPv6Src := createDataMsgForSrc(t, true, false, false, false, false).GetSet().GetRecords()[0]
+	recordIPv6Dst := createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
+	testCases := []struct {
+		name    string
+		records []entities.Record
+	}{
+		{
+			"empty queue",
+			nil,
+		},
+		{
+			"One aggregation record",
+			[]entities.Record{recordIPv4Src, recordIPv4Dst},
+		},
+		{
+			"Two aggregation records",
+			[]entities.Record{recordIPv4Src, recordIPv4Dst, recordIPv6Src, recordIPv6Dst},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, record := range tc.records {
+				flowKey, _ := getFlowKeyFromRecord(record)
+				err := ap.addOrUpdateRecordInMap(flowKey, record)
+				assert.NoError(t, err)
+			}
+			expiryTime := ap.GetExpiryFromExpirePriorityQueue()
+			assert.LessOrEqualf(t, expiryTime.Nanoseconds(), testActiveExpiry.Nanoseconds(), "incorrect expiry time")
+		})
+	}
+}
+
+func TestForAllExpiredFlowRecordsDo(t *testing.T) {
+	messageChan := make(chan *entities.Message)
+	input := AggregationInput{
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
+	}
+	ap, _ := InitAggregationProcess(input)
+	// Add records with IPv4 fields.
+	recordIPv4Src := createDataMsgForSrc(t, false, false, false, false, false).GetSet().GetRecords()[0]
+	recordIPv4Dst := createDataMsgForDst(t, false, false, false, false, false).GetSet().GetRecords()[0]
+	// Add records with IPv6 fields.
+	recordIPv6Src := createDataMsgForSrc(t, true, false, false, false, false).GetSet().GetRecords()[0]
+	recordIPv6Dst := createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
+	numExecutions := 0
+	testCallback := func(key FlowKey, record AggregationFlowRecord) error {
+		numExecutions = numExecutions + 1
+		return nil
+	}
+
+	testCases := []struct {
+		name               string
+		records            []entities.Record
+		expectedExecutions int
+		expectedPQLen      int
+	}{
+		{
+			"empty queue",
+			nil,
+			0,
+			0,
+		},
+		{
+			"One aggregation record and none expired",
+			[]entities.Record{recordIPv4Src, recordIPv4Dst},
+			0,
+			1,
+		},
+		{
+			"One aggregation record and one expired",
+			[]entities.Record{recordIPv4Src, recordIPv4Dst},
+			1,
+			1,
+		},
+		{
+			"Two aggregation records and one expired",
+			[]entities.Record{recordIPv4Src, recordIPv4Dst, recordIPv6Src, recordIPv6Dst},
+			1,
+			2,
+		},
+		{
+			"Two aggregation records and two expired",
+			[]entities.Record{recordIPv4Src, recordIPv4Dst, recordIPv6Src, recordIPv6Dst},
+			2,
+			0,
+		},
+		{
+			"One aggregation record and waitForReadyToSendRetries reach maximum",
+			[]entities.Record{recordIPv4Src},
+			0,
+			0,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			numExecutions = 0
+			for _, record := range tc.records {
+				flowKey, _ := getFlowKeyFromRecord(record)
+				err := ap.addOrUpdateRecordInMap(flowKey, record)
+				assert.NoError(t, err)
+			}
+			switch tc.name {
+			case "One aggregation record and one expired":
+				time.Sleep(testActiveExpiry)
+				err := ap.ForAllExpiredFlowRecordsDo(testCallback)
+				assert.NoError(t, err)
+			case "Two aggregation records and one expired":
+				time.Sleep(testActiveExpiry)
+				secondAggRec := ap.expirePriorityQueue[1]
+				ap.expirePriorityQueue.Update(secondAggRec, secondAggRec.flowKey,
+					secondAggRec.flowRecord, secondAggRec.activeExpireTime.Add(testActiveExpiry), secondAggRec.inactiveExpireTime.Add(testInactiveExpiry))
+				err := ap.ForAllExpiredFlowRecordsDo(testCallback)
+				assert.NoError(t, err)
+			case "Two aggregation records and two expired":
+				time.Sleep(2 * testActiveExpiry)
+				err := ap.ForAllExpiredFlowRecordsDo(testCallback)
+				assert.NoError(t, err)
+			case "One aggregation record and waitForReadyToSendRetries reach maximum":
+				for i := 0; i < testMaxRetries; i++ {
+					time.Sleep(testActiveExpiry)
+					err := ap.ForAllExpiredFlowRecordsDo(testCallback)
+					assert.NoError(t, err)
+				}
+			default:
+				break
+			}
+			assert.Equalf(t, tc.expectedExecutions, numExecutions, "number of callback executions are incorrect")
+			assert.Equalf(t, tc.expectedPQLen, ap.expirePriorityQueue.Len(), "expected pq length not correct")
+		})
+	}
 }
 
 func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1, record2 entities.Record, isIPv6, isIntraNode, needsCorrleation bool) {
 	flowKey1, _ := getFlowKeyFromRecord(record1)
 	err := ap.addOrUpdateRecordInMap(flowKey1, record1)
 	assert.NoError(t, err)
+	item := ap.expirePriorityQueue.Peek()
+	oldActiveExpiryTime := item.activeExpireTime
+	oldInactiveExpiryTime := item.inactiveExpireTime
 	if !isIntraNode && needsCorrleation {
 		flowKey2, _ := getFlowKeyFromRecord(record2)
 		assert.Equalf(t, *flowKey1, *flowKey2, "flow keys should be equal.")
@@ -715,8 +894,14 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 		assert.NoError(t, err)
 	}
 	assert.Equal(t, 1, len(ap.flowKeyRecordMap))
+	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
 	aggRecord, _ := ap.flowKeyRecordMap[*flowKey1]
-
+	item = ap.expirePriorityQueue.Peek()
+	assert.Equal(t, aggRecord, *item.flowRecord)
+	assert.Equal(t, oldActiveExpiryTime, item.activeExpireTime)
+	if !isIntraNode && needsCorrleation {
+		assert.NotEqual(t, oldInactiveExpiryTime, item.inactiveExpireTime)
+	}
 	if !isIntraNode && !needsCorrleation {
 		// for inter-Node deny connections, either src or dst Pod info will be resolved.
 		sourcePodName, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
@@ -732,10 +917,10 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 		assert.Equal(t, "pod2", ieWithValue.Value)
 		if !isIPv6 {
 			ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
-			assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, ieWithValue.Value)
+			assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.Value)
 		} else {
 			ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv6")
-			assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xbb, 0xbb, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xaa, 0xaa}, ieWithValue.Value)
+			assert.Equal(t, net.ParseIP("2001:0:3238:BBBB:63::AAAA"), ieWithValue.Value)
 		}
 		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 		assert.Equal(t, uint16(4739), ieWithValue.Value)
@@ -746,6 +931,10 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 	flowKey, _ := getFlowKeyFromRecord(srcRecord)
 	err := ap.addOrUpdateRecordInMap(flowKey, srcRecord)
 	assert.NoError(t, err)
+	item := ap.expirePriorityQueue.Peek()
+	oldActiveExpiryTime := item.activeExpireTime
+	oldInactiveExpiryTime := item.inactiveExpireTime
+
 	if !isIntraNode {
 		err = ap.addOrUpdateRecordInMap(flowKey, dstRecord)
 		assert.NoError(t, err)
@@ -757,13 +946,20 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 		assert.NoError(t, err)
 	}
 	assert.Equal(t, 1, len(ap.flowKeyRecordMap))
+	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
 	aggRecord, _ := ap.flowKeyRecordMap[*flowKey]
+	item = ap.expirePriorityQueue.Peek()
+	assert.Equal(t, aggRecord, *item.flowRecord)
+	assert.Equal(t, oldActiveExpiryTime, item.activeExpireTime)
+	if !isIntraNode {
+		assert.NotEqual(t, oldInactiveExpiryTime, item.inactiveExpireTime)
+	}
 	ieWithValue, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
 	assert.Equal(t, "pod1", ieWithValue.Value)
 	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
 	assert.Equal(t, "pod2", ieWithValue.Value)
 	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
-	assert.Equal(t, net.IP{0xc0, 0xa8, 0x0, 0x1}, ieWithValue.Value)
+	assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.Value)
 	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 	assert.Equal(t, uint16(4739), ieWithValue.Value)
 	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
