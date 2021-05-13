@@ -377,6 +377,14 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 					}
 					existingIeWithValue.Value = ieWithValue.Value
 				}
+			case entities.Signed32:
+				if ieWithValue.Value != int32(0) {
+					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					if existingIeWithValue.Value != int32(0) {
+						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
+					}
+					existingIeWithValue.Value = ieWithValue.Value
+				}
 			case entities.Ipv4Address:
 				ipInString := ieWithValue.Value.(net.IP).To4().String()
 				if ipInString != "0.0.0.0" {
