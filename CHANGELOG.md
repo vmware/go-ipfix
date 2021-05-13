@@ -4,7 +4,21 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
-## 0.5.0 04-16-2020
+## 0.5.1 05-13-2021
+### Added
+- Create K8s deployment yaml to deploy ipfix-collector and add instructions on 
+deploying the latest go-ipfix collector . (#159, #182, @heanlan)
+- Add aggregation process support for deny connections tracking. (#175, #183, @zyiou)
+### Changed
+- Modify aggregation process to maintain records in a heap based on active and 
+inactive expiry timeouts. (#185, @stati)
+- Modify rule priority types in Antrea registry. (#184, #189, @heanlan)
+- Delete unrequired method of deleting record from record map witout lock. (#181, @stati)
+- Modify network policy related fields in Antrea registry. (#179, @zyiou)
+- Move klog to klog/v2. (@187, @zyiou)
+### Fixed
+- Remove codecov token from script. (#176, @zyiou)
+## 0.5.0 04-16-2021
 Includes all the bug fixes from [0.4.1](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#041-12-09-2020),
 [0.4.2](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#042-12-15-2020),
 [0.4.3](https://github.com/vmware/go-ipfix/blob/main/CHANGELOG.md#043-02-04-2021),
