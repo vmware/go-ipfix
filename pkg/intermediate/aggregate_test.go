@@ -28,6 +28,7 @@ var (
 		"destinationServicePort",
 		"ingressNetworkPolicyRuleAction",
 		"egressNetworkPolicyRuleAction",
+		"ingressNetworkPolicyRulePriority",
 	}
 	nonStatsElementList = []string{
 		"flowEndSeconds",
@@ -86,7 +87,9 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	ie11 := entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), nil)
 	ie12 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRuleAction", 139, 1, registry.AntreaEnterpriseID, 1), nil)
 	ie13 := entities.NewInfoElementWithValue(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), nil)
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13)
+	ie14 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, registry.AntreaEnterpriseID, 4), nil)
+
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14)
 	set.AddRecord(elements, 256)
 
 	message := entities.NewMessage(true)
@@ -124,6 +127,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	tcpState := new(bytes.Buffer)
 	ingressNetworkPolicyRuleAction := new(bytes.Buffer)
 	egressNetworkPolicyRuleAction := new(bytes.Buffer)
+	ingressNetworkPolicyRulePriority := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -178,10 +182,13 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
 	if isToExternal {
 		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeToExternal)
+		util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(50000))
 	} else if !isIntraNode {
 		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeInterNode)
+		util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(0))
 	} else {
 		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeIntraNode)
+		util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(50000))
 	}
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
@@ -190,8 +197,9 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie13 := entities.NewInfoElementWithValue(tmpElement, tcpState)
 	ie14 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRuleAction", 139, 1, registry.AntreaEnterpriseID, 1), ingressNetworkPolicyRuleAction)
 	ie15 := entities.NewInfoElementWithValue(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), egressNetworkPolicyRuleAction)
+	ie16 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, registry.AntreaEnterpriseID, 4), ingressNetworkPolicyRulePriority)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -258,6 +266,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	tcpState := new(bytes.Buffer)
 	ingressNetworkPolicyRuleAction := new(bytes.Buffer)
 	egressNetworkPolicyRuleAction := new(bytes.Buffer)
+	ingressNetworkPolicyRulePriority := new(bytes.Buffer)
 
 	util.Encode(srcPort, binary.BigEndian, uint16(1234))
 	util.Encode(dstPort, binary.BigEndian, uint16(5678))
@@ -270,6 +279,8 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		util.Encode(ingressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionNoAction)
 	}
 	util.Encode(egressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionNoAction)
+	util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(50000))
+
 	if !isIntraNode {
 		util.Encode(svcPort, binary.BigEndian, uint16(0))
 		srcPod.WriteString("")
@@ -327,8 +338,9 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie13 := entities.NewInfoElementWithValue(tmpElement, tcpState)
 	ie14 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRuleAction", 139, 1, registry.AntreaEnterpriseID, 1), ingressNetworkPolicyRuleAction)
 	ie15 := entities.NewInfoElementWithValue(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), egressNetworkPolicyRuleAction)
+	ie16 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, registry.AntreaEnterpriseID, 4), ingressNetworkPolicyRulePriority)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -740,6 +752,8 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 		}
 		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 		assert.Equal(t, uint16(4739), ieWithValue.Value)
+		ingressPriority, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRulePriority")
+		assert.Equal(t, ingressPriority.Value, int32(50000))
 	}
 }
 
