@@ -55,7 +55,7 @@ const (
 
 // placeholder of NetworkPolicyRulePriority for K8s Network Policy.
 const (
-	K8sNetworkPolicyRulePriority = int16(-1)
+	K8sNetworkPolicyRulePriority = int32(-1)
 )
 
 // enum for flowEndReason field in IANA registry.
