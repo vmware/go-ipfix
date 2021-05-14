@@ -267,6 +267,14 @@ func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 	return nil
 }
 
+func (a *AggregationProcess) SetMetadataFilled(record AggregationFlowRecord, isFilled bool) {
+	record.isMetaDataFilled = isFilled
+}
+
+func (a *AggregationProcess) IsMetadataFilled(record AggregationFlowRecord) bool {
+	return record.isMetaDataFilled
+}
+
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
 // flowKeyMap by doing correlation or updating the stats.
 func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record) error {
@@ -284,6 +292,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			if !aggregationRecord.ReadyToSend && !areRecordsFromSameNode(record, aggregationRecord.Record) {
 				a.correlateRecords(record, aggregationRecord.Record)
 				aggregationRecord.ReadyToSend = true
+				aggregationRecord.isMetaDataFilled = true
 			}
 			// Aggregation of incoming flow record with existing by updating stats
 			// and flow timestamps.
@@ -331,6 +340,14 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 		}
 		if !correlationRequired {
 			aggregationRecord.ReadyToSend = true
+			// if no correlation is required for inter-Node record, K8s metadata will not
+			// be filled. For Intra-Node flows and ToExternal flows, isMetaDataFilled is set
+			// to true by default.
+			if isRecordFromSrc(record) || isRecordFromDst(record) {
+				aggregationRecord.isMetaDataFilled = false
+			} else {
+				aggregationRecord.isMetaDataFilled = true
+			}
 		}
 		// Push the record to the priority queue.
 		pqItem := &ItemToExpire{
