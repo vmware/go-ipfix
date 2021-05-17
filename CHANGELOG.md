@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.2 05-17-2021
+### Added
+- Add support for isMetadataFilled for aggregation process (#196 @zyiou)
+### Changed
+- Remove the portion of updating the version of Helm Chart in generating manifest process, 
+and fix the issue that manifest of ipfix-collector cannot be uploaded to release assets. 
+(#194 @heanlan)
+- Update some package versions to keep consistent with Antrea go.mod (#195 @zyiou)
 ## 0.5.1 05-13-2021
 ### Added
 - Create K8s deployment yaml to deploy ipfix-collector and add instructions on 
