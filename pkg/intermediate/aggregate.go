@@ -267,13 +267,27 @@ func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 	return nil
 }
 
+func (a *AggregationProcess) SetMetadataFilled(record AggregationFlowRecord, isFilled bool) {
+	record.isMetaDataFilled = isFilled
+}
+
+func (a *AggregationProcess) IsMetadataFilled(record AggregationFlowRecord) bool {
+	return record.isMetaDataFilled
+}
+
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
 // flowKeyMap by doing correlation or updating the stats.
 func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	correlationRequired := isCorrelationRequired(record)
+	var flowType uint8
+	if flowTypeIE, exist := record.GetInfoElementWithValue("flowType"); exist {
+		flowType = flowTypeIE.Value.(uint8)
+	} else {
+		klog.Warning("FlowType does not exist in current record.")
+	}
+	correlationRequired := isCorrelationRequired(flowType, record)
 
 	currTime := time.Now()
 	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
@@ -284,6 +298,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			if !aggregationRecord.ReadyToSend && !areRecordsFromSameNode(record, aggregationRecord.Record) {
 				a.correlateRecords(record, aggregationRecord.Record)
 				aggregationRecord.ReadyToSend = true
+				aggregationRecord.isMetaDataFilled = true
 			}
 			// Aggregation of incoming flow record with existing by updating stats
 			// and flow timestamps.
@@ -331,6 +346,14 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 		}
 		if !correlationRequired {
 			aggregationRecord.ReadyToSend = true
+			// If no correlation is required for an Inter-Node record, K8s metadata is
+			// expected to be not completely filled. For Intra-Node flows and ToExternal
+			// flows, isMetaDataFilled is set to true by default.
+			if flowType == registry.FlowTypeInterNode {
+				aggregationRecord.isMetaDataFilled = false
+			} else {
+				aggregationRecord.isMetaDataFilled = true
+			}
 		}
 		// Push the record to the priority queue.
 		pqItem := &ItemToExpire{
@@ -760,27 +783,23 @@ func validateDataRecord(record entities.Record) bool {
 // isCorrelationRequired returns true for InterNode flowType when
 // either the egressNetworkPolicyRuleAction is not deny (drop/reject) or
 // the ingressNetworkPolicyRuleAction is not reject.
-func isCorrelationRequired(record entities.Record) bool {
-	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
-		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
-			if recordFlowType == registry.FlowTypeInterNode {
-				if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
-					if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
-						if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
-							return false
-						}
-					}
+func isCorrelationRequired(flowType uint8, record entities.Record) bool {
+	if flowType == registry.FlowTypeInterNode {
+		if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
+			if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
+				if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
+					return false
 				}
-				if ingressRuleActionIe, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
-					if ingressRuleAction, ok := ingressRuleActionIe.Value.(uint8); ok {
-						if ingressRuleAction == registry.NetworkPolicyRuleActionReject {
-							return false
-						}
-					}
-				}
-				return true
 			}
 		}
+		if ingressRuleActionIe, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
+			if ingressRuleAction, ok := ingressRuleActionIe.Value.(uint8); ok {
+				if ingressRuleAction == registry.NetworkPolicyRuleActionReject {
+					return false
+				}
+			}
+		}
+		return true
 	}
 	return false
 }
