@@ -115,10 +115,6 @@ if [ "$MODE" == "dev" ]; then
 fi
 
 if [ "$MODE" == "release" ]; then
-    # update the Chart version
-    version=$(sed -n 's/v\(.*\)-dev/\1/p' $THIS_DIR/../VERSION)
-    sed -i.bak -e "s/^version.*/version: ${version}/g" Chart.yaml
-    rm "Chart.yaml.bak"
     # replace the line starting with "image_tag", and create a backup of the original one
     sed -i.bak -e "s/^image_tag.*/image_tag: $IMG_TAG/g" values.yaml
 
