@@ -281,7 +281,13 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	correlationRequired := isCorrelationRequired(record)
+	var flowType uint8
+	if flowTypeIE, exist := record.GetInfoElementWithValue("flowType"); exist {
+		flowType = flowTypeIE.Value.(uint8)
+	} else {
+		klog.Warning("FlowType does not exist in current record.")
+	}
+	correlationRequired := isCorrelationRequired(flowType, record)
 
 	currTime := time.Now()
 	aggregationRecord, exist := a.flowKeyRecordMap[*flowKey]
@@ -340,10 +346,10 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 		}
 		if !correlationRequired {
 			aggregationRecord.ReadyToSend = true
-			// if no correlation is required for inter-Node record, K8s metadata will not
-			// be filled. For Intra-Node flows and ToExternal flows, isMetaDataFilled is set
-			// to true by default.
-			if isRecordFromSrc(record) || isRecordFromDst(record) {
+			// If no correlation is required for an Inter-Node record, K8s metadata is
+			// expected to be not completely filled. For Intra-Node flows and ToExternal
+			// flows, isMetaDataFilled is set to true by default.
+			if flowType == registry.FlowTypeInterNode {
 				aggregationRecord.isMetaDataFilled = false
 			} else {
 				aggregationRecord.isMetaDataFilled = true
@@ -777,27 +783,23 @@ func validateDataRecord(record entities.Record) bool {
 // isCorrelationRequired returns true for InterNode flowType when
 // either the egressNetworkPolicyRuleAction is not deny (drop/reject) or
 // the ingressNetworkPolicyRuleAction is not reject.
-func isCorrelationRequired(record entities.Record) bool {
-	if ieWithValue, exist := record.GetInfoElementWithValue("flowType"); exist {
-		if recordFlowType, ok := ieWithValue.Value.(uint8); ok {
-			if recordFlowType == registry.FlowTypeInterNode {
-				if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
-					if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
-						if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
-							return false
-						}
-					}
+func isCorrelationRequired(flowType uint8, record entities.Record) bool {
+	if flowType == registry.FlowTypeInterNode {
+		if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
+			if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
+				if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
+					return false
 				}
-				if ingressRuleActionIe, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
-					if ingressRuleAction, ok := ingressRuleActionIe.Value.(uint8); ok {
-						if ingressRuleAction == registry.NetworkPolicyRuleActionReject {
-							return false
-						}
-					}
-				}
-				return true
 			}
 		}
+		if ingressRuleActionIe, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
+			if ingressRuleAction, ok := ingressRuleActionIe.Value.(uint8); ok {
+				if ingressRuleAction == registry.NetworkPolicyRuleActionReject {
+					return false
+				}
+			}
+		}
+		return true
 	}
 	return false
 }
