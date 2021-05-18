@@ -133,9 +133,9 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bo
 	if err != nil {
 		return 0, err
 	}
-	ie := NewInfoElementWithValue(element.Element, value)
-	d.orderedElementList = append(d.orderedElementList, ie)
-	d.elementsMap[element.Element.Name] = ie
+	element.Value = value
+	d.orderedElementList = append(d.orderedElementList, element)
+	d.elementsMap[element.Element.Name] = element
 	if err != nil {
 		return 0, err
 	}
