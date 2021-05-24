@@ -106,9 +106,10 @@ func (s *set) UpdateLenInHeader() {
 func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) error {
 	var record Record
 	if s.setType == Data {
-		record = NewDataRecord(templateID)
+		record = NewDataRecord(templateID, len(elements))
 	} else if s.setType == Template {
-		record = NewTemplateRecord(uint16(len(elements)), templateID)
+		record = NewTemplateRecord(templateID, uint16(len(elements)))
+
 	} else {
 		return fmt.Errorf("set type is not supported")
 	}
