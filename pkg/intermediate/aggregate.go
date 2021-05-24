@@ -740,7 +740,11 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		if set.GetSetType() == entities.Template {
 			originalExporterIP = entities.NewInfoElementWithValue(ie, nil)
 		} else if set.GetSetType() == entities.Data {
-			originalExporterIP = entities.NewInfoElementWithValue(ie, net.ParseIP(message.GetExportAddress()))
+			if isIPv4 {
+				originalExporterIP = entities.NewInfoElementWithValue(ie, net.ParseIP(message.GetExportAddress()).To4())
+			} else {
+				originalExporterIP = entities.NewInfoElementWithValue(ie, net.ParseIP(message.GetExportAddress()).To16())
+			}
 		} else {
 			return fmt.Errorf("set type %d is not supported", set.GetSetType())
 		}
