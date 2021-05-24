@@ -30,15 +30,12 @@ func TestPrepareRecord(t *testing.T) {
 		expectLen uint16
 		expectErr error
 	}{
-		{NewDataRecord(uniqueTemplateID), 0, nil},
-		{NewTemplateRecord(1, uniqueTemplateID), 4, nil},
+		{NewDataRecord(uniqueTemplateID, 1), 0, nil},
+		{NewTemplateRecord(uniqueTemplateID, 1), 4, nil},
 	}
 
 	for _, test := range prepareRecordTests {
-		actualLen, actualErr := test.record.PrepareRecord()
-		if actualLen != test.expectLen {
-			t.Errorf("Prepare record expects returned length of %v, but got %v", actualLen, test.expectLen)
-		}
+		actualErr := test.record.PrepareRecord()
 		if actualErr != test.expectErr {
 			t.Errorf("Prepare record expects no error, but got %v", actualErr)
 		}
@@ -83,8 +80,8 @@ func TestAddInfoElements(t *testing.T) {
 		ieList  []*InfoElement
 		valList []interface{}
 	}{
-		{NewTemplateRecord(1, uniqueTemplateID), testIEs, nil},
-		{NewDataRecord(uniqueTemplateID), testIEs, valData},
+		{NewTemplateRecord(uniqueTemplateID, 1), testIEs, nil},
+		{NewDataRecord(uniqueTemplateID, len(testIEs)), testIEs, valData},
 	}
 
 	for i, test := range addIETests {
@@ -130,7 +127,7 @@ func TestAddInfoElements(t *testing.T) {
 }
 
 func TestGetInfoElementWithValue(t *testing.T) {
-	templateRec := NewTemplateRecord(1, 256)
+	templateRec := NewTemplateRecord(256, 1)
 	templateRec.elementsMap = make(map[string]*InfoElementWithValue)
 	ie := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
 	templateRec.elementsMap["sourceIPv4Address"] = ie
@@ -138,7 +135,7 @@ func TestGetInfoElementWithValue(t *testing.T) {
 	assert.Equal(t, true, exist)
 	_, exist = templateRec.GetInfoElementWithValue("destinationIPv4Address")
 	assert.Equal(t, false, exist)
-	dataRec := NewDataRecord(256)
+	dataRec := NewDataRecord(256, 1)
 	dataRec.elementsMap = make(map[string]*InfoElementWithValue)
 	ie = NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
 	dataRec.elementsMap["sourceIPv4Address"] = ie
