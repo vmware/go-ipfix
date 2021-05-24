@@ -55,16 +55,16 @@ func TestEncodeToIEDataType(t *testing.T) {
 		buff := new(bytes.Buffer)
 		var err error
 		if data.dataType == Boolean {
-			_, err = EncodeToIEDataType(data.dataType, data.expectedDecode, buff)
+			err = EncodeToIEDataType(data.dataType, data.expectedDecode, buff)
 		} else {
-			_, err = EncodeToIEDataType(data.dataType, data.value, buff)
+			err = EncodeToIEDataType(data.dataType, data.value, buff)
 		}
 		assert.Nil(t, err)
 		assert.Equal(t, data.expectedEncode, buff.Bytes())
 	}
 	s := "Test"
 	buff := new(bytes.Buffer)
-	_, err := EncodeToIEDataType(String, s, buff)
+	err := EncodeToIEDataType(String, s, buff)
 	assert.Nil(t, err)
 	assert.Equal(t, []byte{0x4, 0x54, 0x65, 0x73, 0x74}, buff.Bytes())
 }
