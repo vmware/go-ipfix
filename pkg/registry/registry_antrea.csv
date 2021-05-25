@@ -42,3 +42,5 @@ ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,R
 140,egressNetworkPolicyRuleAction,unsigned8,,current,Supported Actions(uint8 value): NetworkPolicyRuleActionAllow(1) NetworkPolicyRuleActionDrop(2) NetworkPolicyRuleActionReject(3),,,,,,,56506,
 141,ingressNetworkPolicyRuleName,string,,current,,,,,,,,56506,
 142,egressNetworkPolicyRuleName,string,,current,,,,,,,,56506,
+143,sourcePodLabels,string,,current,,,,,,,,56506,
+144,destinationPodLabels,string,,current,,,,,,,,56506,
