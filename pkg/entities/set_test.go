@@ -37,9 +37,9 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 	err = encodingSet.AddRecord(elements, 256)
 	assert.NoError(t, err)
 	infoElementWithValue, _ := encodingSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
-	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x1}), infoElementWithValue.Value)
+	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x1}), infoElementWithValue.Value.(net.IP).To4())
 	infoElementWithValue, _ = encodingSet.GetRecords()[0].GetInfoElementWithValue("destinationIPv4Address")
-	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x2}), infoElementWithValue.Value)
+	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x2}), infoElementWithValue.Value.(net.IP).To4())
 }
 
 func TestAddRecordIPv6Addresses(t *testing.T) {

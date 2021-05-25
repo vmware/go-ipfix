@@ -126,14 +126,14 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bo
 	var err error
 	if isDecoding {
 		value, err = DecodeToIEDataType(element.Element.DataType, element.Value)
+		element.Value = value
 	} else {
-		value, err = EncodeToIEDataType(element.Element.DataType, element.Value, &d.buff)
+		err = EncodeToIEDataType(element.Element.DataType, element.Value, &d.buff)
 	}
 
 	if err != nil {
 		return 0, err
 	}
-	element.Value = value
 	d.orderedElementList = append(d.orderedElementList, element)
 	d.elementsMap[element.Element.Name] = element
 	if err != nil {

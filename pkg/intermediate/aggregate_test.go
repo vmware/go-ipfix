@@ -538,7 +538,7 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 	record = message.GetSet().GetRecords()[0]
 	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
 	assert.Equal(t, true, exist)
-	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, ieWithValue.Value)
+	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, ieWithValue.Value.(net.IP).To4())
 	ieWithValue, exist = record.GetInfoElementWithValue("originalObservationDomainId")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, uint32(1234), ieWithValue.Value)
