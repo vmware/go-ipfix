@@ -48,17 +48,17 @@ func (m *MockRecord) EXPECT() *MockRecordMockRecorder {
 }
 
 // AddInfoElement mocks base method
-func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElementWithValue, arg1 bool) error {
+func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElementWithValue) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddInfoElement", arg0, arg1)
+	ret := m.ctrl.Call(m, "AddInfoElement", arg0)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddInfoElement indicates an expected call of AddInfoElement
-func (mr *MockRecordMockRecorder) AddInfoElement(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockRecordMockRecorder) AddInfoElement(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), arg0)
 }
 
 // GetBuffer mocks base method
