@@ -31,7 +31,7 @@ import (
 // Have an interface and expose functions to user.
 
 type Record interface {
-	PrepareRecord() (uint16, error)
+	PrepareRecord() error
 	AddInfoElement(element *InfoElementWithValue, isDecoding bool) (uint16, error)
 	// TODO: Functions for multiple elements as well.
 	GetBuffer() *bytes.Buffer
@@ -53,38 +53,38 @@ type baseRecord struct {
 }
 
 type dataRecord struct {
-	*baseRecord
+	baseRecord
 }
 
-func NewDataRecord(id uint16) *dataRecord {
+func NewDataRecord(id uint16, numElements int) *dataRecord {
 	return &dataRecord{
-		&baseRecord{
+		baseRecord{
 			buff:               bytes.Buffer{},
 			len:                0,
 			fieldCount:         0,
 			templateID:         id,
 			orderedElementList: make([]*InfoElementWithValue, 0),
-			elementsMap:        make(map[string]*InfoElementWithValue),
+			elementsMap:        make(map[string]*InfoElementWithValue, numElements),
 		},
 	}
 }
 
 type templateRecord struct {
-	*baseRecord
+	baseRecord
 	// Minimum data record length required to be sent for this template.
 	// Elements with variable length are considered to be one byte.
 	minDataRecLength uint16
 }
 
-func NewTemplateRecord(count uint16, id uint16) *templateRecord {
+func NewTemplateRecord(id uint16, numElements uint16) *templateRecord {
 	return &templateRecord{
-		&baseRecord{
+		baseRecord{
 			buff:               bytes.Buffer{},
 			len:                0,
-			fieldCount:         count,
+			fieldCount:         numElements,
 			templateID:         id,
 			orderedElementList: make([]*InfoElementWithValue, 0),
-			elementsMap:        make(map[string]*InfoElementWithValue),
+			elementsMap:        make(map[string]*InfoElementWithValue, numElements),
 		},
 		0,
 	}
@@ -114,9 +114,9 @@ func (b *baseRecord) GetInfoElementWithValue(name string) (*InfoElementWithValue
 	}
 }
 
-func (d *dataRecord) PrepareRecord() (uint16, error) {
+func (d *dataRecord) PrepareRecord() error {
 	// We do not have to do anything if it is data record
-	return 0, nil
+	return nil
 }
 
 func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bool) (uint16, error) {
@@ -126,30 +126,26 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bo
 	var err error
 	if isDecoding {
 		value, err = DecodeToIEDataType(element.Element.DataType, element.Value)
+		element.Value = value
 	} else {
-		value, err = EncodeToIEDataType(element.Element.DataType, element.Value, &d.buff)
+		err = EncodeToIEDataType(element.Element.DataType, element.Value, &d.buff)
+	}
+	if err != nil {
+		return 0, err
 	}
 
-	if err != nil {
-		return 0, err
-	}
-	element.Value = value
 	d.orderedElementList = append(d.orderedElementList, element)
 	d.elementsMap[element.Element.Name] = element
-	if err != nil {
-		return 0, err
-	}
 	return uint16(d.buff.Len() - initialLength), nil
 }
 
-func (t *templateRecord) PrepareRecord() (uint16, error) {
+func (t *templateRecord) PrepareRecord() error {
 	// Add Template Record Header
-	initialLength := t.buff.Len()
 	err := util.Encode(&t.buff, binary.BigEndian, t.templateID, t.fieldCount)
 	if err != nil {
-		return 0, fmt.Errorf("AddInfoElement(templateRecord) error in writing template header: %v", err)
+		return fmt.Errorf("AddInfoElement(templateRecord) error in writing template header: %v", err)
 	}
-	return uint16(t.buff.Len() - initialLength), nil
+	return nil
 }
 
 func (t *templateRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bool) (uint16, error) {

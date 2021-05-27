@@ -149,12 +149,11 @@ func (mr *MockRecordMockRecorder) GetTemplateID() *gomock.Call {
 }
 
 // PrepareRecord mocks base method
-func (m *MockRecord) PrepareRecord() (uint16, error) {
+func (m *MockRecord) PrepareRecord() error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PrepareRecord")
-	ret0, _ := ret[0].(uint16)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // PrepareRecord indicates an expected call of PrepareRecord
