@@ -64,4 +64,6 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, 56506, 1), 56506)
 	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyRuleName", 141, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyRuleName", 142, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("sourcePodLabels", 143, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("destinationPodLabels", 144, 13, 56506, 65535), 56506)
 }
