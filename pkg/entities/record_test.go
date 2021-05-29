@@ -86,35 +86,22 @@ func TestAddInfoElements(t *testing.T) {
 
 	for i, test := range addIETests {
 		for j, testIE := range test.ieList {
-			var actualLen, expectLen uint16
 			var actualErr error
 			if i == 0 {
 				// For template record
 				ie := NewInfoElementWithValue(testIE, nil)
-				actualLen, actualErr = test.record.AddInfoElement(ie, false)
-				// IANA registry elements field specifier length
-				expectLen = 4
+				actualErr = test.record.AddInfoElement(ie, false)
 			} else {
 				// For data record
 				ie := NewInfoElementWithValue(testIE, test.valList[j])
-				actualLen, actualErr = test.record.AddInfoElement(ie, false)
+				actualErr = test.record.AddInfoElement(ie, false)
 				if testIE.Len == VariableLength {
-					v, ok := test.valList[j].(string)
+					_, ok := test.valList[j].(string)
 					if !ok {
 						t.Errorf("val argument is not of valid type string")
 					}
-					if len(v) < 255 {
-						expectLen = uint16(len(v) + 1)
-					} else if len(v) < 65535 {
-						expectLen = uint16(len(v) + 3)
-					} else {
-						t.Errorf("val argument do not have valid length (<65535)")
-					}
-				} else {
-					expectLen = testIE.Len
 				}
 			}
-			assert.Equal(t, expectLen, actualLen, "Length of bytes written to buffer is not same as expected.")
 			assert.Equal(t, nil, actualErr, "Error returned is not nil")
 		}
 		// go test -v to see data buffer in hex format
