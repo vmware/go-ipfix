@@ -298,12 +298,14 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 		if err := tempSet.PrepareSet(entities.Template, templateID); err != nil {
 			return err
 		}
-		elements := make([]*entities.InfoElementWithValue, 0)
-		for _, element := range tempValue.elements {
-			ie := entities.NewInfoElementWithValue(element, nil)
-			elements = append(elements, ie)
+		elements := make([]*entities.InfoElementWithValue, len(tempValue.elements))
+		for i, element := range tempValue.elements {
+			elements[i] = entities.NewInfoElementWithValue(element, nil)
 		}
-		tempSet.AddRecord(elements, templateID)
+		err := tempSet.AddRecord(elements, templateID)
+		if err != nil {
+			return err
+		}
 		templateSets = append(templateSets, tempSet)
 	}
 	ep.mutex.Unlock()
@@ -328,7 +330,7 @@ func (ep *ExportingProcess) dataRecSanityCheck(rec entities.Record) error {
 	if rec.GetFieldCount() != uint16(len(ep.templatesMap[templateID].elements)) {
 		return fmt.Errorf("process: field count of data does not match templateID %d", templateID)
 	}
-	if rec.GetBuffer().Len() < int(ep.templatesMap[templateID].minDataRecLen) {
+	if len(rec.GetBuffer()) < int(ep.templatesMap[templateID].minDataRecLen) {
 		return fmt.Errorf("process: Data Record does not pass the min required length (%d) check for template ID %d", ep.templatesMap[templateID].minDataRecLen, templateID)
 	}
 	return nil

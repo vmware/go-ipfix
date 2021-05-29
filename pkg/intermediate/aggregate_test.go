@@ -15,9 +15,7 @@
 package intermediate
 
 import (
-	"bytes"
 	"container/heap"
-	"encoding/binary"
 	"net"
 	"strings"
 	"testing"
@@ -27,7 +25,6 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
-	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 var (
@@ -132,83 +129,67 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
-	srcPort := new(bytes.Buffer)
-	dstPort := new(bytes.Buffer)
-	proto := new(bytes.Buffer)
-	svcPort := new(bytes.Buffer)
-	srcPod := new(bytes.Buffer)
-	dstPod := new(bytes.Buffer)
-	srcAddr := new(bytes.Buffer)
-	dstAddr := new(bytes.Buffer)
-	svcAddr := new(bytes.Buffer)
-	flowEndTime := new(bytes.Buffer)
-	antreaFlowType := new(bytes.Buffer)
-	flowEndReason := new(bytes.Buffer)
-	tcpState := new(bytes.Buffer)
-	ingressNetworkPolicyRuleAction := new(bytes.Buffer)
-	egressNetworkPolicyRuleAction := new(bytes.Buffer)
-	ingressNetworkPolicyRulePriority := new(bytes.Buffer)
+	var egressNetworkPolicyRuleAction, ingressNetworkPolicyRulePriority, svcPort, srcAddr, dstAddr, svcAddr, flowEndTime, flowEndReason, tcpState, antreaFlowType []byte
+	var srcPod, dstPod string
 
-	util.Encode(srcPort, binary.BigEndian, uint16(1234))
-	util.Encode(dstPort, binary.BigEndian, uint16(5678))
-	util.Encode(proto, binary.BigEndian, uint8(6))
-	util.Encode(svcPort, binary.BigEndian, uint16(4739))
-	util.Encode(ingressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionNoAction)
+	srcPort, _ := entities.EncodeToIEDataType(entities.Unsigned16, uint16(1234))
+	dstPort, _ := entities.EncodeToIEDataType(entities.Unsigned16, uint16(5678))
+	proto, _ := entities.EncodeToIEDataType(entities.Unsigned8, uint8(6))
+	svcPort, _ = entities.EncodeToIEDataType(entities.Unsigned16, uint16(4739))
+	ingressNetworkPolicyRuleAction, _ := entities.EncodeToIEDataType(entities.Unsigned8, registry.NetworkPolicyRuleActionNoAction)
 	if isEgressDeny {
-		util.Encode(egressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionDrop)
+		egressNetworkPolicyRuleAction, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.NetworkPolicyRuleActionDrop)
 	} else {
-		util.Encode(egressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionNoAction)
+		egressNetworkPolicyRuleAction, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.NetworkPolicyRuleActionNoAction)
 	}
-
-	srcPod.WriteString("pod1")
+	srcPod = "pod1"
 	if !isIntraNode {
-		dstPod.WriteString("")
+		dstPod = ""
 	} else {
-		dstPod.WriteString("pod2")
+		dstPod = "pod2"
 	}
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
-	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), srcPod)
-	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), dstPod)
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), []byte(srcPod))
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), []byte(dstPod))
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), svcPort)
 	var ie1, ie2, ie8, ie11 *entities.InfoElementWithValue
 	if !isIPv6 {
-		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("10.0.0.1").To4())
-		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("10.0.0.2").To4())
-		util.Encode(svcAddr, binary.BigEndian, net.ParseIP("192.168.0.1").To4())
+		srcAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.1").To4())
+		dstAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.2").To4())
+		svcAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("192.168.0.1").To4())
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), dstAddr)
 		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), svcAddr)
 	} else {
-		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
-		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
-		util.Encode(svcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
+		srcAddr, _ = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
+		dstAddr, _ = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
+		svcAddr, _ = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
 		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
 	}
-
 	if !isUpdatedRecord {
-		util.Encode(flowEndTime, binary.BigEndian, uint32(1))
-		util.Encode(flowEndReason, binary.BigEndian, registry.ActiveTimeoutReason)
-		util.Encode(tcpState, binary.BigEndian, "ESTABLISHED")
+		flowEndTime, _ = entities.EncodeToIEDataType(entities.DateTimeSeconds, uint32(1))
+		flowEndReason, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.ActiveTimeoutReason)
+		tcpState, _ = entities.EncodeToIEDataType(entities.String, "ESTABLISHED")
 	} else {
-		util.Encode(flowEndTime, binary.BigEndian, uint32(10))
-		util.Encode(flowEndReason, binary.BigEndian, registry.EndOfFlowReason)
-		util.Encode(tcpState, binary.BigEndian, "TIME_WAIT")
+		flowEndTime, _ = entities.EncodeToIEDataType(entities.DateTimeSeconds, uint32(10))
+		flowEndReason, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.EndOfFlowReason)
+		tcpState, _ = entities.EncodeToIEDataType(entities.String, "TIME_WAIT")
 	}
 	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
 	if isToExternal {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeToExternal)
-		util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(50000))
+		antreaFlowType, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.FlowTypeToExternal)
+		ingressNetworkPolicyRulePriority, _ = entities.EncodeToIEDataType(entities.Signed32, int32(50000))
 	} else if !isIntraNode {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeInterNode)
-		util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(0))
+		antreaFlowType, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.FlowTypeInterNode)
+		ingressNetworkPolicyRulePriority, _ = entities.EncodeToIEDataType(entities.Signed32, int32(0))
 	} else {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeIntraNode)
-		util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(50000))
+		antreaFlowType, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.FlowTypeIntraNode)
+		ingressNetworkPolicyRulePriority, _ = entities.EncodeToIEDataType(entities.Signed32, int32(50000))
 	}
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
@@ -229,19 +210,19 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 			e, _ = registry.GetInfoElement(element, registry.IANAReversedEnterpriseID)
 		}
 		ieWithValue := entities.NewInfoElementWithValue(e, nil)
-		value := new(bytes.Buffer)
+		var value []byte
 		switch element {
 		case "packetTotalCount", "reversePacketTotalCount":
 			if !isUpdatedRecord {
-				util.Encode(value, binary.BigEndian, uint64(500))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(500))
 			} else {
-				util.Encode(value, binary.BigEndian, uint64(1000))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(1000))
 			}
 		case "packetDeltaCount", "reversePacketDeltaCount":
 			if !isUpdatedRecord {
-				util.Encode(value, binary.BigEndian, uint64(0))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(0))
 			} else {
-				util.Encode(value, binary.BigEndian, uint64(500))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(500))
 			}
 		}
 		ieWithValue.Value = value
@@ -271,85 +252,70 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]*entities.InfoElementWithValue, 0)
-	srcPort := new(bytes.Buffer)
-	dstPort := new(bytes.Buffer)
-	proto := new(bytes.Buffer)
-	svcPort := new(bytes.Buffer)
-	srcPod := new(bytes.Buffer)
-	dstPod := new(bytes.Buffer)
-	srcAddr := new(bytes.Buffer)
-	dstAddr := new(bytes.Buffer)
-	svcAddr := new(bytes.Buffer)
-	flowEndTime := new(bytes.Buffer)
-	antreaFlowType := new(bytes.Buffer)
-	flowEndReason := new(bytes.Buffer)
-	tcpState := new(bytes.Buffer)
-	ingressNetworkPolicyRuleAction := new(bytes.Buffer)
-	egressNetworkPolicyRuleAction := new(bytes.Buffer)
-	ingressNetworkPolicyRulePriority := new(bytes.Buffer)
-
-	util.Encode(srcPort, binary.BigEndian, uint16(1234))
-	util.Encode(dstPort, binary.BigEndian, uint16(5678))
-	util.Encode(proto, binary.BigEndian, uint8(6))
+	var ingressNetworkPolicyRuleAction, svcPort, srcAddr, dstAddr, svcAddr, flowEndTime, flowEndReason, tcpState, antreaFlowType []byte
+	var srcPod, dstPod string
+	srcPort, _ := entities.EncodeToIEDataType(entities.Unsigned16, uint16(1234))
+	dstPort, _ := entities.EncodeToIEDataType(entities.Unsigned16, uint16(5678))
+	proto, _ := entities.EncodeToIEDataType(entities.Unsigned8, uint8(6))
 	if isIngressReject {
-		util.Encode(ingressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionReject)
+		ingressNetworkPolicyRuleAction, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.NetworkPolicyRuleActionReject)
 	} else if isIngressDrop {
-		util.Encode(ingressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionDrop)
+		ingressNetworkPolicyRuleAction, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.NetworkPolicyRuleActionDrop)
 	} else {
-		util.Encode(ingressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionNoAction)
+		ingressNetworkPolicyRuleAction, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.NetworkPolicyRuleActionNoAction)
 	}
-	util.Encode(egressNetworkPolicyRuleAction, binary.BigEndian, registry.NetworkPolicyRuleActionNoAction)
-	util.Encode(ingressNetworkPolicyRulePriority, binary.BigEndian, int32(50000))
-
+	egressNetworkPolicyRuleAction, _ := entities.EncodeToIEDataType(entities.Unsigned8, registry.NetworkPolicyRuleActionNoAction)
+	ingressNetworkPolicyRulePriority, _ := entities.EncodeToIEDataType(entities.Signed32, int32(50000))
 	if !isIntraNode {
-		util.Encode(svcPort, binary.BigEndian, uint16(0))
-		srcPod.WriteString("")
+		svcPort, _ = entities.EncodeToIEDataType(entities.Unsigned16, uint16(0))
+		srcPod = ""
 	} else {
-		util.Encode(svcPort, binary.BigEndian, uint16(4739))
-		srcPod.WriteString("pod1")
+		svcPort, _ = entities.EncodeToIEDataType(entities.Unsigned16, uint16(4739))
+		srcPod = "pod1"
 	}
-	dstPod.WriteString("pod2")
+	dstPod = "pod2"
+
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), srcPort)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), dstPort)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), proto)
-	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), srcPod)
-	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), dstPod)
+	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), []byte(srcPod))
+	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), []byte(dstPod))
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), svcPort)
 	var ie1, ie2, ie8, ie11 *entities.InfoElementWithValue
 	if !isIPv6 {
-		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("10.0.0.1").To4())
-		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("10.0.0.2").To4())
-		util.Encode(svcAddr, binary.BigEndian, net.ParseIP("0.0.0.0").To4())
+		srcAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.1").To4())
+		dstAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.2").To4())
+		svcAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("0.0.0.0").To4())
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), dstAddr)
 		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), svcAddr)
 	} else {
-		util.Encode(srcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
-		util.Encode(dstAddr, binary.BigEndian, net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
+		srcAddr, _ = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
+		dstAddr, _ = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 		if !isIntraNode {
-			util.Encode(svcAddr, binary.BigEndian, net.ParseIP("::0"))
+			svcAddr, _ = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP("::0"))
 		} else {
-			util.Encode(svcAddr, binary.BigEndian, net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
+			svcAddr, _ = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
 		}
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), srcAddr)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
 		ie8 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
 	}
 	if !isUpdatedRecord {
-		util.Encode(flowEndTime, binary.BigEndian, uint32(1))
-		util.Encode(flowEndReason, binary.BigEndian, registry.ActiveTimeoutReason)
-		util.Encode(tcpState, binary.BigEndian, "ESTABLISHED")
+		flowEndTime, _ = entities.EncodeToIEDataType(entities.DateTimeSeconds, uint32(1))
+		flowEndReason, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.ActiveTimeoutReason)
+		tcpState, _ = entities.EncodeToIEDataType(entities.String, "ESTABLISHED")
 	} else {
-		util.Encode(flowEndTime, binary.BigEndian, uint32(10))
-		util.Encode(flowEndReason, binary.BigEndian, registry.EndOfFlowReason)
-		util.Encode(tcpState, binary.BigEndian, "TIME_WAIT")
+		flowEndTime, _ = entities.EncodeToIEDataType(entities.DateTimeSeconds, uint32(10))
+		flowEndReason, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.EndOfFlowReason)
+		tcpState, _ = entities.EncodeToIEDataType(entities.String, "TIME_WAIT")
 	}
 	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewInfoElementWithValue(tmpElement, flowEndTime)
 	if !isIntraNode {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeInterNode)
+		antreaFlowType, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.FlowTypeInterNode)
 	} else {
-		util.Encode(antreaFlowType, binary.BigEndian, registry.FlowTypeIntraNode)
+		antreaFlowType, _ = entities.EncodeToIEDataType(entities.Unsigned8, registry.FlowTypeIntraNode)
 	}
 	ie11 = entities.NewInfoElementWithValue(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), antreaFlowType)
 	tmpElement, _ = registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
@@ -370,19 +336,19 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 			e, _ = registry.GetInfoElement(element, registry.IANAReversedEnterpriseID)
 		}
 		ieWithValue := entities.NewInfoElementWithValue(e, nil)
-		value := new(bytes.Buffer)
+		var value []byte
 		switch element {
 		case "packetTotalCount", "reversePacketTotalCount":
 			if !isUpdatedRecord {
-				util.Encode(value, binary.BigEndian, uint64(502))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(502))
 			} else {
-				util.Encode(value, binary.BigEndian, uint64(1005))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(1005))
 			}
 		case "packetDeltaCount", "reversePacketDeltaCount":
 			if !isUpdatedRecord {
-				util.Encode(value, binary.BigEndian, uint64(0))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(0))
 			} else {
-				util.Encode(value, binary.BigEndian, uint64(503))
+				value, _ = entities.EncodeToIEDataType(entities.Unsigned64, uint64(503))
 			}
 		}
 		ieWithValue.Value = value

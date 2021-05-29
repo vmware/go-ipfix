@@ -210,12 +210,12 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 	if err := util.Decode(templateBuffer, binary.BigEndian, &templateID, &fieldCount); err != nil {
 		return nil, err
 	}
-	elementsWithValue := make([]*entities.InfoElementWithValue, 0)
+
 	templateSet := entities.NewSet(true)
 	if err := templateSet.PrepareSet(entities.Template, templateID); err != nil {
 		return nil, err
 	}
-
+	elementsWithValue := make([]*entities.InfoElementWithValue, int(fieldCount))
 	for i := 0; i < int(fieldCount); i++ {
 		var element *entities.InfoElement
 		var enterpriseID uint32
@@ -262,10 +262,12 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				return nil, err
 			}
 		}
-		ie := entities.NewInfoElementWithValue(element, nil)
-		elementsWithValue = append(elementsWithValue, ie)
+		elementsWithValue[i] = entities.NewInfoElementWithValue(element, nil)
 	}
-	templateSet.AddRecord(elementsWithValue, templateID)
+	err := templateSet.AddRecord(elementsWithValue, templateID)
+	if err != nil {
+		return nil, err
+	}
 	cp.addTemplate(obsDomainID, templateID, elementsWithValue)
 	return templateSet, nil
 }
@@ -277,24 +279,25 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
 	dataSet := entities.NewSet(true)
-	if err := dataSet.PrepareSet(entities.Data, templateID); err != nil {
+	if err = dataSet.PrepareSet(entities.Data, templateID); err != nil {
 		return nil, err
 	}
 
 	for dataBuffer.Len() > 0 {
-		elements := make([]*entities.InfoElementWithValue, 0)
-		for _, element := range template {
+		elements := make([]*entities.InfoElementWithValue, len(template))
+		for i, element := range template {
 			var length int
 			if element.Len == entities.VariableLength { // string
 				length = getFieldLength(dataBuffer)
 			} else {
 				length = int(element.Len)
 			}
-			val := dataBuffer.Next(length)
-			ie := entities.NewInfoElementWithValue(element, bytes.NewBuffer(val))
-			elements = append(elements, ie)
+			elements[i] = entities.NewInfoElementWithValue(element, dataBuffer.Next(length))
 		}
-		dataSet.AddRecord(elements, templateID)
+		err = dataSet.AddRecord(elements, templateID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	return dataSet, nil
 }
