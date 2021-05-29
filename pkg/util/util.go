@@ -20,18 +20,6 @@ import (
 	"io"
 )
 
-// Encode writes the multiple inputs of different possible datatypes to the io writer.
-func Encode(buff io.Writer, byteOrder binary.ByteOrder, inputs ...interface{}) error {
-	var err error
-	for _, in := range inputs {
-		err = binary.Write(buff, byteOrder, in)
-		if err != nil {
-			return fmt.Errorf("error in encoding data %v: %v", in, err)
-		}
-	}
-	return nil
-}
-
 // Decode decodes data from io reader to specified interfaces
 /* Example:
 var num1 uint16

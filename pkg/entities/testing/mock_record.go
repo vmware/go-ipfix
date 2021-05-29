@@ -19,7 +19,6 @@
 package testing
 
 import (
-	bytes "bytes"
 	gomock "github.com/golang/mock/gomock"
 	entities "github.com/vmware/go-ipfix/pkg/entities"
 	reflect "reflect"
@@ -49,12 +48,11 @@ func (m *MockRecord) EXPECT() *MockRecordMockRecorder {
 }
 
 // AddInfoElement mocks base method
-func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElementWithValue, arg1 bool) (uint16, error) {
+func (m *MockRecord) AddInfoElement(arg0 *entities.InfoElementWithValue, arg1 bool) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddInfoElement", arg0, arg1)
-	ret0, _ := ret[0].(uint16)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret0, _ := ret[0].(error)
+	return ret0
 }
 
 // AddInfoElement indicates an expected call of AddInfoElement
@@ -64,10 +62,10 @@ func (mr *MockRecordMockRecorder) AddInfoElement(arg0, arg1 interface{}) *gomock
 }
 
 // GetBuffer mocks base method
-func (m *MockRecord) GetBuffer() *bytes.Buffer {
+func (m *MockRecord) GetBuffer() []byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBuffer")
-	ret0, _ := ret[0].(*bytes.Buffer)
+	ret0, _ := ret[0].([]byte)
 	return ret0
 }
 

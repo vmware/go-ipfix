@@ -108,19 +108,25 @@ func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) err
 	if s.setType == Data {
 		record = NewDataRecord(templateID, len(elements))
 	} else if s.setType == Template {
-		record = NewTemplateRecord(templateID, uint16(len(elements)))
-
+		record = NewTemplateRecord(templateID, len(elements))
+		err := record.PrepareRecord()
+		if err != nil {
+			return err
+		}
 	} else {
 		return fmt.Errorf("set type is not supported")
 	}
-	record.PrepareRecord()
+
 	for _, element := range elements {
-		record.AddInfoElement(element, s.isDecoding)
+		err := record.AddInfoElement(element, s.isDecoding)
+		if err != nil {
+			return err
+		}
 	}
 	s.records = append(s.records, record)
 	// write record to set when encoding
 	if !s.isDecoding {
-		recordBytes := record.GetBuffer().Bytes()
+		recordBytes := record.GetBuffer()
 		bytesWritten, err := s.buffer.Write(recordBytes)
 		if err != nil {
 			return fmt.Errorf("error in writing the buffer to set: %v", err)
