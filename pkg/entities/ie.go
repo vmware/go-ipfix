@@ -15,13 +15,10 @@
 package entities
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 	"math"
 	"net"
-
-	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 type IEDataType uint8
@@ -176,277 +173,218 @@ func IsValidDataType(tp IEDataType) bool {
 
 // DecodeToIEDataType is to decode to specific type
 func DecodeToIEDataType(dataType IEDataType, val interface{}) (interface{}, error) {
-	value, ok := val.(*bytes.Buffer)
+	value, ok := val.([]byte)
 	if !ok {
-		return nil, fmt.Errorf("error when converting value to bytes.Buffer for decoding")
+		return nil, fmt.Errorf("error when converting value to []bytes for decoding")
 	}
 	switch dataType {
 	case Unsigned8:
-		var v uint8
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to uint8: %v", err)
-		}
-		return v, nil
+		return value[0], nil
 	case Unsigned16:
-		var v uint16
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to uint16: %v", err)
-		}
-		return v, nil
+		return binary.BigEndian.Uint16(value), nil
 	case Unsigned32:
-		var v uint32
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to uint32: %v", err)
-		}
-		return v, nil
+		return binary.BigEndian.Uint32(value), nil
 	case Unsigned64:
-		var v uint64
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to uint64: %v", err)
-		}
-		return v, nil
+		return binary.BigEndian.Uint64(value), nil
 	case Signed8:
-		var v int8
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to int8: %v", err)
-		}
-		return v, nil
+		return int8(value[0]), nil
 	case Signed16:
-		var v int16
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to int16: %v", err)
-		}
-		return v, nil
+		return int16(binary.BigEndian.Uint16(value)), nil
 	case Signed32:
-		var v int32
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to int32: %v", err)
-		}
-		return v, nil
+		return int32(binary.BigEndian.Uint32(value)), nil
 	case Signed64:
-		var v int64
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to int64: %v", err)
-		}
-		return v, nil
+		return int64(binary.BigEndian.Uint64(value)), nil
 	case Float32:
-		var v float32
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to float32: %v", err)
-		}
-		return v, nil
+		return math.Float32frombits(binary.BigEndian.Uint32(value)), nil
 	case Float64:
-		var v float64
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to float64: %v", err)
-		}
-		return v, nil
+		return math.Float64frombits(binary.BigEndian.Uint64(value)), nil
 	case Boolean:
-		var v int8
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error when decoding val to boolean: %v", err)
-		}
-		if v == 1 {
+		if int8(value[0]) == 1 {
 			return true, nil
 		} else {
 			return false, nil
 		}
 	case DateTimeSeconds:
-		var v uint32
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("Error in decoding val to uint32: %v", err)
-		}
+		v := binary.BigEndian.Uint32(value)
 		return v, nil
 	case DateTimeMilliseconds:
-		var v uint64
-		err := util.Decode(value, binary.BigEndian, &v)
-		if err != nil {
-			return nil, fmt.Errorf("error in decoding val to uint64: %v", err)
-		}
+		v := binary.BigEndian.Uint64(value)
 		return v, nil
 	case DateTimeMicroseconds, DateTimeNanoseconds:
 		return nil, fmt.Errorf("API does not support micro and nano seconds types yet")
 	case MacAddress:
-		return net.HardwareAddr(value.Bytes()), nil
+		return net.HardwareAddr(value), nil
 	case Ipv4Address, Ipv6Address:
-		return net.IP(value.Bytes()), nil
+		return net.IP(value), nil
 	case String:
-		return value.String(), nil
+		return string(value), nil
 	default:
 		return nil, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 	}
 }
 
 // EncodeToIEDataType is to encode data to specific type to the buff
-func EncodeToIEDataType(dataType IEDataType, val interface{}, buff *bytes.Buffer) error {
+func EncodeToIEDataType(dataType IEDataType, val interface{}) ([]byte, error) {
 	switch dataType {
 	case Unsigned8:
 		v, ok := val.(uint8)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type uint8", val)
+			return nil, fmt.Errorf("val argument %v is not of type uint8", val)
 		}
-		buff.Write([]byte{v})
-		return nil
+		return []byte{v}, nil
 	case Unsigned16:
 		v, ok := val.(uint16)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type uint16", val)
+			return nil, fmt.Errorf("val argument %v is not of type uint16", val)
 		}
 		b := make([]byte, 2)
 		binary.BigEndian.PutUint16(b, v)
-		buff.Write(b)
-		return nil
+		return b, nil
 	case Unsigned32:
 		v, ok := val.(uint32)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type uint32", val)
+			return nil, fmt.Errorf("val argument %v is not of type uint32", val)
 		}
 		b := make([]byte, 4)
 		binary.BigEndian.PutUint32(b, v)
-		buff.Write(b)
-		return nil
+		return b, nil
 	case Unsigned64:
 		v, ok := val.(uint64)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type uint64", val)
+			return nil, fmt.Errorf("val argument %v is not of type uint64", val)
 		}
 		b := make([]byte, 8)
 		binary.BigEndian.PutUint64(b, v)
-		buff.Write(b)
-		return nil
+		return b, nil
 	case Signed8:
 		v, ok := val.(int8)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type int8", val)
+			return nil, fmt.Errorf("val argument %v is not of type int8", val)
 		}
-		err := util.Encode(buff, binary.BigEndian, v)
-		return err
+		return []byte{byte(v)}, nil
 	case Signed16:
 		v, ok := val.(int16)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type int16", val)
+			return nil, fmt.Errorf("val argument %v is not of type int16", val)
 		}
-		err := util.Encode(buff, binary.BigEndian, v)
-		return err
+		b := make([]byte, 2)
+		binary.BigEndian.PutUint16(b, uint16(v))
+		return b, nil
 	case Signed32:
 		v, ok := val.(int32)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type int32", val)
+			return nil, fmt.Errorf("val argument %v is not of type int32", val)
 		}
-		err := util.Encode(buff, binary.BigEndian, v)
-		return err
+		b := make([]byte, 4)
+		binary.BigEndian.PutUint32(b, uint32(v))
+		return b, nil
 	case Signed64:
 		v, ok := val.(int64)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type int64", val)
+			return nil, fmt.Errorf("val argument %v is not of type int64", val)
 		}
-		err := util.Encode(buff, binary.BigEndian, v)
-		return err
+		b := make([]byte, 8)
+		binary.BigEndian.PutUint64(b, uint64(v))
+		return b, nil
 	case Float32:
 		v, ok := val.(float32)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type float32", val)
+			return nil, fmt.Errorf("val argument %v is not of type float32", val)
 		}
-		err := util.Encode(buff, binary.BigEndian, math.Float32bits(v))
-		return err
+		b := make([]byte, 4)
+		binary.BigEndian.PutUint32(b, math.Float32bits(v))
+		return b, nil
 	case Float64:
 		v, ok := val.(float64)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type float64", val)
+			return nil, fmt.Errorf("val argument %v is not of type float64", val)
 		}
-		err := util.Encode(buff, binary.BigEndian, math.Float64bits(v))
-		return err
+		b := make([]byte, 8)
+		binary.BigEndian.PutUint64(b, math.Float64bits(v))
+		return b, nil
 	case Boolean:
 		v, ok := val.(bool)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type bool", val)
+			return nil, fmt.Errorf("val argument %v is not of type bool", val)
 		}
+		b := make([]byte, 1)
 		// Following boolean spec from RFC7011
 		if v {
-			err := util.Encode(buff, binary.BigEndian, int8(1))
-			return err
+			b[0] = byte(int8(1))
 		} else {
-			err := util.Encode(buff, binary.BigEndian, int8(2))
-			return err
+			b[0] = byte(int8(2))
 		}
+		return b, nil
 	case DateTimeSeconds:
 		v, ok := val.(uint32)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type uint32", val)
+			return nil, fmt.Errorf("val argument %v is not of type uint32", val)
 		}
 		b := make([]byte, 4)
 		binary.BigEndian.PutUint32(b, v)
-		buff.Write(b)
-		return nil
+		return b, nil
 	case DateTimeMilliseconds:
 		v, ok := val.(uint64)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type uint64", val)
+			return nil, fmt.Errorf("val argument %v is not of type uint64", val)
 		}
 		b := make([]byte, 8)
 		binary.BigEndian.PutUint64(b, v)
-		buff.Write(b)
-		return nil
+		return b, nil
 		// Currently only supporting seconds and milliseconds
 	case DateTimeMicroseconds, DateTimeNanoseconds:
 		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
-		return fmt.Errorf("API does not support micro and nano seconds types yet")
+		return nil, fmt.Errorf("API does not support micro and nano seconds types yet")
 	case MacAddress:
 		// Expects net.Hardware type
 		v, ok := val.(net.HardwareAddr)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type net.HardwareAddr for this element", val)
+			return nil, fmt.Errorf("val argument %v is not of type net.HardwareAddr for this element", val)
 		}
-		err := util.Encode(buff, binary.BigEndian, v)
-		return err
+		return v, nil
 	case Ipv4Address:
 		// Expects net.IP type
 		v, ok := val.(net.IP)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type net.IP for this element", val)
+			return nil, fmt.Errorf("val argument %v is not of type net.IP for this element", val)
 		}
 		if ipv4Add := v.To4(); ipv4Add != nil {
-			err := util.Encode(buff, binary.BigEndian, ipv4Add)
-			return err
+			return ipv4Add, nil
 		} else {
-			return fmt.Errorf("provided IP %v does not belong to IPv4 address family", v)
+			return nil, fmt.Errorf("provided IP %v does not belong to IPv4 address family", v)
 		}
 	case Ipv6Address:
 		// Expects net.IP type
 		v, ok := val.(net.IP)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type net.IP for this element", val)
+			return nil, fmt.Errorf("val argument %v is not of type net.IP for this element", val)
 		}
 		if ipv6Add := v.To16(); ipv6Add != nil {
-			err := util.Encode(buff, binary.BigEndian, ipv6Add)
-			return err
+			return ipv6Add, nil
 		} else {
-			return fmt.Errorf("provided IPv6 address %v is not of correct length", v)
+			return nil, fmt.Errorf("provided IPv6 address %v is not of correct length", v)
 		}
 	case String:
 		v, ok := val.(string)
 		if !ok {
-			return fmt.Errorf("val argument %v is not of type string for this element", val)
+			return nil, fmt.Errorf("val argument %v is not of type string for this element", val)
 		}
+		var encodedBytes []byte
 		if len(v) < 255 {
-			err := util.Encode(buff, binary.BigEndian, uint8(len(v)), []byte(v))
-			return err
+			encodedBytes = make([]byte, len(v)+1)
+			encodedBytes[0] = uint8(len(v))
+			for i, b := range v {
+				encodedBytes[i+1] = byte(b)
+			}
 		} else if len(v) < 65535 {
-			err := util.Encode(buff, binary.BigEndian, byte(255), uint16(len(v)), []byte(v))
-			return err
+			encodedBytes = make([]byte, len(v)+3)
+			encodedBytes[0] = byte(255)
+			binary.BigEndian.PutUint16(encodedBytes[1:3], uint16(len(v)))
+			for i, b := range v {
+				encodedBytes[i+3] = byte(b)
+			}
 		}
+		return encodedBytes, nil
 	}
-	return fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
+	return nil, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 }

@@ -361,13 +361,12 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 
 	dataSet.AddRecord(elements, templateID)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
-	dataRecBytes := dataRecBuff.Bytes()
 
 	bytesSent, err := exporter.SendSet(dataSet)
 	assert.NoError(t, err)
 	// 28 is the size of the IPFIX message including all headers (20 bytes)
 	assert.Equal(t, 28, bytesSent)
-	assert.Equal(t, dataRecBytes, <-buffCh)
+	assert.Equal(t, dataRecBuff, <-buffCh)
 	assert.Equal(t, uint32(1), exporter.seqNumber)
 
 	// Create data set with multiple data records to test invalid message length
@@ -462,13 +461,12 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 
 	dataSet.AddRecord(elements, templateID)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
-	dataRecBytes := dataRecBuff.Bytes()
 
 	bytesSent, err := exporter.SendSet(dataSet)
 	assert.NoError(t, err)
 	// 28 is the size of the IPFIX message including all headers (20 bytes)
 	assert.Equal(t, 28, bytesSent)
-	assert.Equal(t, dataRecBytes, <-buffCh)
+	assert.Equal(t, dataRecBuff, <-buffCh)
 	assert.Equal(t, uint32(1), exporter.seqNumber)
 
 	// Create data set with multiple data records to test invalid message length

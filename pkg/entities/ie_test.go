@@ -1,8 +1,6 @@
 package entities
 
 import (
-	"bytes"
-	"encoding/binary"
 	"net"
 	"testing"
 
@@ -26,47 +24,45 @@ var valData = []struct {
 	{int64(-12345), Signed64, int64(-12345), []byte{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xcf, 0xc7}},
 	{float32(10.6556), Float32, float32(10.6556), []byte{0x41, 0x2a, 0x7d, 0x56}},
 	{float64(1097.655698798798), Float64, float64(1097.655698798798), []byte{0x40, 0x91, 0x26, 0x9f, 0x6f, 0x81, 0x83, 0x75}},
-	{int8(1), Boolean, true, []byte{0x1}},
-	{int8(2), Boolean, false, []byte{0x2}},
+	{true, Boolean, true, []byte{0x1}},
+	{false, Boolean, false, []byte{0x2}},
 	{macAddress, MacAddress, net.HardwareAddr([]byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}), []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}},
 	{uint32(1257894000), DateTimeSeconds, uint32(1257894000), []byte{0x4a, 0xf9, 0xf0, 0x70}},
-	{net.ParseIP("1.2.3.4"), Ipv4Address, net.IP([]byte{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0xff, 0xff, 0x1, 0x2, 0x3, 0x4}), []byte{0x1, 0x2, 0x3, 0x4}},
+	{net.ParseIP("1.2.3.4"), Ipv4Address, net.IP([]byte{0x1, 0x2, 0x3, 0x4}), []byte{0x1, 0x2, 0x3, 0x4}},
 	{net.ParseIP("2001:0:3238:DFE1:63::FEFB"), Ipv6Address, net.IP([]byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}), []byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}},
 }
 
 func TestDecodeToIEDataType(t *testing.T) {
 	for _, data := range valData {
-		buff := new(bytes.Buffer)
-		binary.Write(buff, binary.BigEndian, data.value)
+		buff, err := EncodeToIEDataType(data.dataType, data.value)
+		assert.Nil(t, err)
 		v, err := DecodeToIEDataType(data.dataType, buff)
 		assert.Nil(t, err)
 		assert.Equal(t, data.expectedDecode, v)
 	}
 	// Handle string differently since it cannot be directly write to buffer
 	s := "Test String"
-	buff := bytes.NewBufferString(s)
-	v, err := DecodeToIEDataType(String, buff)
+	v, err := DecodeToIEDataType(String, []byte(s))
 	assert.Nil(t, err)
 	assert.Equal(t, s, v)
 }
 
 func TestEncodeToIEDataType(t *testing.T) {
 	for _, data := range valData {
-		buff := new(bytes.Buffer)
 		var err error
+		var buff []byte
 		if data.dataType == Boolean {
-			err = EncodeToIEDataType(data.dataType, data.expectedDecode, buff)
+			buff, err = EncodeToIEDataType(data.dataType, data.expectedDecode)
 		} else {
-			err = EncodeToIEDataType(data.dataType, data.value, buff)
+			buff, err = EncodeToIEDataType(data.dataType, data.value)
 		}
 		assert.Nil(t, err)
-		assert.Equal(t, data.expectedEncode, buff.Bytes())
+		assert.Equal(t, data.expectedEncode, buff)
 	}
 	s := "Test"
-	buff := new(bytes.Buffer)
-	err := EncodeToIEDataType(String, s, buff)
+	buff, err := EncodeToIEDataType(String, s)
 	assert.Nil(t, err)
-	assert.Equal(t, []byte{0x4, 0x54, 0x65, 0x73, 0x74}, buff.Bytes())
+	assert.Equal(t, []byte{0x4, 0x54, 0x65, 0x73, 0x74}, buff)
 }
 
 func TestNewInfoElementWithValue(t *testing.T) {

@@ -15,7 +15,6 @@
 package intermediate
 
 import (
-	"bytes"
 	"container/heap"
 	"encoding/binary"
 	"fmt"
@@ -28,7 +27,6 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
-	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 var (
@@ -567,12 +565,10 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 		if err != nil {
 			return err
 		}
-		value := new(bytes.Buffer)
-		if err = util.Encode(value, binary.BigEndian, uint64(0)); err != nil {
-			return err
-		}
-		ieWithValue := entities.NewInfoElementWithValue(ie, value)
-		_, err = record.AddInfoElement(ieWithValue, true)
+		buffBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(buffBytes, uint64(0))
+		ieWithValue := entities.NewInfoElementWithValue(ie, buffBytes)
+		err = record.AddInfoElement(ieWithValue, true)
 		if err != nil {
 			return err
 		}
@@ -748,7 +744,7 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		} else {
 			return fmt.Errorf("set type %d is not supported", set.GetSetType())
 		}
-		_, err = record.AddInfoElement(originalExporterIP, false)
+		err = record.AddInfoElement(originalExporterIP, false)
 		if err != nil {
 			return err
 		}
@@ -765,7 +761,7 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		} else {
 			return fmt.Errorf("set type %d is not supported", set.GetSetType())
 		}
-		_, err = record.AddInfoElement(originalObservationDomainId, false)
+		err = record.AddInfoElement(originalObservationDomainId, false)
 		if err != nil {
 			return err
 		}
