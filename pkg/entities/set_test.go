@@ -36,10 +36,7 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 	elements = append(elements, ie1, ie2)
 	err = encodingSet.AddRecord(elements, 256)
 	assert.NoError(t, err)
-	infoElementWithValue, _ := encodingSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
-	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x1}), infoElementWithValue.Value)
-	infoElementWithValue, _ = encodingSet.GetRecords()[0].GetInfoElementWithValue("destinationIPv4Address")
-	assert.Equal(t, net.IP([]byte{0xa, 0x0, 0x0, 0x2}), infoElementWithValue.Value)
+	assert.Equal(t, []byte{0xa, 0x0, 0x0, 0x1, 0xa, 0x0, 0x0, 0x2}, encodingSet.GetRecords()[0].GetBuffer())
 }
 
 func TestAddRecordIPv6Addresses(t *testing.T) {
@@ -52,10 +49,7 @@ func TestAddRecordIPv6Addresses(t *testing.T) {
 	err := newSet.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
 	newSet.AddRecord(elements, 256)
-	_, exist := newSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
-	assert.Equal(t, true, exist)
-	_, exist = newSet.GetRecords()[0].GetInfoElementWithValue("destinationIPv6Address")
-	assert.Equal(t, true, exist)
+	assert.Equal(t, []byte{0x1, 0x0, 0x0, 0x2, 0x0, 0x1b, 0x0, 0x10, 0x0, 0x1c, 0x0, 0x10}, newSet.GetRecords()[0].GetBuffer())
 	newSet.ResetSet()
 	// Test with data record
 	err = newSet.PrepareSet(Data, testTemplateID)
@@ -65,10 +59,9 @@ func TestAddRecordIPv6Addresses(t *testing.T) {
 	ie2 = NewInfoElementWithValue(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 	elements = append(elements, ie1, ie2)
 	newSet.AddRecord(elements, 256)
-	infoElementWithValue, _ := newSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
-	assert.Equal(t, net.IP([]byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}), infoElementWithValue.Value)
-	infoElementWithValue, _ = newSet.GetRecords()[0].GetInfoElementWithValue("destinationIPv6Address")
-	assert.Equal(t, net.IP([]byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfc}), infoElementWithValue.Value)
+	srcIP := []byte(net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
+	dstIP := []byte(net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
+	assert.Equal(t, append(srcIP, dstIP...), newSet.GetRecords()[0].GetBuffer())
 }
 
 func TestGetSetType(t *testing.T) {

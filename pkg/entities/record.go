@@ -29,7 +29,7 @@ import (
 
 type Record interface {
 	PrepareRecord() error
-	AddInfoElement(element *InfoElementWithValue, isDecoding bool) error
+	AddInfoElement(element *InfoElementWithValue) error
 	// TODO: Functions for multiple elements as well.
 	GetBuffer() []byte
 	GetTemplateID() uint16
@@ -41,11 +41,10 @@ type Record interface {
 
 type baseRecord struct {
 	buffer             []byte
-	len                int
 	fieldCount         uint16
 	templateID         uint16
 	orderedElementList []*InfoElementWithValue
-	elementsMap        map[string]*InfoElementWithValue
+	isDecoding         bool
 	Record
 }
 
@@ -53,17 +52,19 @@ type dataRecord struct {
 	baseRecord
 }
 
-func NewDataRecord(id uint16, numElements int) *dataRecord {
-	return &dataRecord{
+func NewDataRecord(id uint16, numElements int, isDecoding bool) *dataRecord {
+	record := &dataRecord{
 		baseRecord{
-			buffer:             make([]byte, 0),
-			len:                0,
-			fieldCount:         0,
-			templateID:         id,
-			orderedElementList: make([]*InfoElementWithValue, 0),
-			elementsMap:        make(map[string]*InfoElementWithValue, numElements),
+			buffer:     make([]byte, 0),
+			fieldCount: 0,
+			templateID: id,
+			isDecoding: isDecoding,
 		},
 	}
+	if isDecoding {
+		record.orderedElementList = make([]*InfoElementWithValue, numElements)
+	}
+	return record
 }
 
 type templateRecord struct {
@@ -71,20 +72,23 @@ type templateRecord struct {
 	// Minimum data record length required to be sent for this template.
 	// Elements with variable length are considered to be one byte.
 	minDataRecLength uint16
+	// index is used when adding elements to orderedElementList
+	index int
 }
 
-func NewTemplateRecord(id uint16, numElements int) *templateRecord {
-	return &templateRecord{
+func NewTemplateRecord(id uint16, numElements int, isDecoding bool) *templateRecord {
+	record := &templateRecord{
 		baseRecord{
-			buffer:             make([]byte, 0),
-			len:                0,
-			fieldCount:         uint16(numElements),
-			templateID:         id,
-			orderedElementList: make([]*InfoElementWithValue, 0),
-			elementsMap:        make(map[string]*InfoElementWithValue, numElements),
+			buffer:     make([]byte, 0),
+			fieldCount: uint16(numElements),
+			templateID: id,
+			isDecoding: isDecoding,
 		},
 		0,
+		0,
 	}
+	record.orderedElementList = make([]*InfoElementWithValue, numElements)
+	return record
 }
 
 func (b *baseRecord) GetBuffer() []byte {
@@ -99,16 +103,17 @@ func (b *baseRecord) GetFieldCount() uint16 {
 	return b.fieldCount
 }
 
-func (d *baseRecord) GetOrderedElementList() []*InfoElementWithValue {
-	return d.orderedElementList
+func (b *baseRecord) GetOrderedElementList() []*InfoElementWithValue {
+	return b.orderedElementList
 }
 
 func (b *baseRecord) GetInfoElementWithValue(name string) (*InfoElementWithValue, bool) {
-	if element, exist := b.elementsMap[name]; exist {
-		return element, exist
-	} else {
-		return nil, false
+	for _, element := range b.orderedElementList {
+		if element.Element.Name == name {
+			return element, true
+		}
 	}
+	return nil, false
 }
 
 func (d *dataRecord) PrepareRecord() error {
@@ -116,16 +121,20 @@ func (d *dataRecord) PrepareRecord() error {
 	return nil
 }
 
-func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bool) error {
-	d.fieldCount++
+func (d *dataRecord) AddInfoElement(element *InfoElementWithValue) error {
 	var value interface{}
 	var err error
-	if isDecoding {
+	if d.isDecoding {
 		value, err = DecodeToIEDataType(element.Element.DataType, element.Value)
 		if err != nil {
 			return err
 		}
 		element.Value = value
+		if len(d.orderedElementList) <= int(d.fieldCount) {
+			d.orderedElementList = append(d.orderedElementList, element)
+		} else {
+			d.orderedElementList[d.fieldCount] = element
+		}
 	} else {
 		buffBytes, err := EncodeToIEDataType(element.Element.DataType, element.Value)
 		if err != nil {
@@ -133,9 +142,7 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bo
 		}
 		d.buffer = append(d.buffer, buffBytes...)
 	}
-
-	d.orderedElementList = append(d.orderedElementList, element)
-	d.elementsMap[element.Element.Name] = element
+	d.fieldCount++
 	return nil
 }
 
@@ -150,7 +157,7 @@ func (t *templateRecord) PrepareRecord() error {
 	return nil
 }
 
-func (t *templateRecord) AddInfoElement(element *InfoElementWithValue, isDecoding bool) error {
+func (t *templateRecord) AddInfoElement(element *InfoElementWithValue) error {
 	// val could be used to specify smaller length than default? For now assert it to be nil
 	if element.Value != nil {
 		return fmt.Errorf("AddInfoElement(templateRecord) cannot take value %v (nil is expected)", element.Value)
@@ -170,8 +177,8 @@ func (t *templateRecord) AddInfoElement(element *InfoElementWithValue, isDecodin
 		binary.BigEndian.PutUint32(addBytes, element.Element.EnterpriseId)
 		t.buffer = append(t.buffer, addBytes...)
 	}
-	t.orderedElementList = append(t.orderedElementList, element)
-	t.elementsMap[element.Element.Name] = element
+	t.orderedElementList[t.index] = element
+	t.index++
 	// Keep track of minimum data record length required for sanity check
 	if element.Element.Len == VariableLength {
 		t.minDataRecLength = t.minDataRecLength + 1
