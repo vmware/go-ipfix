@@ -130,12 +130,12 @@ func (a *AggregationProcess) Stop() {
 
 // AggregateMsgByFlowKey gets flow key from records in message and stores in cache
 func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) error {
+	set := message.GetSet()
+	if set.GetSetType() != entities.Data { // only process data records
+		return nil
+	}
 	if err := addOriginalExporterInfo(message); err != nil {
 		return err
-	}
-	set := message.GetSet()
-	if set.GetSetType() == entities.Template { // skip template records
-		return nil
 	}
 	records := set.GetRecords()
 	invalidRecs := 0
@@ -568,7 +568,7 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 		buffBytes := make([]byte, 8)
 		binary.BigEndian.PutUint64(buffBytes, uint64(0))
 		ieWithValue := entities.NewInfoElementWithValue(ie, buffBytes)
-		err = record.AddInfoElement(ieWithValue, true)
+		err = record.AddInfoElement(ieWithValue)
 		if err != nil {
 			return err
 		}
@@ -733,18 +733,18 @@ func addOriginalExporterInfo(message *entities.Message) error {
 			return err
 		}
 
-		if set.GetSetType() == entities.Template {
-			originalExporterIP = entities.NewInfoElementWithValue(ie, nil)
-		} else if set.GetSetType() == entities.Data {
-			if isIPv4 {
-				originalExporterIP = entities.NewInfoElementWithValue(ie, net.ParseIP(message.GetExportAddress()).To4())
-			} else {
-				originalExporterIP = entities.NewInfoElementWithValue(ie, net.ParseIP(message.GetExportAddress()).To16())
-			}
+		var value []byte
+		if isIPv4 {
+			value, err = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP(message.GetExportAddress()).To4())
 		} else {
-			return fmt.Errorf("set type %d is not supported", set.GetSetType())
+			value, err = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP(message.GetExportAddress()).To16())
 		}
-		err = record.AddInfoElement(originalExporterIP, false)
+		if err != nil {
+			return fmt.Errorf("error when encoding originalExporterIP: %v", err)
+		}
+		originalExporterIP = entities.NewInfoElementWithValue(ie, value)
+
+		err = record.AddInfoElement(originalExporterIP)
 		if err != nil {
 			return err
 		}
@@ -754,14 +754,12 @@ func addOriginalExporterInfo(message *entities.Message) error {
 		if err != nil {
 			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId")
 		}
-		if set.GetSetType() == entities.Template {
-			originalObservationDomainId = entities.NewInfoElementWithValue(ie, nil)
-		} else if set.GetSetType() == entities.Data {
-			originalObservationDomainId = entities.NewInfoElementWithValue(ie, message.GetObsDomainID())
-		} else {
-			return fmt.Errorf("set type %d is not supported", set.GetSetType())
+		value, err = entities.EncodeToIEDataType(entities.Unsigned32, message.GetObsDomainID())
+		if err != nil {
+			return fmt.Errorf("error when encoding originalObservationDomainId: %v", err)
 		}
-		err = record.AddInfoElement(originalObservationDomainId, false)
+		originalObservationDomainId = entities.NewInfoElementWithValue(ie, value)
+		err = record.AddInfoElement(originalObservationDomainId)
 		if err != nil {
 			return err
 		}
