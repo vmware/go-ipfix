@@ -25,11 +25,11 @@ import (
 
 	"github.com/Shopify/sarama"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/producer/convertor"
-	"github.com/vmware/go-ipfix/pkg/producer/protobuf"
 )
 
 type ProducerInput struct {
@@ -141,8 +141,8 @@ func setupTLSConfig(caFile, tlsCertFile, tlsKeyFile string, kafkaTLSSkipVerify b
 // SendFlowMessage takes in the flow message in proto schema, encodes it and sends
 // it to on the producer channel. If kafkaDelimitMsgWithLen is set to true, it will
 // return  a length-prefixed encoded message.
-func (kp *KafkaProducer) SendFlowMessage(msg *protobuf.FlowMessage, kafkaDelimitMsgWithLen bool) {
-	bytes, err := proto.Marshal(msg)
+func (kp *KafkaProducer) SendFlowMessage(msg protoreflect.Message, kafkaDelimitMsgWithLen bool) {
+	bytes, err := proto.Marshal(msg.Interface())
 	if err != nil {
 		klog.Errorf("Error when encoding flow message: %v", err)
 		return

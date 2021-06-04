@@ -18,13 +18,6 @@ package github.com.vmware.goipfix.producer.protobuf;
 
 option go_package = "pkg/producer/protobuf";
 
-message FlowMessage {
-  oneof FlowType {
-    FlowType1 flow1 = 1;
-    FlowType2 flow2 = 2;
-  }
-}
-
 // FlowType1 and FlowType2 are two different proto schemas with same fields. Used
 // two different proto schemas to demonstrate that the producer can be built in a
 // flexible manner and can support multiple proto schemas.
