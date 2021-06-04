@@ -15,8 +15,9 @@
 package convertor
 
 import (
+	"google.golang.org/protobuf/reflect/protoreflect"
+
 	"github.com/vmware/go-ipfix/pkg/entities"
-	"github.com/vmware/go-ipfix/pkg/producer/protobuf"
 )
 
 type RegisterProtoSchema func() IPFIXToKafkaConvertor
@@ -28,5 +29,10 @@ var ProtoSchemaConvertor = map[string]RegisterProtoSchema{}
 type IPFIXToKafkaConvertor interface {
 	// ConvertIPFIXMsgToFlowMsgs converts multiple data records in the IPFIX message
 	// to flow messages for any given proto schema.
-	ConvertIPFIXMsgToFlowMsgs(msg *entities.Message) []*protobuf.FlowMessage
+	ConvertIPFIXMsgToFlowMsgs(msg *entities.Message) []protoreflect.Message
+	// ConvertIPFIXRecordToFlowMsg converts a single IPFIX record to a kafka flow
+	// message for any given proto schema. Some times producers are interacting
+	// with the intermediate process instead of the collector process, where only
+	// the record is available.
+	ConvertIPFIXRecordToFlowMsg(record entities.Record) protoreflect.Message
 }
