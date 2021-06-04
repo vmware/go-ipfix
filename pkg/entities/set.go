@@ -106,9 +106,9 @@ func (s *set) UpdateLenInHeader() {
 func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) error {
 	var record Record
 	if s.setType == Data {
-		record = NewDataRecord(templateID, len(elements))
+		record = NewDataRecord(templateID, len(elements), s.isDecoding)
 	} else if s.setType == Template {
-		record = NewTemplateRecord(templateID, len(elements))
+		record = NewTemplateRecord(templateID, len(elements), s.isDecoding)
 		err := record.PrepareRecord()
 		if err != nil {
 			return err
@@ -118,7 +118,7 @@ func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) err
 	}
 
 	for _, element := range elements {
-		err := record.AddInfoElement(element, s.isDecoding)
+		err := record.AddInfoElement(element)
 		if err != nil {
 			return err
 		}

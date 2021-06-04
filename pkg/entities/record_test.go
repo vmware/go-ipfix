@@ -30,8 +30,8 @@ func TestPrepareRecord(t *testing.T) {
 		expectLen uint16
 		expectErr error
 	}{
-		{NewDataRecord(uniqueTemplateID, 1), 0, nil},
-		{NewTemplateRecord(uniqueTemplateID, 1), 4, nil},
+		{NewDataRecord(uniqueTemplateID, 1, false), 0, nil},
+		{NewTemplateRecord(uniqueTemplateID, 1, false), 4, nil},
 	}
 
 	for _, test := range prepareRecordTests {
@@ -80,8 +80,8 @@ func TestAddInfoElements(t *testing.T) {
 		ieList  []*InfoElement
 		valList []interface{}
 	}{
-		{NewTemplateRecord(uniqueTemplateID, 1), testIEs, nil},
-		{NewDataRecord(uniqueTemplateID, len(testIEs)), testIEs, valData},
+		{NewTemplateRecord(uniqueTemplateID, 12, false), testIEs, nil},
+		{NewDataRecord(uniqueTemplateID, len(testIEs), false), testIEs, valData},
 	}
 
 	for i, test := range addIETests {
@@ -90,11 +90,11 @@ func TestAddInfoElements(t *testing.T) {
 			if i == 0 {
 				// For template record
 				ie := NewInfoElementWithValue(testIE, nil)
-				actualErr = test.record.AddInfoElement(ie, false)
+				actualErr = test.record.AddInfoElement(ie)
 			} else {
 				// For data record
 				ie := NewInfoElementWithValue(testIE, test.valList[j])
-				actualErr = test.record.AddInfoElement(ie, false)
+				actualErr = test.record.AddInfoElement(ie)
 				if testIE.Len == VariableLength {
 					_, ok := test.valList[j].(string)
 					if !ok {
@@ -114,18 +114,18 @@ func TestAddInfoElements(t *testing.T) {
 }
 
 func TestGetInfoElementWithValue(t *testing.T) {
-	templateRec := NewTemplateRecord(256, 1)
-	templateRec.elementsMap = make(map[string]*InfoElementWithValue)
+	templateRec := NewTemplateRecord(256, 1, true)
+	templateRec.orderedElementList = make([]*InfoElementWithValue, 0)
 	ie := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
-	templateRec.elementsMap["sourceIPv4Address"] = ie
+	templateRec.orderedElementList = append(templateRec.orderedElementList, ie)
 	_, exist := templateRec.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	_, exist = templateRec.GetInfoElementWithValue("destinationIPv4Address")
 	assert.Equal(t, false, exist)
-	dataRec := NewDataRecord(256, 1)
-	dataRec.elementsMap = make(map[string]*InfoElementWithValue)
+	dataRec := NewDataRecord(256, 1, true)
+	dataRec.orderedElementList = make([]*InfoElementWithValue, 0)
 	ie = NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
-	dataRec.elementsMap["sourceIPv4Address"] = ie
+	dataRec.orderedElementList = append(dataRec.orderedElementList, ie)
 	infoElementWithValue, _ := dataRec.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, net.ParseIP("10.0.0.1"), infoElementWithValue.Value)
 	infoElementWithValue, _ = dataRec.GetInfoElementWithValue("destinationIPv4Address")

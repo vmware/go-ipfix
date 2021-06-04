@@ -488,20 +488,10 @@ func TestAggregationProcess(t *testing.T) {
 }
 
 func TestAddOriginalExporterInfo(t *testing.T) {
-	// Test message with template set
-	message := createMsgwithTemplateSet(false)
+	message := createDataMsgForSrc(t, false, false, false, false, false)
 	err := addOriginalExporterInfo(message)
 	assert.NoError(t, err)
 	record := message.GetSet().GetRecords()[0]
-	_, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
-	assert.Equal(t, true, exist)
-	_, exist = record.GetInfoElementWithValue("originalObservationDomainId")
-	assert.Equal(t, true, exist)
-	// Test message with data set
-	message = createDataMsgForSrc(t, false, false, false, false, false)
-	err = addOriginalExporterInfo(message)
-	assert.NoError(t, err)
-	record = message.GetSet().GetRecords()[0]
 	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, ieWithValue.Value)
@@ -511,20 +501,11 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 }
 
 func TestAddOriginalExporterInfoIPv6(t *testing.T) {
-	// Test message with template set
-	message := createMsgwithTemplateSet(true)
+	// Test message with data set
+	message := createDataMsgForSrc(t, true, false, false, false, false)
 	err := addOriginalExporterInfo(message)
 	assert.NoError(t, err)
 	record := message.GetSet().GetRecords()[0]
-	_, exist := record.GetInfoElementWithValue("originalExporterIPv6Address")
-	assert.Equal(t, true, exist)
-	_, exist = record.GetInfoElementWithValue("originalObservationDomainId")
-	assert.Equal(t, true, exist)
-	// Test message with data set
-	message = createDataMsgForSrc(t, true, false, false, false, false)
-	err = addOriginalExporterInfo(message)
-	assert.NoError(t, err)
-	record = message.GetSet().GetRecords()[0]
 	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv6Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1}, ieWithValue.Value)
