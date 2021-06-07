@@ -102,7 +102,7 @@ func TestCollectorToProducer(t *testing.T) {
 	go func() {
 		mockSaramaProducer.ExpectInputAndSucceed()
 		mockSaramaProducer.ExpectInputAndSucceed()
-		kafkaProducer.Publish(cp.GetMsgChan())
+		kafkaProducer.PublishIPFIXMessages(cp.GetMsgChan())
 	}()
 
 	kafkaMsg1 := <-mockSaramaProducer.Successes()
