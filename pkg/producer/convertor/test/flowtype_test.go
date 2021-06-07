@@ -307,7 +307,7 @@ func TestKafkaProducer_Publish(t *testing.T) {
 				close(messageChan)
 			}()
 
-			kafkaProducer.Publish(messageChan)
+			kafkaProducer.PublishIPFIXMessages(messageChan)
 
 			kafkaMsg1 := <-mockSaramaProducer.Successes()
 			kafkaMsg1InBytes, _ := kafkaMsg1.Value.Encode()

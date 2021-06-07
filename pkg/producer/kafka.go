@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"sync"
 
 	"github.com/Shopify/sarama"
 	"google.golang.org/protobuf/proto"
@@ -52,6 +53,9 @@ type KafkaProducer struct {
 	producer             sarama.AsyncProducer
 	input                ProducerInput
 	protoSchemaConvertor convertor.IPFIXToKafkaConvertor
+	// closeCh is required to exit the go routine that captures error messages from
+	// sarama go client.
+	closeCh chan struct{}
 }
 
 func NewKafkaProducer(input ProducerInput) *KafkaProducer {
@@ -86,16 +90,27 @@ func (kp *KafkaProducer) InitSaramaProducer() error {
 		return err
 	}
 
-	// Capturing errors from Kafka sarama client
+	// Capturing errors from Kafka sarama client and publishing error messages as
+	// klog error messages.
 	if kp.input.KafkaLogErrors {
+		kp.closeCh = make(chan struct{})
 		go func() {
-			for msg := range kp.producer.Errors() {
-				klog.Error(msg)
+			for {
+				select {
+				case <-kp.closeCh:
+					return
+				case msg := <-kp.producer.Errors():
+					klog.Error(msg)
+				}
 			}
 		}()
 	}
 
 	return nil
+}
+
+func (kp *KafkaProducer) GetSaramaProducer() sarama.AsyncProducer {
+	return kp.producer
 }
 
 // SetSaramaProducer is needed for only tests for setting the sarama producer as
@@ -147,6 +162,7 @@ func (kp *KafkaProducer) SendFlowMessage(msg protoreflect.Message, kafkaDelimitM
 		klog.Errorf("Error when encoding flow message: %v", err)
 		return
 	}
+	klog.V(4).Infof("Sending the kafka message: %v", string(bytes))
 	if kafkaDelimitMsgWithLen {
 		b := make([]byte, 4)
 		binary.BigEndian.PutUint32(b, uint32(len(bytes)))
@@ -159,19 +175,47 @@ func (kp *KafkaProducer) SendFlowMessage(msg protoreflect.Message, kafkaDelimitM
 	}
 	if kp.input.KafkaLogSuccesses {
 		kafkaMsg := <-kp.producer.Successes()
-		klog.V(2).Infof("Sent the message successfully: %v", kafkaMsg)
+		klog.V(4).Infof("Sent the message successfully: %v", kafkaMsg)
 	}
 
 }
 
-// Publish takes in a message channel as input and converts all the messages on
+// PublishIPFIXMessages takes in a message channel as input and converts all the messages on
 // the message channel to flow messages in proto schema. This function exits when
 // the input message channel is closed.
-func (kp *KafkaProducer) Publish(msgCh chan *entities.Message) {
+func (kp *KafkaProducer) PublishIPFIXMessages(msgCh chan *entities.Message) {
 	for msg := range msgCh {
 		flowMsgs := kp.protoSchemaConvertor.ConvertIPFIXMsgToFlowMsgs(msg)
 		for _, flowMsg := range flowMsgs {
 			kp.SendFlowMessage(flowMsg, true)
 		}
 	}
+}
+
+func (kp *KafkaProducer) PublishRecord(record entities.Record) {
+	flowMsg := kp.protoSchemaConvertor.ConvertIPFIXRecordToFlowMsg(record)
+	kp.SendFlowMessage(flowMsg, false)
+}
+
+func (kp *KafkaProducer) Close() {
+	if kp.producer == nil {
+		return
+	}
+
+	var wg sync.WaitGroup
+	kp.producer.AsyncClose()
+
+	wg.Add(1)
+	go func() {
+		if kp.closeCh != nil {
+			close(kp.closeCh)
+		}
+		if kp.input.KafkaLogSuccesses {
+			for range kp.producer.Successes() {
+				klog.Error("Unexpected message on Successes()")
+			}
+		}
+		wg.Done()
+	}()
+	wg.Wait()
 }
