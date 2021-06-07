@@ -58,7 +58,8 @@ func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, client
 	defer closeTmpFile(t, keyFile)
 
 	testInput := ProducerInput{
-		KafkaLogSuccesses:  false,
+		KafkaLogSuccesses:  true,
+		KafkaLogErrors:     true,
 		KafkaCAFile:        caCertFile.Name(),
 		KafkaTLSCertFile:   certFile.Name(),
 		KafkaTLSKeyFile:    keyFile.Name(),
@@ -72,10 +73,9 @@ func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, client
 	}
 	err = kafkaProducer.InitSaramaProducer()
 	assert.NoError(t, err)
-	if err == nil {
-		err = kafkaProducer.producer.Close()
-		assert.NoError(t, err)
-	}
+	saramaProducer := kafkaProducer.GetSaramaProducer()
+	assert.NotNil(t, saramaProducer)
+	kafkaProducer.Close()
 }
 
 func createTmpFileAndWrite(t *testing.T, content, pattern string) *os.File {
