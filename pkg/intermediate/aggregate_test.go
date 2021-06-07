@@ -677,6 +677,7 @@ func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 		true,
 		0,
 		false,
+		false,
 	}
 	aggregationProcess.flowKeyRecordMap[flowKey1] = aggFlowRecord
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
