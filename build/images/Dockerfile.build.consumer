@@ -1,0 +1,19 @@
+FROM golang:1.15 as go-ipfix-build
+
+WORKDIR /go-ipfix
+
+COPY go.mod /go-ipfix/go.mod
+
+RUN go mod download
+
+COPY . /go-ipfix
+
+RUN make consumer
+
+FROM ubuntu:18.04
+
+LABEL maintainer="go-ipfix"
+LABEL description="A Docker image based on Ubuntu 18.04 which contains a Kafka consumer"
+
+COPY --from=go-ipfix-build /go-ipfix/bin/consumer /usr/local/bin/
+ENTRYPOINT ["consumer"]

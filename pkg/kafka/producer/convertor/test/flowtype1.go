@@ -21,27 +21,28 @@ import (
 	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
-	"github.com/vmware/go-ipfix/pkg/producer/convertor"
-	"github.com/vmware/go-ipfix/pkg/producer/protobuf"
+	"github.com/vmware/go-ipfix/pkg/kafka/producer/convertor"
+	"github.com/vmware/go-ipfix/pkg/kafka/producer/protobuf"
 )
 
-// convertRecordToFlowType2 is to support the FlowType2 proto schema.
-type convertRecordToFlowType2 struct{}
+// convertRecordToFlowType1 is to support the FlowType1 proto schema.
+type convertRecordToFlowType1 struct{}
 
-func NewFlowType2Convertor() convertor.IPFIXToKafkaConvertor {
-	return &convertRecordToFlowType2{}
+func NewFlowType1Convertor() convertor.IPFIXToKafkaConvertor {
+	return &convertRecordToFlowType1{}
 }
 
-func (c *convertRecordToFlowType2) ConvertIPFIXMsgToFlowMsgs(msg *entities.Message) []protoreflect.Message {
+func (c *convertRecordToFlowType1) ConvertIPFIXMsgToFlowMsgs(msg *entities.Message) []protoreflect.Message {
 	convertRecordToFlowMsg := func(msg *entities.Message, record entities.Record) protoreflect.Message {
-		flowType2 := &protobuf.FlowType2{}
-		flowType2.TimeReceived = msg.GetExportTime()
-		flowType2.SequenceNumber = msg.GetSequenceNum()
-		flowType2.ObsDomainID = msg.GetObsDomainID()
-		flowType2.ExportAddress = msg.GetExportAddress()
-		addAllFieldsToFlowType2(flowType2, record)
-		return flowType2.ProtoReflect()
+		flowType1 := &protobuf.FlowType1{}
+		flowType1.TimeReceived = msg.GetExportTime()
+		flowType1.SequenceNumber = msg.GetSequenceNum()
+		flowType1.ObsDomainID = msg.GetObsDomainID()
+		flowType1.ExportAddress = msg.GetExportAddress()
+		addAllFieldsToFlowType1(flowType1, record)
+		return flowType1.ProtoReflect()
 	}
+	// Convert all records in IPFIX set to Flow messages.
 	set := msg.GetSet()
 	if set.GetSetType() == entities.Template {
 		return nil
@@ -54,16 +55,16 @@ func (c *convertRecordToFlowType2) ConvertIPFIXMsgToFlowMsgs(msg *entities.Messa
 	return flowMsgs
 }
 
-func (c *convertRecordToFlowType2) ConvertIPFIXRecordToFlowMsg(record entities.Record) protoreflect.Message {
+func (c *convertRecordToFlowType1) ConvertIPFIXRecordToFlowMsg(record entities.Record) protoreflect.Message {
 	// We add the fields from the record directly and do not add the fields from
 	// the IPIFX message to flowType1 kafka flow message.
-	flowType2 := &protobuf.FlowType2{}
-	addAllFieldsToFlowType2(flowType2, record)
+	flowType1 := &protobuf.FlowType1{}
+	addAllFieldsToFlowType1(flowType1, record)
 
-	return flowType2.ProtoReflect()
+	return flowType1.ProtoReflect()
 }
 
-func addAllFieldsToFlowType2(flowMsg *protobuf.FlowType2, record entities.Record) {
+func addAllFieldsToFlowType1(flowMsg *protobuf.FlowType1, record entities.Record) {
 	for _, ie := range record.GetOrderedElementList() {
 		switch ie.Element.Name {
 		case "flowStartSeconds":

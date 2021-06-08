@@ -1,0 +1,114 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-zookeeper
+  namespace: kafka
+  labels:
+    app: zookeeper
+spec:
+  ports:
+    - name: client
+      port: 2181
+      protocol: TCP
+  selector:
+    app: zookeeper
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+  namespace: kafka
+  labels:
+    app: kafka-broker
+spec:
+  ports:
+    - name: kafka-port
+      port: 9092
+      protocol: TCP
+      targetPort: 9092
+  selector:
+    app: kafka-broker
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper-deployment
+  namespace: kafka
+spec:
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      containers:
+        - name: zookeeper
+          image: harbor-repo.vmware.com/dockerhub-proxy-cache/confluentinc/cp-zookeeper:latest
+          ports:
+            - containerPort: 2181
+          env:
+            - name: ZOOKEEPER_ID
+              value: "1"
+            - name: ZOOKEEPER_SERVER
+              value: kafka-zookeeper
+            - name: ZOOKEEPER_CLIENT_PORT
+              value: "2181"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-broker
+  namespace: kafka
+spec:
+  selector:
+    matchLabels:
+      app: kafka-broker
+  template:
+    metadata:
+      labels:
+        app: kafka-broker
+    spec:
+      containers:
+        - name: kafka
+          image: harbor-repo.vmware.com/dockerhub-proxy-cache/confluentinc/cp-kafka:latest
+          ports:
+            - containerPort: 9092
+          env:
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: PLAINTEXT://kafka-service.kafka.svc:9092
+            - name: KAFKA_ZOOKEEPER_CONNECT
+              value: kafka-zookeeper:2181
+            - name: KAFKA_CREATE_TOPICS
+              value: AntreaTopic:1:1
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-consumer
+  namespace: kafka
+spec:
+  selector:
+    matchLabels:
+      app: kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: kafka-consumer
+    spec:
+      containers:
+        - name: kafka
+          image: projects.registry.vmware.com/antrea/kafka-consumer
+          imagePullPolicy: IfNotPresent
+          args:
+            - --brokers=kafka-service.kafka.svc:9092
+            - --consumer.topic=AntreaTopic
+            - --consumer.delimitlen=false

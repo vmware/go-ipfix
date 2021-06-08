@@ -25,8 +25,8 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
-	"github.com/vmware/go-ipfix/pkg/producer"
-	convertortest "github.com/vmware/go-ipfix/pkg/producer/convertor/test"
+	"github.com/vmware/go-ipfix/pkg/kafka/producer"
+	convertortest "github.com/vmware/go-ipfix/pkg/kafka/producer/convertor/test"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
 
