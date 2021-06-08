@@ -12,7 +12,7 @@ codegen:
 	# GO111MODULE=on $(GO) run pkg/registry/build_registry/build_registry.go
 
     # Generate protobuf code for flow.proto with protoc.
-	protoc --go_out=. --plugin=$(GOPATH)/bin/protoc-gen-go pkg/producer/protobuf/*.proto
+	protoc --go_out=. --plugin=$(GOPATH)/bin/protoc-gen-go pkg/kafka/producer/protobuf/*.proto
 
 .coverage:
 	mkdir -p ./.coverage
@@ -34,11 +34,19 @@ collector:
 	@mkdir -p $(BINDIR)
 	GOOS=linux $(GO) build -o $(BINDIR) github.com/vmware/go-ipfix/cmd/collector/
 
+consumer:
+	@mkdir -p $(BINDIR)
+	GOOS=linux $(GO) build -o $(BINDIR) github.com/vmware/go-ipfix/cmd/consumer/
+
 ### Docker images ###
 
 docker-collector:
 	@echo "===> Building antrea/ipfix-collector Docker image <==="
 	docker build --pull -t antrea/ipfix-collector -f build/images/Dockerfile.build.collector .
+
+docker-consumer:
+	@echo "===> Building antrea/kafka-consumer Docker image <==="
+	docker build --pull -t antrea/kafka-consumer -f build/images/Dockerfile.build.consumer .
 
 .PHONY: manifest
 manifest:
