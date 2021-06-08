@@ -6,7 +6,7 @@ on:
       - created
 
 jobs:
-  build:
+  build-ipfix-collector:
     runs-on: [ubuntu-latest]
     steps:
       - uses: actions/checkout@v2
@@ -24,4 +24,19 @@ jobs:
           upload_url: ${{ github.event.release.upload_url }}
           asset_path: ./assets/ipfix-collector.yaml
           asset_name: ipfix-collector.yaml
+          asset_content_type: application/octet-stream
+  build-kafka-collector:
+    runs-on: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build assets
+        run: cp ./build/yamls/kafka-flow-collector.yaml ./assets
+      - name: Upload kafka-flow-collector.yaml
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./build/yamls/kafka-flow-collector.yaml
+          asset_name: kafka-flow-collector.yaml
           asset_content_type: application/octet-stream
