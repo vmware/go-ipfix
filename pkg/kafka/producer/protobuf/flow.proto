@@ -16,7 +16,7 @@ syntax = "proto3";
 
 package github.com.vmware.goipfix.producer.protobuf;
 
-option go_package = "pkg/producer/protobuf";
+option go_package = "pkg/kafka/producer/protobuf";
 
 // FlowType1 and FlowType2 are two different proto schemas with same fields. Used
 // two different proto schemas to demonstrate that the producer can be built in a
