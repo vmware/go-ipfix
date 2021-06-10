@@ -219,8 +219,8 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 
 }
 
-func copyFlowKeyRecordMap(key intermediate.FlowKey, aggregationFlowRecord intermediate.AggregationFlowRecord) error {
-	flowKeyRecordMap[key] = aggregationFlowRecord
+func copyFlowKeyRecordMap(key intermediate.FlowKey, aggregationFlowRecord *intermediate.AggregationFlowRecord) error {
+	flowKeyRecordMap[key] = *aggregationFlowRecord
 	return nil
 }
 

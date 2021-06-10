@@ -33,11 +33,12 @@ type AggregationFlowRecord struct {
 	// inter-node flow and record from the node for the case of intra-node flow.
 	ReadyToSend               bool
 	waitForReadyToSendRetries int
-	// isMetaDataFilled is an indicator for IPFIX Mediator to check whether K8s
-	// metadata are filled for flow record. It is always true for Intra-Node
-	// and ToExternal flows and only applicable for Inter-Node flows that are
-	// not required to be correlated. (e.g. flows with Egress deny rule applied)
-	isMetaDataFilled bool
+	// areCorrelatedFieldsFilled is an indicator for IPFIX Mediator to check
+	// whether correlated fields are filled for flow record. It is always true
+	// for Intra-Node and ToExternal flows and only applicable for Inter-Node
+	// flows that are not required to be correlated. (e.g. flows with Egress
+	// deny rule applied)
+	areCorrelatedFieldsFilled bool
 }
 
 type AggregationElements struct {
@@ -47,4 +48,4 @@ type AggregationElements struct {
 	AggregatedDestinationStatsElements []string
 }
 
-type FlowKeyRecordMapCallBack func(key FlowKey, record AggregationFlowRecord) error
+type FlowKeyRecordMapCallBack func(key FlowKey, record *AggregationFlowRecord) error
