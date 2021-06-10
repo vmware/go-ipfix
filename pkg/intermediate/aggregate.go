@@ -36,7 +36,7 @@ var (
 
 type AggregationProcess struct {
 	// flowKeyRecordMap maps each connection (5-tuple) with its records
-	flowKeyRecordMap map[FlowKey]AggregationFlowRecord
+	flowKeyRecordMap map[FlowKey]*AggregationFlowRecord
 	// expirePriorityQueue helps to maintain a priority queue for the records given
 	// active expiry and inactive expiry timeouts.
 	expirePriorityQueue TimeToExpirePriorityQueue
@@ -94,7 +94,7 @@ func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error)
 		}
 	}
 	return &AggregationProcess{
-		make(map[FlowKey]AggregationFlowRecord),
+		make(map[FlowKey]*AggregationFlowRecord),
 		make(TimeToExpirePriorityQueue, 0),
 		sync.RWMutex{},
 		input.MessageChan,
@@ -243,7 +243,7 @@ func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 			}
 			continue
 		}
-		err := callback(*pqItem.flowKey, *pqItem.flowRecord)
+		err := callback(*pqItem.flowKey, pqItem.flowRecord)
 		if err != nil {
 			return fmt.Errorf("callback execution failed for popped flow record with key: %v, record: %v, error: %v", pqItem.flowKey, pqItem.flowRecord, err)
 		}
@@ -265,12 +265,12 @@ func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 	return nil
 }
 
-func (a *AggregationProcess) SetMetadataFilled(record AggregationFlowRecord, isFilled bool) {
-	record.isMetaDataFilled = isFilled
+func (a *AggregationProcess) SetCorrelatedFieldsFilled(record *AggregationFlowRecord, isFilled bool) {
+	record.areCorrelatedFieldsFilled = isFilled
 }
 
-func (a *AggregationProcess) IsMetadataFilled(record AggregationFlowRecord) bool {
-	return record.isMetaDataFilled
+func (a *AggregationProcess) AreCorrelatedFieldsFilled(record AggregationFlowRecord) bool {
+	return record.areCorrelatedFieldsFilled
 }
 
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
@@ -296,7 +296,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			if !aggregationRecord.ReadyToSend && !areRecordsFromSameNode(record, aggregationRecord.Record) {
 				a.correlateRecords(record, aggregationRecord.Record)
 				aggregationRecord.ReadyToSend = true
-				aggregationRecord.isMetaDataFilled = true
+				aggregationRecord.areCorrelatedFieldsFilled = true
 			}
 			// Aggregation of incoming flow record with existing by updating stats
 			// and flow timestamps.
@@ -319,7 +319,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 		// Reset the inactive expiry time in the queue item with updated aggregate
 		// record.
 		a.expirePriorityQueue.Update(aggregationRecord.PriorityQueueItem,
-			flowKey, &aggregationRecord, aggregationRecord.PriorityQueueItem.activeExpireTime, currTime.Add(a.inactiveExpiryTimeout))
+			flowKey, aggregationRecord, aggregationRecord.PriorityQueueItem.activeExpireTime, currTime.Add(a.inactiveExpiryTimeout))
 	} else {
 		// Add all the new stat fields and initialize them.
 		if correlationRequired {
@@ -337,7 +337,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 				return err
 			}
 		}
-		aggregationRecord = AggregationFlowRecord{
+		aggregationRecord = &AggregationFlowRecord{
 			Record:                    record,
 			ReadyToSend:               false,
 			waitForReadyToSendRetries: 0,
@@ -348,9 +348,9 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			// expected to be not completely filled. For Intra-Node flows and ToExternal
 			// flows, isMetaDataFilled is set to true by default.
 			if flowType == registry.FlowTypeInterNode {
-				aggregationRecord.isMetaDataFilled = false
+				aggregationRecord.areCorrelatedFieldsFilled = false
 			} else {
-				aggregationRecord.isMetaDataFilled = true
+				aggregationRecord.areCorrelatedFieldsFilled = true
 			}
 		}
 		// Push the record to the priority queue.
@@ -359,7 +359,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 		}
 		aggregationRecord.PriorityQueueItem = pqItem
 
-		pqItem.flowRecord = &aggregationRecord
+		pqItem.flowRecord = aggregationRecord
 		pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
 		pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 		heap.Push(&a.expirePriorityQueue, pqItem)
