@@ -671,7 +671,7 @@ func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 	message := createDataMsgForSrc(t, false, false, false, false, false)
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
-	aggFlowRecord := AggregationFlowRecord{
+	aggFlowRecord := &AggregationFlowRecord{
 		message.GetSet().GetRecords()[0],
 		&ItemToExpire{},
 		true,
@@ -752,7 +752,7 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 	recordIPv6Src := createDataMsgForSrc(t, true, false, false, false, false).GetSet().GetRecords()[0]
 	recordIPv6Dst := createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
 	numExecutions := 0
-	testCallback := func(key FlowKey, record AggregationFlowRecord) error {
+	testCallback := func(key FlowKey, record *AggregationFlowRecord) error {
 		numExecutions = numExecutions + 1
 		return nil
 	}
@@ -857,11 +857,11 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
 	aggRecord, _ := ap.flowKeyRecordMap[*flowKey1]
 	item = ap.expirePriorityQueue.Peek()
-	assert.Equal(t, aggRecord, *item.flowRecord)
+	assert.Equal(t, *aggRecord, *item.flowRecord)
 	assert.Equal(t, oldActiveExpiryTime, item.activeExpireTime)
 	if !isIntraNode && needsCorrleation {
 		assert.NotEqual(t, oldInactiveExpiryTime, item.inactiveExpireTime)
-		assert.True(t, ap.IsMetadataFilled(aggRecord))
+		assert.True(t, ap.AreCorrelatedFieldsFilled(*aggRecord))
 	}
 	if !isIntraNode && !needsCorrleation {
 		// for inter-Node deny connections, either src or dst Pod info will be resolved.
@@ -871,7 +871,7 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 		egress, _ := aggRecord.Record.GetInfoElementWithValue("egressNetworkPolicyRuleAction")
 		ingress, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
 		assert.True(t, egress.Value != 0 || ingress.Value != 0)
-		assert.False(t, ap.IsMetadataFilled(aggRecord))
+		assert.False(t, ap.AreCorrelatedFieldsFilled(*aggRecord))
 	} else {
 		ieWithValue, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
 		assert.Equal(t, "pod1", ieWithValue.Value)
@@ -888,7 +888,7 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 		assert.Equal(t, uint16(4739), ieWithValue.Value)
 		ingressPriority, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRulePriority")
 		assert.Equal(t, ingressPriority.Value, int32(50000))
-		assert.True(t, ap.IsMetadataFilled(aggRecord))
+		assert.True(t, ap.AreCorrelatedFieldsFilled(*aggRecord))
 	}
 }
 
@@ -914,7 +914,7 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
 	aggRecord, _ := ap.flowKeyRecordMap[*flowKey]
 	item = ap.expirePriorityQueue.Peek()
-	assert.Equal(t, aggRecord, *item.flowRecord)
+	assert.Equal(t, *aggRecord, *item.flowRecord)
 	assert.Equal(t, oldActiveExpiryTime, item.activeExpireTime)
 	if !isIntraNode {
 		assert.NotEqual(t, oldInactiveExpiryTime, item.inactiveExpireTime)
