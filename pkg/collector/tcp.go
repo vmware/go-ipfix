@@ -59,9 +59,9 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	cp.addClient(address, client)
 	go func() {
 		defer conn.Close()
+		buff := make([]byte, cp.maxBufferSize)
 	out:
 		for {
-			buff := make([]byte, cp.maxBufferSize)
 			size, err := conn.Read(buff)
 			if err != nil {
 				if err == io.EOF {
@@ -73,8 +73,10 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 				break out
 			}
 			klog.V(2).Infof("Receiving %d bytes from %s", size, address)
+			buffBytes := make([]byte, size)
+			copy(buffBytes, buff[:size])
 			for size > 0 {
-				length, err := getMessageLength(bytes.NewBuffer(buff))
+				length, err := getMessageLength(bytes.NewBuffer(buffBytes))
 				if err != nil {
 					klog.Error(err)
 					client.errChan <- true
@@ -86,7 +88,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 				}
 				size = size - length
 				// get the message here
-				message, err := cp.decodePacket(bytes.NewBuffer(buff[0:length]), address)
+				message, err := cp.decodePacket(bytes.NewBuffer(buffBytes[0:length]), address)
 				if err != nil {
 					klog.Error(err)
 					client.errChan <- true
@@ -94,7 +96,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 				}
 				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
 					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
-				buff = buff[length:]
+				buffBytes = buffBytes[length:]
 			}
 		}
 	}()

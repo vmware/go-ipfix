@@ -358,11 +358,10 @@ func (cp *CollectingProcess) updateAddress(address net.Addr) {
 
 // getMessageLength returns buffer length by decoding the header
 func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
-	var version, msgLen, setID, setLen uint16
-	var exportTime, sequencNum, obsDomainID uint32
+	var version, msgLen uint16
 	// We do not really need to decode whole header. Support an utility function
 	// that decodes header based on the offset.
-	err := util.Decode(msgBuffer, binary.BigEndian, &version, &msgLen, &exportTime, &sequencNum, &obsDomainID, &setID, &setLen)
+	err := util.Decode(msgBuffer, binary.BigEndian, &version, &msgLen)
 	if err != nil {
 		return 0, fmt.Errorf("cannot decode message: %v", err)
 	}
@@ -372,14 +371,12 @@ func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
 // getFieldLength returns string field length for data record
 // (encoding reference: https://tools.ietf.org/html/rfc7011#appendix-A.5)
 func getFieldLength(dataBuffer *bytes.Buffer) int {
-	lengthBuff := dataBuffer.Next(1)
 	var lengthOneByte uint8
-	util.Decode(bytes.NewBuffer(lengthBuff), binary.BigEndian, &lengthOneByte)
+	util.Decode(dataBuffer, binary.BigEndian, &lengthOneByte)
 	if lengthOneByte < 255 { // string length is less than 255
 		return int(lengthOneByte)
 	}
 	var lengthTwoBytes uint16
-	lengthBuff = dataBuffer.Next(2)
-	util.Decode(bytes.NewBuffer(lengthBuff), binary.BigEndian, &lengthTwoBytes)
+	util.Decode(dataBuffer, binary.BigEndian, &lengthTwoBytes)
 	return int(lengthTwoBytes)
 }
