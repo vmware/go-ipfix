@@ -567,9 +567,21 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 	statsElementList := a.aggregateElements.StatsElements
 	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
 	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
-	antreaElements := append(antreaSourceStatsElements, antreaDestinationStatsElements...)
 
-	for _, element := range antreaElements {
+	for _, element := range antreaSourceStatsElements {
+		ie, err := registry.GetInfoElement(element, registry.AntreaEnterpriseID)
+		if err != nil {
+			return err
+		}
+		buffBytes := make([]byte, 8)
+		binary.BigEndian.PutUint64(buffBytes, uint64(0))
+		ieWithValue := entities.NewInfoElementWithValue(ie, buffBytes)
+		err = record.AddInfoElement(ieWithValue)
+		if err != nil {
+			return err
+		}
+	}
+	for _, element := range antreaDestinationStatsElements {
 		ie, err := registry.GetInfoElement(element, registry.AntreaEnterpriseID)
 		if err != nil {
 			return err
