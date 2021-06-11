@@ -273,6 +273,14 @@ func (a *AggregationProcess) AreCorrelatedFieldsFilled(record AggregationFlowRec
 	return record.areCorrelatedFieldsFilled
 }
 
+func (a *AggregationProcess) SetExternalFieldsFilled(record *AggregationFlowRecord, isFilled bool) {
+	record.areExternalFieldsFilled = isFilled
+}
+
+func (a *AggregationProcess) AreExternalFieldsFilled(record AggregationFlowRecord) bool {
+	return record.areExternalFieldsFilled
+}
+
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
 // flowKeyMap by doing correlation or updating the stats.
 func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record) error {
@@ -346,13 +354,14 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			aggregationRecord.ReadyToSend = true
 			// If no correlation is required for an Inter-Node record, K8s metadata is
 			// expected to be not completely filled. For Intra-Node flows and ToExternal
-			// flows, isMetaDataFilled is set to true by default.
+			// flows, areCorrelatedFieldsFilled is set to true by default.
 			if flowType == registry.FlowTypeInterNode {
 				aggregationRecord.areCorrelatedFieldsFilled = false
 			} else {
 				aggregationRecord.areCorrelatedFieldsFilled = true
 			}
 		}
+		aggregationRecord.areExternalFieldsFilled = false
 		// Push the record to the priority queue.
 		pqItem := &ItemToExpire{
 			flowKey: flowKey,

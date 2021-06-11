@@ -33,12 +33,18 @@ type AggregationFlowRecord struct {
 	// inter-node flow and record from the node for the case of intra-node flow.
 	ReadyToSend               bool
 	waitForReadyToSendRetries int
-	// areCorrelatedFieldsFilled is an indicator for IPFIX Mediator to check
-	// whether correlated fields are filled for flow record. It is always true
-	// for Intra-Node and ToExternal flows and only applicable for Inter-Node
-	// flows that are not required to be correlated. (e.g. flows with Egress
-	// deny rule applied)
+	// areCorrelatedFieldsFilled is an indicator for IPFIX Mediator to check whether K8s
+	// metadata are filled for flow record. It is always true for Intra-Node
+	// and ToExternal flows and only applicable for Inter-Node flows that are
+	// not required to be correlated. (e.g. flows with Egress deny rule applied)
 	areCorrelatedFieldsFilled bool
+	// Some fields could be filled externally on aggregation records once before
+	// exporting them in IPFIX mediator, e.g., metadata of a flow.
+	// areExternalFieldsFilled is an indicator for IPFIX Mediator to check whether
+	// these fields has been filled or not before exporting. This field is set to
+	// false when creating new AggregationFlowRecord. Setting and utilizing this
+	// field is upto the user and not used in go-ipfix library code.
+	areExternalFieldsFilled bool
 }
 
 type AggregationElements struct {
