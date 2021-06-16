@@ -17,6 +17,8 @@ package entities
 import (
 	"encoding/binary"
 	"fmt"
+
+	"k8s.io/klog/v2"
 )
 
 //go:generate mockgen -copyright_file ../../license_templates/license_header.raw.txt -destination=testing/mock_record.go -package=testing github.com/vmware/go-ipfix/pkg/entities Record
@@ -36,6 +38,7 @@ type Record interface {
 	GetFieldCount() uint16
 	GetOrderedElementList() []*InfoElementWithValue
 	GetInfoElementWithValue(name string) (*InfoElementWithValue, bool)
+	GetRecordLength() int
 	GetMinDataRecordLen() uint16
 }
 
@@ -45,6 +48,7 @@ type baseRecord struct {
 	templateID         uint16
 	orderedElementList []*InfoElementWithValue
 	isDecoding         bool
+	len                int
 	Record
 }
 
@@ -53,18 +57,14 @@ type dataRecord struct {
 }
 
 func NewDataRecord(id uint16, numElements int, isDecoding bool) *dataRecord {
-	record := &dataRecord{
+	return &dataRecord{
 		baseRecord{
-			buffer:     make([]byte, 0),
-			fieldCount: 0,
-			templateID: id,
-			isDecoding: isDecoding,
+			fieldCount:         0,
+			templateID:         id,
+			isDecoding:         isDecoding,
+			orderedElementList: make([]*InfoElementWithValue, numElements),
 		},
 	}
-	if isDecoding {
-		record.orderedElementList = make([]*InfoElementWithValue, numElements)
-	}
-	return record
 }
 
 type templateRecord struct {
@@ -77,22 +77,17 @@ type templateRecord struct {
 }
 
 func NewTemplateRecord(id uint16, numElements int, isDecoding bool) *templateRecord {
-	record := &templateRecord{
+	return &templateRecord{
 		baseRecord{
-			buffer:     make([]byte, 0),
-			fieldCount: uint16(numElements),
-			templateID: id,
-			isDecoding: isDecoding,
+			buffer:             make([]byte, 4),
+			fieldCount:         uint16(numElements),
+			templateID:         id,
+			isDecoding:         isDecoding,
+			orderedElementList: make([]*InfoElementWithValue, numElements),
 		},
 		0,
 		0,
 	}
-	record.orderedElementList = make([]*InfoElementWithValue, numElements)
-	return record
-}
-
-func (b *baseRecord) GetBuffer() []byte {
-	return b.buffer
 }
 
 func (b *baseRecord) GetTemplateID() uint16 {
@@ -121,6 +116,26 @@ func (d *dataRecord) PrepareRecord() error {
 	return nil
 }
 
+func (d *dataRecord) GetBuffer() []byte {
+	if len(d.buffer) == d.len || d.isDecoding {
+		return d.buffer
+	}
+	d.buffer = make([]byte, d.len)
+	index := 0
+	for _, element := range d.orderedElementList {
+		err := encodeToBuff(element.Element.DataType, element.Value, element.Length, d.buffer, index)
+		if err != nil {
+			klog.Error(err)
+		}
+		index += element.Length
+	}
+	return d.buffer
+}
+
+func (d *dataRecord) GetRecordLength() int {
+	return d.len
+}
+
 func (d *dataRecord) AddInfoElement(element *InfoElementWithValue) error {
 	var value interface{}
 	var err error
@@ -130,17 +145,14 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue) error {
 			return err
 		}
 		element.Value = value
-		if len(d.orderedElementList) <= int(d.fieldCount) {
-			d.orderedElementList = append(d.orderedElementList, element)
-		} else {
-			d.orderedElementList[d.fieldCount] = element
-		}
 	} else {
-		buffBytes, err := EncodeToIEDataType(element.Element.DataType, element.Value)
-		if err != nil {
-			return err
-		}
-		d.buffer = append(d.buffer, buffBytes...)
+		setInfoElementLen(element)
+		d.len += element.Length
+	}
+	if len(d.orderedElementList) <= int(d.fieldCount) {
+		d.orderedElementList = append(d.orderedElementList, element)
+	} else {
+		d.orderedElementList[d.fieldCount] = element
 	}
 	d.fieldCount++
 	return nil
@@ -148,12 +160,8 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue) error {
 
 func (t *templateRecord) PrepareRecord() error {
 	// Add Template Record Header
-	addBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(addBytes, t.templateID)
-	t.buffer = append(t.buffer, addBytes...)
-	addBytes = make([]byte, 2)
-	binary.BigEndian.PutUint16(addBytes, t.fieldCount)
-	t.buffer = append(t.buffer, addBytes...)
+	binary.BigEndian.PutUint16(t.buffer[0:2], t.templateID)
+	binary.BigEndian.PutUint16(t.buffer[2:4], t.fieldCount)
 	return nil
 }
 
@@ -164,11 +172,9 @@ func (t *templateRecord) AddInfoElement(element *InfoElementWithValue) error {
 	}
 	initialLength := len(t.buffer)
 	// Add field specifier {elementID: uint16, elementLen: uint16}
-	addBytes := make([]byte, 2)
-	binary.BigEndian.PutUint16(addBytes, element.Element.ElementId)
-	t.buffer = append(t.buffer, addBytes...)
-	addBytes = make([]byte, 2)
-	binary.BigEndian.PutUint16(addBytes, element.Element.Len)
+	addBytes := make([]byte, 4)
+	binary.BigEndian.PutUint16(addBytes[0:2], element.Element.ElementId)
+	binary.BigEndian.PutUint16(addBytes[2:4], element.Element.Len)
 	t.buffer = append(t.buffer, addBytes...)
 	if element.Element.EnterpriseId != 0 {
 		// Set the MSB of elementID to 1 as per RFC7011
@@ -186,6 +192,14 @@ func (t *templateRecord) AddInfoElement(element *InfoElementWithValue) error {
 		t.minDataRecLength = t.minDataRecLength + element.Element.Len
 	}
 	return nil
+}
+
+func (t *templateRecord) GetBuffer() []byte {
+	return t.buffer
+}
+
+func (t *templateRecord) GetRecordLength() int {
+	return len(t.buffer)
 }
 
 func (t *templateRecord) GetMinDataRecordLen() uint16 {

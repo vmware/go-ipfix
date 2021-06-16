@@ -73,24 +73,16 @@ func TestGetSetType(t *testing.T) {
 	assert.Equal(t, Data, newSet.GetSetType())
 }
 
-func TestGetBuffer(t *testing.T) {
+func TestGetHeaderBuffer(t *testing.T) {
 	decodingSet := NewSet(true)
 	err := decodingSet.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
-	assert.Equal(t, 0, decodingSet.GetBuffer().Len())
-	decodingSet.ResetSet()
-	err = decodingSet.PrepareSet(Template, uint16(258))
-	assert.NoError(t, err)
-	assert.Equal(t, 0, decodingSet.GetBuffer().Len())
+	assert.Equal(t, 0, len(decodingSet.GetHeaderBuffer()))
 
 	encodingSet := NewSet(false)
 	err = encodingSet.PrepareSet(Template, uint16(257))
 	assert.NoError(t, err)
-	assert.Equal(t, 4, encodingSet.GetBuffer().Len())
-	encodingSet.ResetSet()
-	err = encodingSet.PrepareSet(Template, uint16(257))
-	assert.NoError(t, err)
-	assert.Equal(t, 4, encodingSet.GetBuffer().Len())
+	assert.Equal(t, 4, len(encodingSet.GetHeaderBuffer()))
 }
 
 func TestGetRecords(t *testing.T) {
@@ -129,12 +121,10 @@ func TestSet_UpdateLenInHeader(t *testing.T) {
 	err = setForEncoding.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
 	setForEncoding.AddRecord(elements, testTemplateID)
-	assert.Equal(t, 0, setForDecoding.GetBuffer().Len())
-	assert.Equal(t, 16, setForEncoding.GetBuffer().Len())
 	setForDecoding.UpdateLenInHeader()
 	setForEncoding.UpdateLenInHeader()
 	// Nothing should be written in setForDecoding
-	assert.Equal(t, 0, setForDecoding.GetBuffer().Len())
+	assert.Equal(t, 0, len(setForDecoding.GetHeaderBuffer()))
 	// Check the bytes in the header for set length
-	assert.Equal(t, uint16(setForEncoding.GetBuffer().Len()), binary.BigEndian.Uint16(setForEncoding.GetBuffer().Bytes()[2:4]))
+	assert.Equal(t, uint16(setForEncoding.GetSetLength()), binary.BigEndian.Uint16(setForEncoding.GetHeaderBuffer()[2:4]))
 }

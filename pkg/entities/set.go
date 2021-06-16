@@ -15,7 +15,6 @@
 package entities
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
 )
@@ -29,6 +28,7 @@ const (
 	TemplateTTL = TemplateRefreshTimeOut * 3
 	// TemplateSetID is the setID for template record
 	TemplateSetID uint16 = 2
+	SetHeaderLen  int    = 4
 )
 
 type ContentType uint8
@@ -43,7 +43,8 @@ const (
 type Set interface {
 	PrepareSet(setType ContentType, templateID uint16) error
 	ResetSet()
-	GetBuffer() *bytes.Buffer
+	GetHeaderBuffer() []byte
+	GetSetLength() int
 	GetSetType() ContentType
 	UpdateLenInHeader()
 	AddRecord(elements []*InfoElementWithValue, templateID uint16) error
@@ -52,18 +53,26 @@ type Set interface {
 }
 
 type set struct {
-	// Pointer to message buffer
-	buffer     *bytes.Buffer
-	setType    ContentType
-	records    []Record
-	isDecoding bool
+	headerBuffer []byte
+	setType      ContentType
+	records      []Record
+	isDecoding   bool
+	length       int
 }
 
 func NewSet(isDecoding bool) Set {
-	return &set{
-		buffer:     &bytes.Buffer{},
-		records:    make([]Record, 0),
-		isDecoding: isDecoding,
+	if isDecoding {
+		return &set{
+			records:    make([]Record, 0),
+			isDecoding: isDecoding,
+		}
+	} else {
+		return &set{
+			headerBuffer: make([]byte, SetHeaderLen),
+			records:      make([]Record, 0),
+			isDecoding:   isDecoding,
+			length:       SetHeaderLen,
+		}
 	}
 }
 
@@ -75,20 +84,28 @@ func (s *set) PrepareSet(setType ContentType, templateID uint16) error {
 	}
 	if !s.isDecoding {
 		// Create the set header and append it when encoding
-		return s.createHeader(s.setType, templateID)
+		s.createHeader(s.setType, templateID)
 	}
 	return nil
 }
 
 func (s *set) ResetSet() {
-	s.buffer.Reset()
+	if !s.isDecoding {
+		s.headerBuffer = nil
+		s.headerBuffer = make([]byte, SetHeaderLen)
+		s.length = SetHeaderLen
+	}
 	s.setType = Undefined
 	s.records = nil
 	s.records = make([]Record, 0)
 }
 
-func (s *set) GetBuffer() *bytes.Buffer {
-	return s.buffer
+func (s *set) GetHeaderBuffer() []byte {
+	return s.headerBuffer
+}
+
+func (s *set) GetSetLength() int {
+	return s.length
 }
 
 func (s *set) GetSetType() ContentType {
@@ -99,7 +116,7 @@ func (s *set) UpdateLenInHeader() {
 	// TODO:Add padding to the length when multiple sets are sent in IPFIX message
 	if !s.isDecoding {
 		// Add length to the set header
-		binary.BigEndian.PutUint16(s.buffer.Bytes()[2:4], uint16(s.buffer.Len()))
+		binary.BigEndian.PutUint16(s.headerBuffer[2:4], uint16(s.length))
 	}
 }
 
@@ -124,17 +141,7 @@ func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) err
 		}
 	}
 	s.records = append(s.records, record)
-	// write record to set when encoding
-	if !s.isDecoding {
-		recordBytes := record.GetBuffer()
-		bytesWritten, err := s.buffer.Write(recordBytes)
-		if err != nil {
-			return fmt.Errorf("error in writing the buffer to set: %v", err)
-		}
-		if bytesWritten != len(recordBytes) {
-			return fmt.Errorf("bytes written length is not expected")
-		}
-	}
+	s.length += record.GetRecordLength()
 	return nil
 }
 
@@ -146,15 +153,10 @@ func (s *set) GetNumberOfRecords() uint32 {
 	return uint32(len(s.records))
 }
 
-func (s *set) createHeader(setType ContentType, templateID uint16) error {
-	header := make([]byte, 4)
+func (s *set) createHeader(setType ContentType, templateID uint16) {
 	if setType == Template {
-		binary.BigEndian.PutUint16(header[0:2], TemplateSetID)
+		binary.BigEndian.PutUint16(s.headerBuffer[0:2], TemplateSetID)
 	} else if setType == Data {
-		binary.BigEndian.PutUint16(header[0:2], templateID)
+		binary.BigEndian.PutUint16(s.headerBuffer[0:2], templateID)
 	}
-	if _, err := s.buffer.Write(header); err != nil {
-		return err
-	}
-	return nil
 }
