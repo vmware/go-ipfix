@@ -215,15 +215,10 @@ func (ep *ExportingProcess) NewTemplateID() uint16 {
 func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 	// Create a new message and use it to send the set.
 	msg := entities.NewMessage(false)
-	// Create the header in the IPFIX message.
-	_, err := msg.CreateHeader()
-	if err != nil {
-		return 0, fmt.Errorf("error when creating header: %v", err)
-	}
 
 	// Check if message is exceeding the limit after adding the set. Include message
 	// header length too.
-	msgLen := msg.GetMsgBufferLen() + set.GetBuffer().Len()
+	msgLen := entities.MsgHeaderLength + set.GetSetLength()
 	if ep.connToCollector.LocalAddr().Network() == "tcp" {
 		if msgLen > entities.MaxTcpSocketMsgSize {
 			return 0, fmt.Errorf("TCP transport: message size exceeds max socket buffer size")
@@ -246,14 +241,20 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 	}
 	msg.SetSequenceNum(ep.seqNumber)
 
-	// Append the byte slices together to send on the exporter connection rather
-	// than copying the set buffer to message buffer again.
-	bytesSlice := append(msg.GetMsgBuffer().Bytes(), set.GetBuffer().Bytes()...)
+	bytesSlice := make([]byte, msgLen)
+	copy(bytesSlice[:entities.MsgHeaderLength], msg.GetMsgHeader())
+	copy(bytesSlice[entities.MsgHeaderLength:entities.MsgHeaderLength+entities.SetHeaderLen], set.GetHeaderBuffer())
+	index := entities.MsgHeaderLength + entities.SetHeaderLen
+	for _, record := range set.GetRecords() {
+		len := record.GetRecordLength()
+		copy(bytesSlice[index:index+len], record.GetBuffer())
+		index += len
+	}
 	// Send the message on the exporter connection.
 	bytesSent, err := ep.connToCollector.Write(bytesSlice)
 	if err != nil {
 		return bytesSent, fmt.Errorf("error when sending message on the connection: %v", err)
-	} else if bytesSent != int(msg.GetMessageLen()) {
+	} else if bytesSent != msgLen {
 		return bytesSent, fmt.Errorf("could not send the complete message on the connection")
 	}
 

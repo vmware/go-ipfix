@@ -19,7 +19,6 @@
 package testing
 
 import (
-	bytes "bytes"
 	gomock "github.com/golang/mock/gomock"
 	entities "github.com/vmware/go-ipfix/pkg/entities"
 	reflect "reflect"
@@ -62,18 +61,18 @@ func (mr *MockSetMockRecorder) AddRecord(arg0, arg1 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), arg0, arg1)
 }
 
-// GetBuffer mocks base method
-func (m *MockSet) GetBuffer() *bytes.Buffer {
+// GetHeaderBuffer mocks base method
+func (m *MockSet) GetHeaderBuffer() []byte {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBuffer")
-	ret0, _ := ret[0].(*bytes.Buffer)
+	ret := m.ctrl.Call(m, "GetHeaderBuffer")
+	ret0, _ := ret[0].([]byte)
 	return ret0
 }
 
-// GetBuffer indicates an expected call of GetBuffer
-func (mr *MockSetMockRecorder) GetBuffer() *gomock.Call {
+// GetHeaderBuffer indicates an expected call of GetHeaderBuffer
+func (mr *MockSetMockRecorder) GetHeaderBuffer() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBuffer", reflect.TypeOf((*MockSet)(nil).GetBuffer))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHeaderBuffer", reflect.TypeOf((*MockSet)(nil).GetHeaderBuffer))
 }
 
 // GetNumberOfRecords mocks base method
@@ -102,6 +101,20 @@ func (m *MockSet) GetRecords() []entities.Record {
 func (mr *MockSetMockRecorder) GetRecords() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecords", reflect.TypeOf((*MockSet)(nil).GetRecords))
+}
+
+// GetSetLength mocks base method
+func (m *MockSet) GetSetLength() int {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetSetLength")
+	ret0, _ := ret[0].(int)
+	return ret0
+}
+
+// GetSetLength indicates an expected call of GetSetLength
+func (mr *MockSetMockRecorder) GetSetLength() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSetLength", reflect.TypeOf((*MockSet)(nil).GetSetLength))
 }
 
 // GetSetType mocks base method
