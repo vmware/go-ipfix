@@ -97,6 +97,7 @@ type InfoElement struct {
 type InfoElementWithValue struct {
 	Element *InfoElement
 	Value   interface{}
+	Length  int
 }
 
 func NewInfoElement(name string, ieID uint16, ieType IEDataType, entID uint32, len uint16) *InfoElement {
@@ -111,7 +112,7 @@ func NewInfoElement(name string, ieID uint16, ieType IEDataType, entID uint32, l
 
 func NewInfoElementWithValue(element *InfoElement, value interface{}) *InfoElementWithValue {
 	return &InfoElementWithValue{
-		element, value,
+		element, value, 0,
 	}
 }
 
@@ -387,4 +388,162 @@ func EncodeToIEDataType(dataType IEDataType, val interface{}) ([]byte, error) {
 		return encodedBytes, nil
 	}
 	return nil, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
+}
+
+// encodeToBuff is to encode data to specific type to the buff
+func encodeToBuff(dataType IEDataType, val interface{}, length int, buffer []byte, index int) error {
+	if index+length > len(buffer) {
+		return fmt.Errorf("buffer size is not enough for encoding")
+	}
+	switch dataType {
+	case Unsigned8:
+		v, ok := val.(uint8)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type uint8", val)
+		}
+		copy(buffer[index:index+1], []byte{v})
+	case Unsigned16:
+		v, ok := val.(uint16)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type uint16", val)
+		}
+		binary.BigEndian.PutUint16(buffer[index:], v)
+	case Unsigned32:
+		v, ok := val.(uint32)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type uint32", val)
+		}
+		binary.BigEndian.PutUint32(buffer[index:], v)
+	case Unsigned64:
+		v, ok := val.(uint64)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type uint64", val)
+		}
+		binary.BigEndian.PutUint64(buffer[index:], v)
+	case Signed8:
+		v, ok := val.(int8)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type int8", val)
+		}
+		copy(buffer[index:index+1], []byte{byte(v)})
+	case Signed16:
+		v, ok := val.(int16)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type int16", val)
+		}
+		binary.BigEndian.PutUint16(buffer[index:], uint16(v))
+	case Signed32:
+		v, ok := val.(int32)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type int32", val)
+		}
+		binary.BigEndian.PutUint32(buffer[index:], uint32(v))
+	case Signed64:
+		v, ok := val.(int64)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type int64", val)
+		}
+		binary.BigEndian.PutUint64(buffer[index:], uint64(v))
+	case Float32:
+		v, ok := val.(float32)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type float32", val)
+		}
+		binary.BigEndian.PutUint32(buffer[index:], math.Float32bits(v))
+	case Float64:
+		v, ok := val.(float64)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type float64", val)
+		}
+		binary.BigEndian.PutUint64(buffer[index:], math.Float64bits(v))
+	case Boolean:
+		v, ok := val.(bool)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type bool", val)
+		}
+		// Following boolean spec from RFC7011
+		indicator := byte(int8(1))
+		if !v {
+			indicator = byte(int8(2))
+		}
+		copy(buffer[index:index+1], []byte{indicator})
+	case DateTimeSeconds:
+		v, ok := val.(uint32)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type uint32", val)
+		}
+		binary.BigEndian.PutUint32(buffer[index:], v)
+	case DateTimeMilliseconds:
+		v, ok := val.(uint64)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type uint64", val)
+		}
+		binary.BigEndian.PutUint64(buffer[index:], v)
+		// Currently only supporting seconds and milliseconds
+	case DateTimeMicroseconds, DateTimeNanoseconds:
+		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
+		return fmt.Errorf("API does not support micro and nano seconds types yet")
+	case MacAddress:
+		// Expects net.Hardware type
+		v, ok := val.(net.HardwareAddr)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type net.HardwareAddr for this element", val)
+		}
+		copy(buffer[index:], v)
+	case Ipv4Address:
+		// Expects net.IP type
+		v, ok := val.(net.IP)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type net.IP for this element", val)
+		}
+		if ipv4Add := v.To4(); ipv4Add != nil {
+			copy(buffer[index:], ipv4Add)
+		} else {
+			return fmt.Errorf("provided IP %v does not belong to IPv4 address family", v)
+		}
+	case Ipv6Address:
+		// Expects net.IP type
+		v, ok := val.(net.IP)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type net.IP for this element", val)
+		}
+		if ipv6Add := v.To16(); ipv6Add != nil {
+			copy(buffer[index:], ipv6Add)
+		} else {
+			return fmt.Errorf("provided IPv6 address %v is not of correct length", v)
+		}
+	case String:
+		v, ok := val.(string)
+		if !ok {
+			return fmt.Errorf("val argument %v is not of type string for this element", val)
+		}
+		if len(v) < 255 {
+			buffer[index] = uint8(len(v))
+			for i, b := range v {
+				buffer[i+index+1] = byte(b)
+			}
+		} else if len(v) < 65535 {
+			buffer[index] = byte(255)
+			binary.BigEndian.PutUint16(buffer[index+1:index+3], uint16(len(v)))
+			for i, b := range v {
+				buffer[i+index+3] = byte(b)
+			}
+		}
+	default:
+		return fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
+	}
+	return nil
+}
+
+func setInfoElementLen(element *InfoElementWithValue) {
+	if element.Element.DataType != String {
+		element.Length = int(element.Element.Len)
+	} else {
+		v := element.Value.(string)
+		if len(v) < 255 {
+			element.Length = len(v) + 1
+		} else {
+			element.Length = len(v) + 3
+		}
+	}
 }
