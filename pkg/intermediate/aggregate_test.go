@@ -489,8 +489,9 @@ func TestAggregationProcess(t *testing.T) {
 
 func TestAddOriginalExporterInfo(t *testing.T) {
 	message := createDataMsgForSrc(t, false, false, false, false, false)
-	err := addOriginalExporterInfo(message)
+	isIPv4, err := addOriginalExporterInfo(message)
 	assert.NoError(t, err)
+	assert.True(t, isIPv4)
 	record := message.GetSet().GetRecords()[0]
 	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
 	assert.Equal(t, true, exist)
@@ -503,8 +504,9 @@ func TestAddOriginalExporterInfo(t *testing.T) {
 func TestAddOriginalExporterInfoIPv6(t *testing.T) {
 	// Test message with data set
 	message := createDataMsgForSrc(t, true, false, false, false, false)
-	err := addOriginalExporterInfo(message)
+	isIPv4, err := addOriginalExporterInfo(message)
 	assert.NoError(t, err)
+	assert.False(t, isIPv4)
 	record := message.GetSet().GetRecords()[0]
 	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv6Address")
 	assert.Equal(t, true, exist)
@@ -530,7 +532,7 @@ func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
 	record2 := createDataMsgForDst(t, false, false, false, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, record2, false, false, true)
 	// Cleanup the flowKeyMap in aggregation process.
-	flowKey1, _ := getFlowKeyFromRecord(record1)
+	flowKey1, _, _ := getFlowKeyFromRecord(record1)
 	err := ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
 	heap.Pop(&ap.expirePriorityQueue)
@@ -548,7 +550,7 @@ func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
 	record2 = createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, record2, true, false, true)
 	// Cleanup the flowKeyMap in aggregation process.
-	flowKey1, _ = getFlowKeyFromRecord(record1)
+	flowKey1, _, _ = getFlowKeyFromRecord(record1)
 	err = ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
 	heap.Pop(&ap.expirePriorityQueue)
@@ -570,7 +572,7 @@ func TestCorrelateRecordsForInterNodeDenyFlow(t *testing.T) {
 	record1 := createDataMsgForSrc(t, false, false, false, false, true).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, false, false)
 	// Cleanup the flowKeyMap in aggregation process.
-	flowKey1, _ := getFlowKeyFromRecord(record1)
+	flowKey1, _, _ := getFlowKeyFromRecord(record1)
 	ap.deleteFlowKeyFromMap(*flowKey1)
 	heap.Pop(&ap.expirePriorityQueue)
 	// Test the scenario, where dst record has ingress reject rule
@@ -602,7 +604,7 @@ func TestCorrelateRecordsForIntraNodeFlow(t *testing.T) {
 	record1 := createDataMsgForSrc(t, false, true, false, false, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, false)
 	// Cleanup the flowKeyMap in aggregation process.
-	flowKey1, _ := getFlowKeyFromRecord(record1)
+	flowKey1, _, _ := getFlowKeyFromRecord(record1)
 	err := ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
 	heap.Pop(&ap.expirePriorityQueue)
@@ -625,7 +627,7 @@ func TestCorrelateRecordsForToExternalFlow(t *testing.T) {
 	record1 := createDataMsgForSrc(t, false, true, false, true, false).GetSet().GetRecords()[0]
 	runCorrelationAndCheckResult(t, ap, record1, nil, false, true, false)
 	// Cleanup the flowKeyMap in aggregation process.
-	flowKey1, _ := getFlowKeyFromRecord(record1)
+	flowKey1, _, _ := getFlowKeyFromRecord(record1)
 	err := ap.deleteFlowKeyFromMap(*flowKey1)
 	assert.NoError(t, err)
 	heap.Pop(&ap.expirePriorityQueue)
@@ -672,12 +674,12 @@ func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 	flowKey1 := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	flowKey2 := FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	aggFlowRecord := &AggregationFlowRecord{
-		message.GetSet().GetRecords()[0],
-		&ItemToExpire{},
-		true,
-		0,
-		false,
-		false,
+		Record:                    message.GetSet().GetRecords()[0],
+		PriorityQueueItem:         &ItemToExpire{},
+		ReadyToSend:               true,
+		waitForReadyToSendRetries: 0,
+		areCorrelatedFieldsFilled: false,
+		areExternalFieldsFilled:   false,
 	}
 	aggregationProcess.flowKeyRecordMap[flowKey1] = aggFlowRecord
 	assert.Equal(t, 1, len(aggregationProcess.flowKeyRecordMap))
@@ -726,8 +728,8 @@ func TestGetExpiryFromExpirePriorityQueue(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, record := range tc.records {
-				flowKey, _ := getFlowKeyFromRecord(record)
-				err := ap.addOrUpdateRecordInMap(flowKey, record)
+				flowKey, isIPv4, _ := getFlowKeyFromRecord(record)
+				err := ap.addOrUpdateRecordInMap(flowKey, record, isIPv4, true)
 				assert.NoError(t, err)
 			}
 			expiryTime := ap.GetExpiryFromExpirePriorityQueue()
@@ -806,8 +808,8 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			numExecutions = 0
 			for _, record := range tc.records {
-				flowKey, _ := getFlowKeyFromRecord(record)
-				err := ap.addOrUpdateRecordInMap(flowKey, record)
+				flowKey, isIPv4, _ := getFlowKeyFromRecord(record)
+				err := ap.addOrUpdateRecordInMap(flowKey, record, isIPv4, true)
 				assert.NoError(t, err)
 			}
 			switch tc.name {
@@ -842,16 +844,16 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 }
 
 func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1, record2 entities.Record, isIPv6, isIntraNode, needsCorrleation bool) {
-	flowKey1, _ := getFlowKeyFromRecord(record1)
-	err := ap.addOrUpdateRecordInMap(flowKey1, record1)
+	flowKey1, isIPv4, _ := getFlowKeyFromRecord(record1)
+	err := ap.addOrUpdateRecordInMap(flowKey1, record1, isIPv4, true)
 	assert.NoError(t, err)
 	item := ap.expirePriorityQueue.Peek()
 	oldActiveExpiryTime := item.activeExpireTime
 	oldInactiveExpiryTime := item.inactiveExpireTime
 	if !isIntraNode && needsCorrleation {
-		flowKey2, _ := getFlowKeyFromRecord(record2)
+		flowKey2, isIPv4, _ := getFlowKeyFromRecord(record2)
 		assert.Equalf(t, *flowKey1, *flowKey2, "flow keys should be equal.")
-		err = ap.addOrUpdateRecordInMap(flowKey2, record2)
+		err = ap.addOrUpdateRecordInMap(flowKey2, record2, isIPv4, true)
 		assert.NoError(t, err)
 	}
 	assert.Equal(t, 1, len(ap.flowKeyRecordMap))
@@ -894,21 +896,21 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 }
 
 func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecord, dstRecord, srcRecordLatest, dstRecordLatest entities.Record, isIntraNode bool) {
-	flowKey, _ := getFlowKeyFromRecord(srcRecord)
-	err := ap.addOrUpdateRecordInMap(flowKey, srcRecord)
+	flowKey, isIPv4, _ := getFlowKeyFromRecord(srcRecord)
+	err := ap.addOrUpdateRecordInMap(flowKey, srcRecord, isIPv4, true)
 	assert.NoError(t, err)
 	item := ap.expirePriorityQueue.Peek()
 	oldActiveExpiryTime := item.activeExpireTime
 	oldInactiveExpiryTime := item.inactiveExpireTime
 
 	if !isIntraNode {
-		err = ap.addOrUpdateRecordInMap(flowKey, dstRecord)
+		err = ap.addOrUpdateRecordInMap(flowKey, dstRecord, isIPv4, true)
 		assert.NoError(t, err)
 	}
-	err = ap.addOrUpdateRecordInMap(flowKey, srcRecordLatest)
+	err = ap.addOrUpdateRecordInMap(flowKey, srcRecordLatest, isIPv4, true)
 	assert.NoError(t, err)
 	if !isIntraNode {
-		err = ap.addOrUpdateRecordInMap(flowKey, dstRecordLatest)
+		err = ap.addOrUpdateRecordInMap(flowKey, dstRecordLatest, isIPv4, true)
 		assert.NoError(t, err)
 	}
 	assert.Equal(t, 1, len(ap.flowKeyRecordMap))
