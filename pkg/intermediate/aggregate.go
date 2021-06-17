@@ -134,7 +134,8 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 	if set.GetSetType() != entities.Data { // only process data records
 		return nil
 	}
-	if err := addOriginalExporterInfo(message); err != nil {
+	isExporterIPv4, err := addOriginalExporterInfo(message)
+	if err != nil {
 		return err
 	}
 	records := set.GetRecords()
@@ -146,11 +147,11 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 			klog.Errorf("Invalid data record because decoded values of elements are not valid.")
 			invalidRecs = invalidRecs + 1
 		} else {
-			flowKey, err := getFlowKeyFromRecord(record)
+			flowKey, isIPv4, err := getFlowKeyFromRecord(record)
 			if err != nil {
 				return err
 			}
-			if err = a.addOrUpdateRecordInMap(flowKey, record); err != nil {
+			if err = a.addOrUpdateRecordInMap(flowKey, record, isIPv4, isExporterIPv4); err != nil {
 				return err
 			}
 		}
@@ -281,9 +282,17 @@ func (a *AggregationProcess) AreExternalFieldsFilled(record AggregationFlowRecor
 	return record.areExternalFieldsFilled
 }
 
+func (a *AggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord) bool {
+	return record.isIPv4
+}
+
+func (a *AggregationProcess) IsExporterOfAggregatedRecordIPv4(record AggregationFlowRecord) bool {
+	return record.isExporterIPv4
+}
+
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
 // flowKeyMap by doing correlation or updating the stats.
-func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record) error {
+func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record, isIPv4, isExporterIPv4 bool) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -349,6 +358,8 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			Record:                    record,
 			ReadyToSend:               false,
 			waitForReadyToSendRetries: 0,
+			isIPv4:                    isIPv4,
+			isExporterIPv4:            isExporterIPv4,
 		}
 		if !correlationRequired {
 			aggregationRecord.ReadyToSend = true
@@ -651,7 +662,7 @@ func areRecordsFromSameNode(record1 entities.Record, record2 entities.Record) bo
 }
 
 // getFlowKeyFromRecord returns 5-tuple from data record
-func getFlowKeyFromRecord(record entities.Record) (*FlowKey, error) {
+func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 	flowKey := &FlowKey{}
 	elementList := []string{
 		"sourceTransportPort",
@@ -668,11 +679,11 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, error) {
 		case "sourceTransportPort", "destinationTransportPort":
 			element, exist := record.GetInfoElementWithValue(name)
 			if !exist {
-				return nil, fmt.Errorf("%s does not exist", name)
+				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
 			port, ok := element.Value.(uint16)
 			if !ok {
-				return nil, fmt.Errorf("%s is not in correct format", name)
+				return nil, false, fmt.Errorf("%s is not in correct format", name)
 			}
 			if name == "sourceTransportPort" {
 				flowKey.SourcePort = port
@@ -686,7 +697,7 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, error) {
 			}
 			addr, ok := element.Value.(net.IP)
 			if !ok {
-				return nil, fmt.Errorf("%s is not in correct format", name)
+				return nil, false, fmt.Errorf("%s is not in correct format", name)
 			}
 
 			if strings.Contains(name, "source") {
@@ -705,11 +716,11 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, error) {
 				break
 			}
 			if !exist {
-				return nil, fmt.Errorf("%s does not exist", name)
+				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
 			addr, ok := element.Value.(net.IP)
 			if !ok {
-				return nil, fmt.Errorf("%s is not in correct format", name)
+				return nil, false, fmt.Errorf("%s is not in correct format", name)
 			}
 			if strings.Contains(name, "source") {
 				flowKey.SourceAddress = addr.String()
@@ -719,20 +730,21 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, error) {
 		case "protocolIdentifier":
 			element, exist := record.GetInfoElementWithValue(name)
 			if !exist {
-				return nil, fmt.Errorf("%s does not exist", name)
+				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
 			proto, ok := element.Value.(uint8)
 			if !ok {
-				return nil, fmt.Errorf("%s is not in correct format: %v", name, proto)
+				return nil, false, fmt.Errorf("%s is not in correct format: %v", name, proto)
 			}
 			flowKey.Protocol = proto
 		}
 	}
-	return flowKey, nil
+	return flowKey, isSrcIPv4Filled && isDstIPv4Filled, nil
 }
 
-// addOriginalExporterInfo adds originalExporterIP and originalObservationDomainId to records in message set
-func addOriginalExporterInfo(message *entities.Message) error {
+// addOriginalExporterInfo adds originalExporterIP and originalObservationDomainId
+// to records in message set. It returns whether exportIP is IPv4(true) or IPv6(false).
+func addOriginalExporterInfo(message *entities.Message) (bool, error) {
 	isIPv4 := false
 	exporterIP := net.ParseIP(message.GetExportAddress())
 	if exporterIP.To4() != nil {
@@ -751,7 +763,7 @@ func addOriginalExporterInfo(message *entities.Message) error {
 			ie, err = registry.GetInfoElement("originalExporterIPv6Address", registry.IANAEnterpriseID)
 		}
 		if err != nil {
-			return err
+			return isIPv4, err
 		}
 
 		var value []byte
@@ -761,31 +773,31 @@ func addOriginalExporterInfo(message *entities.Message) error {
 			value, err = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP(message.GetExportAddress()).To16())
 		}
 		if err != nil {
-			return fmt.Errorf("error when encoding originalExporterIP: %v", err)
+			return isIPv4, fmt.Errorf("error when encoding originalExporterIP: %v", err)
 		}
 		originalExporterIP = entities.NewInfoElementWithValue(ie, value)
 
 		err = record.AddInfoElement(originalExporterIP)
 		if err != nil {
-			return err
+			return isIPv4, err
 		}
 
 		// Add originalObservationDomainId
 		ie, err = registry.GetInfoElement("originalObservationDomainId", registry.IANAEnterpriseID)
 		if err != nil {
-			return fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId")
+			return isIPv4, fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId")
 		}
 		value, err = entities.EncodeToIEDataType(entities.Unsigned32, message.GetObsDomainID())
 		if err != nil {
-			return fmt.Errorf("error when encoding originalObservationDomainId: %v", err)
+			return isIPv4, fmt.Errorf("error when encoding originalObservationDomainId: %v", err)
 		}
 		originalObservationDomainId = entities.NewInfoElementWithValue(ie, value)
 		err = record.AddInfoElement(originalObservationDomainId)
 		if err != nil {
-			return err
+			return isIPv4, err
 		}
 	}
-	return nil
+	return isIPv4, nil
 }
 
 func validateDataRecord(record entities.Record) bool {

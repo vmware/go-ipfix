@@ -45,6 +45,12 @@ type AggregationFlowRecord struct {
 	// false when creating new AggregationFlowRecord. Setting and utilizing this
 	// field is upto the user and not used in go-ipfix library code.
 	areExternalFieldsFilled bool
+	// isIPv4 indicates whether the source and destination addresses are IPv4 or
+	// IPv6 in the aggregated flow record.
+	isIPv4 bool
+	// isExporterIPv4 indicates whether the exporter address of the received flow
+	// aggregator is IPv4 or IPv6.
+	isExporterIPv4 bool
 }
 
 type AggregationElements struct {
