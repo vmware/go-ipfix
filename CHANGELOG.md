@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.3 06-17-2021
+### Added
+- Add Pod Labels to the Antrea registry. (#203, @dreamtalen)
+- Add Kafka TLS support to the Kafka Producer. (#178, @stati)
+- Add more methods to the Kafka Producer. (#210, @stati)
+- Add `AreExternalFieldsFilled` metadata field for AggregationFlowRecord. (#211, @dreamtalen)
+- Add more metadata to the aggregated flow record. (#216, @stati)
+### Changed
+- Modify record entity and encoding/decoding methods to use byte datatype directly. (#207, @stati)
+- Remove element map from the record. (#206, @zyiou)
+- Modify the proto format of Kafka flow message. (#208, @stati)
+### Fixed
+- Remove unnecessary allocations in record entity code. (#200, @stati)
+- Optimize encoding code when adding element to data record and decrease memory allocations. (#204, @stati)
+- Fix the aggregation process set/get methods by modifying the aggregate record
+  map. (#212, @zyiou)
+- Fix the buffer management in the Collection Process. (#213, @stati)   
 ## 0.5.2 05-17-2021
 ### Added
 - Add support for isMetadataFilled for aggregation process (#196 @zyiou)
