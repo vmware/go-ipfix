@@ -13,7 +13,6 @@ import (
 
 func (cp *CollectingProcess) startTCPServer() {
 	var listener net.Listener
-	var err error
 	if cp.isEncrypted { // use TLS
 		config, err := cp.createServerConfig()
 		if err != nil {
@@ -28,6 +27,7 @@ func (cp *CollectingProcess) startTCPServer() {
 		cp.updateAddress(listener.Addr())
 		klog.Infof("Started TLS collecting process on %s", cp.address)
 	} else {
+		var err error
 		listener, err = net.Listen("tcp", cp.address)
 		if err != nil {
 			klog.Errorf("Cannot start collecting process on %s: %v", cp.address, err)
@@ -36,32 +36,37 @@ func (cp *CollectingProcess) startTCPServer() {
 		cp.updateAddress(listener.Addr())
 		klog.Infof("Start TCP collecting process on %s", cp.address)
 	}
-
-	go func() {
-		defer listener.Close()
+	defer listener.Close()
+	go func(stopCh chan struct{}) {
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				klog.Errorf("Cannot start collecting process on %s: %v", cp.address, err)
-				return
+				select {
+				case <-stopCh:
+					return
+				default:
+					klog.Errorf("Cannot start the connection on the collecting process at %s: %v", cp.address, err)
+					return
+				}
 			}
-			go cp.handleTCPClient(conn)
+			go cp.handleTCPClient(conn, stopCh)
 		}
-	}()
+	}(cp.stopChan)
 	<-cp.stopChan
-	// close all connections
-	cp.closeAllClients()
 }
 
-func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
+func (cp *CollectingProcess) handleTCPClient(conn net.Conn, stopCh chan struct{}) {
 	address := conn.RemoteAddr().String()
 	client := cp.createClient()
 	cp.addClient(address, client)
-	go func() {
-		defer conn.Close()
-		buff := make([]byte, cp.maxBufferSize)
-	out:
-		for {
+	defer conn.Close()
+	buff := make([]byte, cp.maxBufferSize)
+	for {
+		select {
+		case <-stopCh:
+			cp.deleteClient(address)
+			return
+		default:
 			size, err := conn.Read(buff)
 			if err != nil {
 				if err == io.EOF {
@@ -69,8 +74,8 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 				} else {
 					klog.Errorf("Error in collecting process: %v", err)
 				}
-				client.errChan <- true
-				break out
+				cp.deleteClient(address)
+				return
 			}
 			klog.V(2).Infof("Receiving %d bytes from %s", size, address)
 			buffBytes := make([]byte, size)
@@ -79,29 +84,28 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 				length, err := getMessageLength(bytes.NewBuffer(buffBytes))
 				if err != nil {
 					klog.Error(err)
-					client.errChan <- true
-					break out
+					cp.deleteClient(address)
+					return
 				}
 				if size < length {
 					klog.Errorf("Message length %v is larger than size read from buffer %v", length, size)
-					break out
+					cp.deleteClient(address)
+					return
 				}
 				size = size - length
 				// get the message here
 				message, err := cp.decodePacket(bytes.NewBuffer(buffBytes[0:length]), address)
 				if err != nil {
 					klog.Error(err)
-					client.errChan <- true
-					break out
+					cp.deleteClient(address)
+					return
 				}
 				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
 					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
 				buffBytes = buffBytes[length:]
 			}
 		}
-	}()
-	<-client.errChan
-	cp.deleteClient(address)
+	}
 }
 
 func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {

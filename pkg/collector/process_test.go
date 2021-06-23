@@ -131,6 +131,9 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
+	// Check if connection has closed properly or not by creating a new connection.
+	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
+	assert.Error(t, err)
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -148,11 +151,11 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
 	collectorAddr := cp.GetAddress()
+	resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
+	if err != nil {
+		t.Errorf("UDP Address cannot be resolved.")
+	}
 	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("UDP Address cannot be resolved.")
-		}
 		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
 		if err != nil {
 			t.Errorf("UDP Collecting Process does not start correctly.")
