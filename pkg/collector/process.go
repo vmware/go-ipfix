@@ -46,7 +46,7 @@ type CollectingProcess struct {
 	// maximum buffer size to read the record
 	maxBufferSize uint16
 	// chanel to receive stop information
-	stopChan chan bool
+	stopChan chan struct{}
 	// messageChan is the channel to output message
 	messageChan chan *entities.Message
 	// maps each client to its client handler (required channels)
@@ -88,7 +88,7 @@ func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 		address:       input.Address,
 		protocol:      input.Protocol,
 		maxBufferSize: input.MaxBufferSize,
-		stopChan:      make(chan bool),
+		stopChan:      make(chan struct{}),
 		messageChan:   make(chan *entities.Message),
 		clients:       make(map[string]*clientHandler),
 		isEncrypted:   input.IsEncrypted,
@@ -108,7 +108,8 @@ func (cp *CollectingProcess) Start() {
 }
 
 func (cp *CollectingProcess) Stop() {
-	cp.stopChan <- true
+	klog.V(4).Info("stopping the collecting process")
+	close(cp.stopChan)
 }
 
 func (cp *CollectingProcess) GetAddress() net.Addr {
