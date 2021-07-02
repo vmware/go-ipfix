@@ -171,7 +171,7 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 		assert.NotNil(t, flowKeyRecordMap[flowKey1])
 		record = flowKeyRecordMap[flowKey1].Record
 	}
-	assert.Equal(t, 27, len(record.GetOrderedElementList()))
+	assert.Equal(t, 25, len(record.GetOrderedElementList()))
 	for _, element := range record.GetOrderedElementList() {
 		switch element.Element.Name {
 		case "sourcePodName":
