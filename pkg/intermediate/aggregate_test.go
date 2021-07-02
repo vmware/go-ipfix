@@ -487,35 +487,6 @@ func TestAggregationProcess(t *testing.T) {
 	assert.Equalf(t, aggRecord.Record, dataMsg.GetSet().GetRecords()[0], "records should be equal")
 }
 
-func TestAddOriginalExporterInfo(t *testing.T) {
-	message := createDataMsgForSrc(t, false, false, false, false, false)
-	isIPv4, err := addOriginalExporterInfo(message)
-	assert.NoError(t, err)
-	assert.True(t, isIPv4)
-	record := message.GetSet().GetRecords()[0]
-	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv4Address")
-	assert.Equal(t, true, exist)
-	assert.Equal(t, net.IP{0x7f, 0x0, 0x0, 0x1}, ieWithValue.Value)
-	ieWithValue, exist = record.GetInfoElementWithValue("originalObservationDomainId")
-	assert.Equal(t, true, exist)
-	assert.Equal(t, uint32(1234), ieWithValue.Value)
-}
-
-func TestAddOriginalExporterInfoIPv6(t *testing.T) {
-	// Test message with data set
-	message := createDataMsgForSrc(t, true, false, false, false, false)
-	isIPv4, err := addOriginalExporterInfo(message)
-	assert.NoError(t, err)
-	assert.False(t, isIPv4)
-	record := message.GetSet().GetRecords()[0]
-	ieWithValue, exist := record.GetInfoElementWithValue("originalExporterIPv6Address")
-	assert.Equal(t, true, exist)
-	assert.Equal(t, net.IP{0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x1}, ieWithValue.Value)
-	ieWithValue, exist = record.GetInfoElementWithValue("originalObservationDomainId")
-	assert.Equal(t, true, exist)
-	assert.Equal(t, uint32(1234), ieWithValue.Value)
-}
-
 func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{
@@ -729,7 +700,7 @@ func TestGetExpiryFromExpirePriorityQueue(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, record := range tc.records {
 				flowKey, isIPv4, _ := getFlowKeyFromRecord(record)
-				err := ap.addOrUpdateRecordInMap(flowKey, record, isIPv4, true)
+				err := ap.addOrUpdateRecordInMap(flowKey, record, isIPv4)
 				assert.NoError(t, err)
 			}
 			expiryTime := ap.GetExpiryFromExpirePriorityQueue()
@@ -809,7 +780,7 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 			numExecutions = 0
 			for _, record := range tc.records {
 				flowKey, isIPv4, _ := getFlowKeyFromRecord(record)
-				err := ap.addOrUpdateRecordInMap(flowKey, record, isIPv4, true)
+				err := ap.addOrUpdateRecordInMap(flowKey, record, isIPv4)
 				assert.NoError(t, err)
 			}
 			switch tc.name {
@@ -845,7 +816,7 @@ func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 
 func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1, record2 entities.Record, isIPv6, isIntraNode, needsCorrleation bool) {
 	flowKey1, isIPv4, _ := getFlowKeyFromRecord(record1)
-	err := ap.addOrUpdateRecordInMap(flowKey1, record1, isIPv4, true)
+	err := ap.addOrUpdateRecordInMap(flowKey1, record1, isIPv4)
 	assert.NoError(t, err)
 	item := ap.expirePriorityQueue.Peek()
 	oldActiveExpiryTime := item.activeExpireTime
@@ -853,7 +824,7 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 	if !isIntraNode && needsCorrleation {
 		flowKey2, isIPv4, _ := getFlowKeyFromRecord(record2)
 		assert.Equalf(t, *flowKey1, *flowKey2, "flow keys should be equal.")
-		err = ap.addOrUpdateRecordInMap(flowKey2, record2, isIPv4, true)
+		err = ap.addOrUpdateRecordInMap(flowKey2, record2, isIPv4)
 		assert.NoError(t, err)
 	}
 	assert.Equal(t, 1, len(ap.flowKeyRecordMap))
@@ -897,20 +868,20 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 
 func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecord, dstRecord, srcRecordLatest, dstRecordLatest entities.Record, isIntraNode bool) {
 	flowKey, isIPv4, _ := getFlowKeyFromRecord(srcRecord)
-	err := ap.addOrUpdateRecordInMap(flowKey, srcRecord, isIPv4, true)
+	err := ap.addOrUpdateRecordInMap(flowKey, srcRecord, isIPv4)
 	assert.NoError(t, err)
 	item := ap.expirePriorityQueue.Peek()
 	oldActiveExpiryTime := item.activeExpireTime
 	oldInactiveExpiryTime := item.inactiveExpireTime
 
 	if !isIntraNode {
-		err = ap.addOrUpdateRecordInMap(flowKey, dstRecord, isIPv4, true)
+		err = ap.addOrUpdateRecordInMap(flowKey, dstRecord, isIPv4)
 		assert.NoError(t, err)
 	}
-	err = ap.addOrUpdateRecordInMap(flowKey, srcRecordLatest, isIPv4, true)
+	err = ap.addOrUpdateRecordInMap(flowKey, srcRecordLatest, isIPv4)
 	assert.NoError(t, err)
 	if !isIntraNode {
-		err = ap.addOrUpdateRecordInMap(flowKey, dstRecordLatest, isIPv4, true)
+		err = ap.addOrUpdateRecordInMap(flowKey, dstRecordLatest, isIPv4)
 		assert.NoError(t, err)
 	}
 	assert.Equal(t, 1, len(ap.flowKeyRecordMap))

@@ -48,9 +48,6 @@ type AggregationFlowRecord struct {
 	// isIPv4 indicates whether the source and destination addresses are IPv4 or
 	// IPv6 in the aggregated flow record.
 	isIPv4 bool
-	// isExporterIPv4 indicates whether the exporter address of the received flow
-	// aggregator is IPv4 or IPv6.
-	isExporterIPv4 bool
 }
 
 type AggregationElements struct {
