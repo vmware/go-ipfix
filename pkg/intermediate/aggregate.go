@@ -134,10 +134,7 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 	if set.GetSetType() != entities.Data { // only process data records
 		return nil
 	}
-	isExporterIPv4, err := addOriginalExporterInfo(message)
-	if err != nil {
-		return err
-	}
+
 	records := set.GetRecords()
 	invalidRecs := 0
 	for _, record := range records {
@@ -151,7 +148,7 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 			if err != nil {
 				return err
 			}
-			if err = a.addOrUpdateRecordInMap(flowKey, record, isIPv4, isExporterIPv4); err != nil {
+			if err = a.addOrUpdateRecordInMap(flowKey, record, isIPv4); err != nil {
 				return err
 			}
 		}
@@ -286,13 +283,9 @@ func (a *AggregationProcess) IsAggregatedRecordIPv4(record AggregationFlowRecord
 	return record.isIPv4
 }
 
-func (a *AggregationProcess) IsExporterOfAggregatedRecordIPv4(record AggregationFlowRecord) bool {
-	return record.isExporterIPv4
-}
-
 // addOrUpdateRecordInMap either adds the record to flowKeyMap or updates the record in
 // flowKeyMap by doing correlation or updating the stats.
-func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record, isIPv4, isExporterIPv4 bool) error {
+func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record entities.Record, isIPv4 bool) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
@@ -359,8 +352,8 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 			ReadyToSend:               false,
 			waitForReadyToSendRetries: 0,
 			isIPv4:                    isIPv4,
-			isExporterIPv4:            isExporterIPv4,
 		}
+
 		if !correlationRequired {
 			aggregationRecord.ReadyToSend = true
 			// If no correlation is required for an Inter-Node record, K8s metadata is
@@ -740,64 +733,6 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 		}
 	}
 	return flowKey, isSrcIPv4Filled && isDstIPv4Filled, nil
-}
-
-// addOriginalExporterInfo adds originalExporterIP and originalObservationDomainId
-// to records in message set. It returns whether exportIP is IPv4(true) or IPv6(false).
-func addOriginalExporterInfo(message *entities.Message) (bool, error) {
-	isIPv4 := false
-	exporterIP := net.ParseIP(message.GetExportAddress())
-	if exporterIP.To4() != nil {
-		isIPv4 = true
-	}
-	set := message.GetSet()
-	records := set.GetRecords()
-	for _, record := range records {
-		var originalExporterIP, originalObservationDomainId *entities.InfoElementWithValue
-		var ie *entities.InfoElement
-		var err error
-		// Add originalExporterIP. Supports both IPv4 and IPv6.
-		if isIPv4 {
-			ie, err = registry.GetInfoElement("originalExporterIPv4Address", registry.IANAEnterpriseID)
-		} else {
-			ie, err = registry.GetInfoElement("originalExporterIPv6Address", registry.IANAEnterpriseID)
-		}
-		if err != nil {
-			return isIPv4, err
-		}
-
-		var value []byte
-		if isIPv4 {
-			value, err = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP(message.GetExportAddress()).To4())
-		} else {
-			value, err = entities.EncodeToIEDataType(entities.Ipv6Address, net.ParseIP(message.GetExportAddress()).To16())
-		}
-		if err != nil {
-			return isIPv4, fmt.Errorf("error when encoding originalExporterIP: %v", err)
-		}
-		originalExporterIP = entities.NewInfoElementWithValue(ie, value)
-
-		err = record.AddInfoElement(originalExporterIP)
-		if err != nil {
-			return isIPv4, err
-		}
-
-		// Add originalObservationDomainId
-		ie, err = registry.GetInfoElement("originalObservationDomainId", registry.IANAEnterpriseID)
-		if err != nil {
-			return isIPv4, fmt.Errorf("IANA Registry is not loaded correctly with originalObservationDomainId")
-		}
-		value, err = entities.EncodeToIEDataType(entities.Unsigned32, message.GetObsDomainID())
-		if err != nil {
-			return isIPv4, fmt.Errorf("error when encoding originalObservationDomainId: %v", err)
-		}
-		originalObservationDomainId = entities.NewInfoElementWithValue(ie, value)
-		err = record.AddInfoElement(originalObservationDomainId)
-		if err != nil {
-			return isIPv4, err
-		}
-	}
-	return isIPv4, nil
 }
 
 func validateDataRecord(record entities.Record) bool {
