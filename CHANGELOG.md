@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.4 07-06-2021
+### Changed
+- Clear original export fields in the aggregation process. (#220, @stati)
+- Move bytes.buffer to []byte for set and message. Optimize the encoding of record, set and message entities. (#215, @zyiou)
 ## 0.5.3 06-17-2021
 ### Added
 - Add Pod Labels to the Antrea registry. (#203, @dreamtalen)
