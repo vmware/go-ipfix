@@ -98,10 +98,6 @@ var (
 
 func init() {
 	registry.LoadRegistry()
-	convertor.ProtoSchemaConvertor = map[string]convertor.RegisterProtoSchema{
-		FlowType1: RegisterFlowType1,
-		FlowType2: RegisterFlowType2,
-	}
 }
 
 func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
@@ -270,23 +266,24 @@ func TestKafkaProducer_Publish(t *testing.T) {
 	testInput := producer.ProducerInput{
 		KafkaLogSuccesses: false,
 		KafkaTopic:        "test-flow-msgs",
+		KafkaVersion:      sarama.DefaultVersion,
 	}
 
 	tests := []struct {
-		name         string
-		protoSchema  string
-		expectedMsg1 []byte
-		expectedMsg2 []byte
+		name                 string
+		protoSchemaConvertor convertor.IPFIXToKafkaConvertor
+		expectedMsg1         []byte
+		expectedMsg2         []byte
 	}{
 		{
 			"test-with-FlowType1",
-			FlowType1,
+			NewFlowType1Convertor(),
 			msg1ForFlowType1,
 			msg2ForFlowType1,
 		},
 		{
 			"test-with-FlowType2",
-			FlowType2,
+			NewFlowType2Convertor(),
 			msg1ForFlowType2,
 			msg2ForFlowType2,
 		},
@@ -294,8 +291,9 @@ func TestKafkaProducer_Publish(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockSaramaProducer := saramamock.NewAsyncProducer(t, kafkaConfig)
-			testInput.KafkaProtoSchema = tt.protoSchema
-			kafkaProducer := producer.NewKafkaProducer(testInput)
+			testInput.ProtoSchemaConvertor = tt.protoSchemaConvertor
+			kafkaProducer, err := producer.NewKafkaProducer(testInput)
+			assert.NoError(t, err)
 			kafkaProducer.SetSaramaProducer(mockSaramaProducer)
 
 			mockSaramaProducer.ExpectInputAndSucceed()
