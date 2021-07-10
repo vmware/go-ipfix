@@ -25,12 +25,10 @@ import (
 	"github.com/vmware/go-ipfix/pkg/producer/protobuf"
 )
 
-const FlowType1 string = "FlowType1"
-
 // convertRecordToFlowType1 is to support the FlowType1 proto schema.
 type convertRecordToFlowType1 struct{}
 
-func RegisterFlowType1() convertor.IPFIXToKafkaConvertor {
+func NewFlowType1Convertor() convertor.IPFIXToKafkaConvertor {
 	return &convertRecordToFlowType1{}
 }
 
