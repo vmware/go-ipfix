@@ -26,7 +26,6 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/producer"
-	"github.com/vmware/go-ipfix/pkg/producer/convertor"
 	convertortest "github.com/vmware/go-ipfix/pkg/producer/convertor/test"
 	"github.com/vmware/go-ipfix/pkg/registry"
 )
@@ -52,9 +51,6 @@ var (
 func TestCollectorToProducer(t *testing.T) {
 	// Initialize required objects.
 	registry.LoadRegistry()
-	convertor.ProtoSchemaConvertor = map[string]convertor.RegisterProtoSchema{
-		convertortest.FlowType1: convertortest.RegisterFlowType1,
-	}
 	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
 	if err != nil {
 		t.Error(err)
@@ -77,12 +73,14 @@ func TestCollectorToProducer(t *testing.T) {
 	kafkaConfig.Producer.Return.Errors = true
 
 	testInput := producer.ProducerInput{
-		KafkaLogSuccesses: false,
-		KafkaTopic:        "test-flow-msgs",
-		KafkaProtoSchema:  convertortest.FlowType1,
+		KafkaLogSuccesses:    false,
+		KafkaTopic:           "test-flow-msgs",
+		ProtoSchemaConvertor: convertortest.NewFlowType1Convertor(),
+		KafkaVersion:         sarama.DefaultVersion,
 	}
 	mockSaramaProducer := saramamock.NewAsyncProducer(t, kafkaConfig)
-	kafkaProducer := producer.NewKafkaProducer(testInput)
+	kafkaProducer, err := producer.NewKafkaProducer(testInput)
+	assert.NoError(t, err)
 	kafkaProducer.SetSaramaProducer(mockSaramaProducer)
 
 	go cp.Start()

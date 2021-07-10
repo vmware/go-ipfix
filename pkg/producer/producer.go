@@ -38,7 +38,6 @@ type ProducerInput struct {
 	KafkaBrokers         []string
 	KafkaVersion         sarama.KafkaVersion
 	KafkaTopic           string
-	KafkaProtoSchema     string
 	KafkaTLSEnabled      bool
 	KafkaCAFile          string
 	KafkaTLSCertFile     string
@@ -47,22 +46,27 @@ type ProducerInput struct {
 	KafkaLogErrors       bool
 	KafkaLogSuccesses    bool
 	EnableSaramaDebugLog bool
+	ProtoSchemaConvertor convertor.IPFIXToKafkaConvertor
 }
 
 type KafkaProducer struct {
-	producer             sarama.AsyncProducer
-	input                ProducerInput
-	protoSchemaConvertor convertor.IPFIXToKafkaConvertor
+	producer sarama.AsyncProducer
+	input    ProducerInput
 	// closeCh is required to exit the go routine that captures error messages from
 	// sarama go client.
 	closeCh chan struct{}
 }
 
-func NewKafkaProducer(input ProducerInput) *KafkaProducer {
-	return &KafkaProducer{
-		input:                input,
-		protoSchemaConvertor: convertor.ProtoSchemaConvertor[input.KafkaProtoSchema](),
+func NewKafkaProducer(input ProducerInput) (*KafkaProducer, error) {
+	if !input.KafkaVersion.IsAtLeast(sarama.DefaultVersion) {
+		return nil, fmt.Errorf("kafka version is not provided correctly")
 	}
+	if input.ProtoSchemaConvertor == nil {
+		return nil, fmt.Errorf("requires a protoschema convertor to convert IPFIX messages into kafka flow message")
+	}
+	return &KafkaProducer{
+		input: input,
+	}, nil
 }
 
 func (kp *KafkaProducer) InitSaramaProducer() error {
@@ -185,7 +189,7 @@ func (kp *KafkaProducer) SendFlowMessage(msg protoreflect.Message, kafkaDelimitM
 // the input message channel is closed.
 func (kp *KafkaProducer) PublishIPFIXMessages(msgCh chan *entities.Message) {
 	for msg := range msgCh {
-		flowMsgs := kp.protoSchemaConvertor.ConvertIPFIXMsgToFlowMsgs(msg)
+		flowMsgs := kp.input.ProtoSchemaConvertor.ConvertIPFIXMsgToFlowMsgs(msg)
 		for _, flowMsg := range flowMsgs {
 			kp.SendFlowMessage(flowMsg, true)
 		}
@@ -193,7 +197,7 @@ func (kp *KafkaProducer) PublishIPFIXMessages(msgCh chan *entities.Message) {
 }
 
 func (kp *KafkaProducer) PublishRecord(record entities.Record) {
-	flowMsg := kp.protoSchemaConvertor.ConvertIPFIXRecordToFlowMsg(record)
+	flowMsg := kp.input.ProtoSchemaConvertor.ConvertIPFIXRecordToFlowMsg(record)
 	kp.SendFlowMessage(flowMsg, false)
 }
 
