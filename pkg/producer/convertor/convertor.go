@@ -20,10 +20,6 @@ import (
 	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
-type RegisterProtoSchema func() IPFIXToKafkaConvertor
-
-var ProtoSchemaConvertor = map[string]RegisterProtoSchema{}
-
 // IPFIXToKafkaConvertor is an interface to support multiple proto schema for Kafka
 // producer.
 type IPFIXToKafkaConvertor interface {
