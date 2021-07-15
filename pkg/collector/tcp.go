@@ -26,7 +26,7 @@ func (cp *CollectingProcess) startTCPServer() {
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Started TLS collecting process on %s", cp.address)
+		klog.Infof("Started TLS collecting process on %s", cp.netAddress)
 	} else {
 		listener, err = net.Listen("tcp", cp.address)
 		if err != nil {
@@ -34,15 +34,14 @@ func (cp *CollectingProcess) startTCPServer() {
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Start TCP collecting process on %s", cp.address)
+		klog.Infof("Start TCP collecting process on %s", cp.netAddress)
 	}
-
+	defer listener.Close()
 	go func() {
-		defer listener.Close()
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
-				klog.Errorf("Cannot start collecting process on %s: %v", cp.address, err)
+				klog.Errorf("Cannot accept connection on %s: %v", cp.netAddress, err)
 				return
 			}
 			go cp.handleTCPClient(conn)

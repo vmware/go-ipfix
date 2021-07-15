@@ -57,7 +57,7 @@ func (cp *CollectingProcess) startUDPServer() {
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Start dtls collecting process on %s", cp.address)
+		klog.Infof("Start dtls collecting process on %s", cp.netAddress)
 		conn, err = listener.Accept()
 		if err != nil {
 			klog.Error(err)
@@ -94,7 +94,7 @@ func (cp *CollectingProcess) startUDPServer() {
 			return
 		}
 		cp.updateAddress(conn.LocalAddr())
-		klog.Infof("Start UDP collecting process on %s", cp.address)
+		klog.Infof("Start UDP collecting process on %s", cp.netAddress)
 		defer conn.Close()
 		go func() {
 			for {

@@ -131,6 +131,8 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
+	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
+	assert.Error(t, err)
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -361,6 +363,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
 	collectorAddr := cp.GetAddress()
+	var config *tls.Config
 	go func() {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM([]byte(test.FakeCACert))
@@ -388,6 +391,8 @@ func TestTLSCollectingProcess(t *testing.T) {
 	<-cp.GetMsgChan()
 	cp.Stop()
 	assert.NotNil(t, cp.templatesMap[1], "TLS Collecting Process should receive and store the received template.")
+	_, err = tls.Dial("tcp", collectorAddr.String(), config)
+	assert.Error(t, err)
 }
 
 func TestDTLSCollectingProcess(t *testing.T) {
@@ -449,6 +454,8 @@ func TestTCPCollectingProcessIPv6(t *testing.T) {
 	ie, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
 	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.Value)
+	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
+	assert.Error(t, err)
 }
 
 func TestUDPCollectingProcessIPv6(t *testing.T) {
