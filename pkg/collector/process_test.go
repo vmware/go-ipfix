@@ -120,19 +120,21 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	var conn net.Conn
 	collectorAddr := cp.GetAddress()
 	go func() {
-		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+		conn, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
 			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
-		defer conn.Close()
 		conn.Write(validDataPacket)
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
-	// Check if connection has closed properly or not by creating a new connection.
-	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
+	// Check if connection has closed properly or not by writing to it
+	_, err = conn.Write(validDataPacket)
+	time.Sleep(time.Millisecond)
+	_, err = conn.Write(validDataPacket)
 	assert.Error(t, err)
 }
 
@@ -188,7 +190,7 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
 		time.Sleep(time.Millisecond)
-		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
+		assert.GreaterOrEqual(t, cp.getClientCount(), 2, "There should be at least two tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
@@ -225,11 +227,12 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 		defer conn.Close()
 		conn.Write(validTemplatePacket)
 		time.Sleep(time.Millisecond)
-		assert.Equal(t, 2, cp.getClientCount(), "There should be two udp clients.")
+		assert.GreaterOrEqual(t, cp.getClientCount(), 2, "There should be at least two udp clients.")
 	}()
 	// there should be two messages received
 	<-cp.GetMsgChan()
 	<-cp.GetMsgChan()
+	time.Sleep(2 * time.Millisecond)
 	cp.Stop()
 }
 
@@ -364,6 +367,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
 	collectorAddr := cp.GetAddress()
+	var conn net.Conn
 	go func() {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM([]byte(test.FakeCACert))
@@ -379,7 +383,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 			Certificates: []tls.Certificate{cert},
 		}
 
-		conn, err := tls.Dial("tcp", collectorAddr.String(), config)
+		conn, err = tls.Dial("tcp", collectorAddr.String(), config)
 		if err != nil {
 			t.Error(err)
 			return
@@ -391,6 +395,10 @@ func TestTLSCollectingProcess(t *testing.T) {
 	<-cp.GetMsgChan()
 	cp.Stop()
 	assert.NotNil(t, cp.templatesMap[1], "TLS Collecting Process should receive and store the received template.")
+	// Check if connection has closed properly or not by writing to it
+	_, _ = conn.Write(validDataPacket)
+	_, err = conn.Write(validDataPacket)
+	assert.Error(t, err)
 }
 
 func TestDTLSCollectingProcess(t *testing.T) {
