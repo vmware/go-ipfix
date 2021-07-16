@@ -25,7 +25,7 @@ func (cp *CollectingProcess) startTCPServer() {
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Started TLS collecting process on %s", cp.address)
+		klog.Infof("Started TLS collecting process on %s", cp.netAddress)
 	} else {
 		var err error
 		listener, err = net.Listen("tcp", cp.address)
@@ -34,10 +34,12 @@ func (cp *CollectingProcess) startTCPServer() {
 			return
 		}
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Start TCP collecting process on %s", cp.address)
+		klog.Infof("Start TCP collecting process on %s", cp.netAddress)
 	}
-	defer listener.Close()
+
+	cp.wg.Add(1)
 	go func(stopCh chan struct{}) {
+		defer cp.wg.Done()
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
@@ -49,24 +51,23 @@ func (cp *CollectingProcess) startTCPServer() {
 					return
 				}
 			}
-			go cp.handleTCPClient(conn, stopCh)
+			cp.wg.Add(1)
+			go cp.handleTCPClient(conn)
 		}
 	}(cp.stopChan)
 	<-cp.stopChan
+	listener.Close()
 }
 
-func (cp *CollectingProcess) handleTCPClient(conn net.Conn, stopCh chan struct{}) {
+func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	address := conn.RemoteAddr().String()
 	client := cp.createClient()
 	cp.addClient(address, client)
-	defer conn.Close()
 	buff := make([]byte, cp.maxBufferSize)
-	for {
-		select {
-		case <-stopCh:
-			cp.deleteClient(address)
-			return
-		default:
+	defer cp.wg.Done()
+	defer conn.Close()
+	go func() {
+		for {
 			size, err := conn.Read(buff)
 			if err != nil {
 				if err == io.EOF {
@@ -105,7 +106,8 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, stopCh chan struct{}
 				buffBytes = buffBytes[length:]
 			}
 		}
-	}
+	}()
+	<-cp.stopChan
 }
 
 func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {

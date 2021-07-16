@@ -18,6 +18,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -29,6 +30,7 @@ import (
 )
 
 const startTemplateID uint16 = 255
+const defaultCheckConnInterval = 10 * time.Second
 
 type templateValue struct {
 	elements      []*entities.InfoElement
@@ -49,7 +51,8 @@ type ExportingProcess struct {
 	pathMTU         int
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
-	mutex           sync.Mutex
+	templateMutex   sync.Mutex
+	connMutex       sync.Mutex
 }
 
 type ExporterInput struct {
@@ -66,6 +69,7 @@ type ExporterInput struct {
 	ClientCert          []byte
 	ClientKey           []byte
 	IsIPv6              bool
+	CheckConnInterval   time.Duration
 }
 
 // InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID)
@@ -125,6 +129,30 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 		pathMTU:         input.PathMTU,
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
+	}
+
+	// Start a goroutine for checking whether connection to collector is still open
+	if input.CollectorProtocol == "tcp" {
+		interval := input.CheckConnInterval
+		if interval == 0 {
+			interval = defaultCheckConnInterval
+		}
+		go func() {
+			ticker := time.NewTicker(interval)
+			oneByteForRead := make([]byte, 1)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					isConnected := expProc.checkConnToCollector(oneByteForRead)
+					if !isConnected {
+						expProc.CloseConnToCollector()
+						klog.Error("Error when connecting to collector because connection is closed.")
+						return
+					}
+				}
+			}
+		}()
 	}
 
 	// Template refresh logic is only for UDP transport.
@@ -195,13 +223,26 @@ func (ep *ExportingProcess) CloseConnToCollector() {
 	if !isChanClosed(ep.templateRefCh) {
 		close(ep.templateRefCh) // Close template refresh channel
 	}
-
+	ep.connMutex.Lock()
+	defer ep.connMutex.Unlock()
 	err := ep.connToCollector.Close()
 	// Just log the error that happened when closing the connection. Not returning error as we do not expect library
 	// consumers to exit their programs with this error.
 	if err != nil {
 		klog.Errorf("Error when closing connection to collector: %v", err)
 	}
+}
+
+// checkConnToCollector checks whether the connection from exporter is still open
+// by trying to read from connection. Closed connection will return EOF from read.
+func (ep *ExportingProcess) checkConnToCollector(oneByteForRead []byte) bool {
+	ep.connMutex.Lock()
+	defer ep.connMutex.Unlock()
+	ep.connToCollector.SetReadDeadline(time.Now().Add(time.Millisecond))
+	if _, err := ep.connToCollector.Read(oneByteForRead); err == io.EOF {
+		return false
+	}
+	return true
 }
 
 // NewTemplateID is called to get ID when creating new template record.
@@ -250,7 +291,10 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 		copy(bytesSlice[index:index+len], record.GetBuffer())
 		index += len
 	}
+
 	// Send the message on the exporter connection.
+	ep.connMutex.Lock()
+	defer ep.connMutex.Unlock()
 	bytesSent, err := ep.connToCollector.Write(bytesSlice)
 	if err != nil {
 		return bytesSent, fmt.Errorf("error when sending message on the connection: %v", err)
@@ -262,8 +306,8 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 }
 
 func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElementWithValue, minDataRecLen uint16) {
-	ep.mutex.Lock()
-	defer ep.mutex.Unlock()
+	ep.templateMutex.Lock()
+	defer ep.templateMutex.Unlock()
 
 	if _, exist := ep.templatesMap[id]; exist {
 		return
@@ -279,8 +323,8 @@ func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoE
 }
 
 func (ep *ExportingProcess) deleteTemplate(id uint16) error {
-	ep.mutex.Lock()
-	defer ep.mutex.Unlock()
+	ep.templateMutex.Lock()
+	defer ep.templateMutex.Unlock()
 
 	if _, exist := ep.templatesMap[id]; !exist {
 		return fmt.Errorf("process: template %d does not exist in exporting process", id)
@@ -293,7 +337,7 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 	// Send refreshed template for every template in template map
 	templateSets := make([]entities.Set, 0)
 
-	ep.mutex.Lock()
+	ep.templateMutex.Lock()
 	for templateID, tempValue := range ep.templatesMap {
 		tempSet := entities.NewSet(false)
 		if err := tempSet.PrepareSet(entities.Template, templateID); err != nil {
@@ -309,7 +353,7 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 		}
 		templateSets = append(templateSets, tempSet)
 	}
-	ep.mutex.Unlock()
+	ep.templateMutex.Unlock()
 
 	for _, templateSet := range templateSets {
 		if _, err := ep.SendSet(templateSet); err != nil {
@@ -322,8 +366,8 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 func (ep *ExportingProcess) dataRecSanityCheck(rec entities.Record) error {
 	templateID := rec.GetTemplateID()
 
-	ep.mutex.Lock()
-	defer ep.mutex.Unlock()
+	ep.templateMutex.Lock()
+	defer ep.templateMutex.Unlock()
 
 	if _, exist := ep.templatesMap[templateID]; !exist {
 		return fmt.Errorf("process: templateID %d does not exist in exporting process", templateID)

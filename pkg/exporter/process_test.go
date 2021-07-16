@@ -590,3 +590,27 @@ func TestExportingProcess_GetMsgSizeLimit(t *testing.T) {
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
 	assert.Equal(t, entities.DefaultUDPMsgSize, exporter.GetMsgSizeLimit())
 }
+
+func TestExportingProcess_CheckConnToCollector(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("Got error when creating a local server: %v", err)
+	}
+	input := ExporterInput{
+		CollectorAddress:  listener.Addr().String(),
+		CollectorProtocol: listener.Addr().Network(),
+	}
+	exporter, err := InitExportingProcess(input)
+	if err != nil {
+		t.Fatalf("Got error when connecting to local server %s: %v", listener.Addr().String(), err)
+	}
+
+	defer listener.Close()
+	conn, _ := listener.Accept()
+	oneByte := make([]byte, 1)
+	isOpen := exporter.checkConnToCollector(oneByte)
+	assert.True(t, isOpen)
+	conn.Close()
+	isOpen = exporter.checkConnToCollector(oneByte)
+	assert.False(t, isOpen)
+}

@@ -19,7 +19,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/pion/dtls/v2"
@@ -32,7 +31,6 @@ func (cp *CollectingProcess) startUDPServer() {
 	var listener net.Listener
 	var err error
 	var conn net.Conn
-	var wg sync.WaitGroup
 	address, err := net.ResolveUDPAddr(cp.protocol, cp.address)
 	if err != nil {
 		klog.Error(err)
@@ -56,8 +54,9 @@ func (cp *CollectingProcess) startUDPServer() {
 			klog.Error(err)
 			return
 		}
+		defer listener.Close()
 		cp.updateAddress(listener.Addr())
-		klog.Infof("Start dtls collecting process on %s", cp.address)
+		klog.Infof("Start dtls collecting process on %s", cp.netAddress)
 		conn, err = listener.Accept()
 		if err != nil {
 			klog.Error(err)
@@ -81,7 +80,7 @@ func (cp *CollectingProcess) startUDPServer() {
 					return
 				}
 				klog.V(2).Infof("Receiving %d bytes from %s", size, address.String())
-				cp.handleUDPClient(address, &wg)
+				cp.handleUDPClient(address)
 				buffBytes := make([]byte, size)
 				copy(buffBytes, buff[0:size])
 				cp.clients[address.String()].packetChan <- bytes.NewBuffer(buffBytes)
@@ -94,7 +93,7 @@ func (cp *CollectingProcess) startUDPServer() {
 			return
 		}
 		cp.updateAddress(conn.LocalAddr())
-		klog.Infof("Start UDP collecting process on %s", cp.address)
+		klog.Infof("Start UDP collecting process on %s", cp.netAddress)
 		defer conn.Close()
 		go func() {
 			for {
@@ -108,29 +107,27 @@ func (cp *CollectingProcess) startUDPServer() {
 					return
 				}
 				klog.V(2).Infof("Receiving %d bytes from %s", size, address.String())
-				cp.handleUDPClient(address, &wg)
+				cp.handleUDPClient(address)
 				cp.clients[address.String()].packetChan <- bytes.NewBuffer(buff[0:size])
 			}
 		}()
 	}
 	<-cp.stopChan
-	// stop all the workers before closing collector
-	cp.closeAllClients()
-	wg.Wait()
 }
 
-func (cp *CollectingProcess) handleUDPClient(address net.Addr, wg *sync.WaitGroup) {
+func (cp *CollectingProcess) handleUDPClient(address net.Addr) {
 	if _, exist := cp.clients[address.String()]; !exist {
 		client := cp.createClient()
 		cp.addClient(address.String(), client)
-		wg.Add(1)
-		defer wg.Done()
+		cp.wg.Add(1)
 		go func() {
+			defer cp.wg.Done()
 			ticker := time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
 			for {
 				select {
-				case <-client.errChan:
+				case <-cp.stopChan:
 					klog.Infof("Collecting process from %s has stopped.", address.String())
+					cp.deleteClient(address.String())
 					return
 				case <-ticker.C: // set timeout for udp connection
 					klog.Errorf("UDP connection from %s timed out.", address.String())
