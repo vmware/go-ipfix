@@ -120,18 +120,24 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	var conn net.Conn
 	collectorAddr := cp.GetAddress()
 	go func() {
-		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+		conn, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 		if err != nil {
 			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
-		defer conn.Close()
 		conn.Write(validDataPacket)
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
-	// Check if connection has closed properly or not by creating a new connection.
+	// Check if connection has closed properly or not by trying to write to it
+	_, err = conn.Write(validDataPacket)
+	time.Sleep(time.Millisecond)
+	_, err = conn.Write(validDataPacket)
+	assert.Error(t, err)
+	conn.Close()
+	// Check if connection has closed properly or not by trying to create a new connection.
 	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 	assert.Error(t, err)
 }
@@ -156,15 +162,21 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		t.Errorf("UDP Address cannot be resolved.")
 	}
 	go func() {
-		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
-		if err != nil {
-			t.Errorf("UDP Collecting Process does not start correctly.")
-		}
-		defer conn.Close()
-		conn.Write(validDataPacket)
+		<-cp.GetMsgChan()
+		cp.Stop()
 	}()
-	<-cp.GetMsgChan()
-	cp.Stop()
+	conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
+	if err != nil {
+		t.Errorf("UDP Collecting Process does not start correctly.")
+	}
+	conn.Write(validDataPacket)
+	time.Sleep(time.Millisecond)
+	// Check if connection has closed properly or not by trying to write to it
+	_, _ = conn.Write(validDataPacket)
+	time.Sleep(time.Millisecond)
+	_, err = conn.Write(validDataPacket)
+	assert.Error(t, err)
+	conn.Close()
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
@@ -188,7 +200,7 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
 		time.Sleep(time.Millisecond)
-		assert.Equal(t, 2, cp.getClientCount(), "There should be two tcp clients.")
+		assert.GreaterOrEqual(t, cp.getClientCount(), 2, "There should be at least two tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
@@ -201,32 +213,25 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
 	collectorAddr := cp.GetAddress()
-	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("UDP Address cannot be resolved.")
-		}
-		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
-		if err != nil {
-			t.Errorf("UDP Collecting Process does not start correctly.")
-		}
-		defer conn.Close()
-		conn.Write(validTemplatePacket)
-	}()
-	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("UDP Address cannot be resolved.")
-		}
-		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
-		if err != nil {
-			t.Errorf("UDP Collecting Process does not start correctly.")
-		}
-		defer conn.Close()
-		conn.Write(validTemplatePacket)
-		time.Sleep(time.Millisecond)
-		assert.Equal(t, 2, cp.getClientCount(), "There should be two udp clients.")
-	}()
+	resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
+	if err != nil {
+		t.Errorf("UDP Address cannot be resolved.")
+	}
+	conn1, err := net.DialUDP(udpTransport, nil, resolveAddr)
+	if err != nil {
+		t.Errorf("UDP Collecting Process does not start correctly.")
+	}
+	defer conn1.Close()
+	conn1.Write(validTemplatePacket)
+
+	conn2, err := net.DialUDP(udpTransport, nil, resolveAddr)
+	if err != nil {
+		t.Errorf("UDP Collecting Process does not start correctly.")
+	}
+	defer conn2.Close()
+	conn2.Write(validTemplatePacket)
+	time.Sleep(time.Millisecond)
+	assert.GreaterOrEqual(t, cp.getClientCount(), 2, "There should be at least two udp clients.")
 	// there should be two messages received
 	<-cp.GetMsgChan()
 	<-cp.GetMsgChan()
@@ -364,6 +369,8 @@ func TestTLSCollectingProcess(t *testing.T) {
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
 	collectorAddr := cp.GetAddress()
+	var conn net.Conn
+	var config *tls.Config
 	go func() {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM([]byte(test.FakeCACert))
@@ -374,23 +381,31 @@ func TestTLSCollectingProcess(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		config := &tls.Config{
+		config = &tls.Config{
 			RootCAs:      roots,
 			Certificates: []tls.Certificate{cert},
 		}
 
-		conn, err := tls.Dial("tcp", collectorAddr.String(), config)
+		conn, err = tls.Dial("tcp", collectorAddr.String(), config)
 		if err != nil {
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
 		_, err = conn.Write(validTemplatePacket)
 		assert.NoError(t, err)
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
 	assert.NotNil(t, cp.templatesMap[1], "TLS Collecting Process should receive and store the received template.")
+	// Check if connection has closed properly or not by trying to write to it
+	_, _ = conn.Write(validDataPacket)
+	time.Sleep(time.Millisecond)
+	_, err = conn.Write(validDataPacket)
+	assert.Error(t, err)
+	conn.Close()
+	// Check if connection has closed properly or not by trying to create a new connection.
+	_, err = tls.Dial(collectorAddr.Network(), collectorAddr.String(), config)
+	assert.Error(t, err)
 }
 
 func TestDTLSCollectingProcess(t *testing.T) {

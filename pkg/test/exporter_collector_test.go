@@ -19,8 +19,10 @@ package test
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/entities"
@@ -183,45 +185,45 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	cp, _ := collector.InitCollectingProcess(cpInput)
 	// Start collecting process
 	go cp.Start()
-	go func() { // Start exporting process in go routine
-		waitForCollectorReady(t, cp)
-		epInput := exporter.ExporterInput{
-			CollectorAddress:    cp.GetAddress().String(),
-			CollectorProtocol:   cp.GetAddress().Network(),
-			ObservationDomainID: 1,
-			TempRefTimeout:      0,
-			PathMTU:             0,
-			IsEncrypted:         isEncrypted,
-			CACert:              nil,
+	// Start exporting process
+	waitForCollectorReady(t, cp)
+	epInput := exporter.ExporterInput{
+		CollectorAddress:    cp.GetAddress().String(),
+		CollectorProtocol:   cp.GetAddress().Network(),
+		ObservationDomainID: 1,
+		TempRefTimeout:      0,
+		PathMTU:             0,
+		IsEncrypted:         isEncrypted,
+		CACert:              nil,
+		CheckConnInterval:   time.Millisecond,
+	}
+	if isEncrypted {
+		if address.Network() == "tcp" { // use TLS
+			epInput.CACert = []byte(FakeCACert)
+			epInput.ClientCert = []byte(FakeClientCert)
+			epInput.ClientKey = []byte(FakeClientKey)
+		} else if address.Network() == "udp" { // use DTLS
+			epInput.CACert = []byte(FakeCert2)
 		}
-		if isEncrypted {
-			if address.Network() == "tcp" { // use TLS
-				epInput.CACert = []byte(FakeCACert)
-				epInput.ClientCert = []byte(FakeClientCert)
-				epInput.ClientKey = []byte(FakeClientKey)
-			} else if address.Network() == "udp" { // use DTLS
-				epInput.CACert = []byte(FakeCert2)
-			}
-		}
-		export, err := exporter.InitExportingProcess(epInput)
-		if err != nil {
-			t.Fatalf("Got error when connecting to %s", cp.GetAddress().String())
-		}
-		templateID := export.NewTemplateID()
-		templateSet := createTemplateSet(templateID, isIPv6)
-		// Send template record
-		_, err = export.SendSet(templateSet)
-		if err != nil {
-			t.Fatalf("Got error when sending record: %v", err)
-		}
-		dataSet := createDataSet(templateID, isSrcNode, isIPv6, isMultipleRecord)
-		// Send data set
-		_, err = export.SendSet(dataSet)
-		if err != nil {
-			t.Fatalf("Got error when sending record: %v", err)
-		}
-		export.CloseConnToCollector() // Close exporting process
-	}()
+	}
+	export, err := exporter.InitExportingProcess(epInput)
+	if err != nil {
+		t.Fatalf("Got error when connecting to %s", cp.GetAddress().String())
+	}
+	templateID := export.NewTemplateID()
+	templateSet := createTemplateSet(templateID, isIPv6)
+	// Send template record
+	_, err = export.SendSet(templateSet)
+	if err != nil {
+		t.Fatalf("Got error when sending record: %v", err)
+	}
+	dataSet := createDataSet(templateID, isSrcNode, isIPv6, isMultipleRecord)
+	// Send data set
+	_, err = export.SendSet(dataSet)
+	if err != nil {
+		t.Fatalf("Got error when sending record: %v", err)
+	}
+	set := dataSet
 
 	for message := range cp.GetMsgChan() {
 		messages = append(messages, message)
@@ -233,7 +235,7 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	templateMsg := messages[0]
 	assert.Equal(t, uint16(10), templateMsg.GetVersion(), "Version of flow record (template) should be 10.")
 	assert.Equal(t, uint32(1), templateMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
-	templateSet := templateMsg.GetSet()
+	templateSet = templateMsg.GetSet()
 	templateElements := templateSet.GetRecords()[0].GetOrderedElementList()
 	if !isIPv6 {
 		assert.Equal(t, len(templateElements), len(commonFields)+len(ianaIPv4Fields)+len(antreaCommonFields)+len(antreaIPv4)+len(reverseFields))
@@ -258,12 +260,23 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	dataMsg := messages[1]
 	assert.Equal(t, uint16(10), dataMsg.GetVersion(), "Version of flow record (template) should be 10.")
 	assert.Equal(t, uint32(1), dataMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
-	dataSet := dataMsg.GetSet()
+	dataSet = dataMsg.GetSet()
 	record := dataSet.GetRecords()[0]
 	matchDataRecordElements(t, record, isSrcNode, isIPv6)
 	if isMultipleRecord {
 		record = dataSet.GetRecords()[1]
 		matchDataRecordElements(t, record, isSrcNode, isIPv6)
+	}
+	checkError := func() (bool, error) {
+		_, err = export.SendSet(set)
+		if err != nil {
+			return true, nil
+		} else {
+			return false, nil
+		}
+	}
+	if err := wait.Poll(time.Millisecond, 10*time.Millisecond, checkError); err != nil {
+		t.Errorf("Collector process does not close correctly.")
 	}
 }
 
