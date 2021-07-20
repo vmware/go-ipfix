@@ -36,7 +36,7 @@ func (cp *CollectingProcess) startTCPServer() {
 		cp.updateAddress(listener.Addr())
 		klog.Infof("Start TCP collecting process on %s", cp.netAddress)
 	}
-	defer listener.Close()
+
 	cp.wg.Add(1)
 	go func(stopCh chan struct{}) {
 		defer cp.wg.Done()
@@ -52,13 +52,14 @@ func (cp *CollectingProcess) startTCPServer() {
 				}
 			}
 			cp.wg.Add(1)
-			go cp.handleTCPClient(conn)
+			go cp.handleTCPClient(conn, stopCh)
 		}
 	}(cp.stopChan)
 	<-cp.stopChan
+	listener.Close()
 }
 
-func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
+func (cp *CollectingProcess) handleTCPClient(conn net.Conn, stopChan chan struct{}) {
 	address := conn.RemoteAddr().String()
 	client := cp.createClient()
 	cp.addClient(address, client)
@@ -106,7 +107,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 			}
 		}
 	}()
-	<-client.errChan
+	<-stopChan
 }
 
 func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {

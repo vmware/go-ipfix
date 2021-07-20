@@ -109,10 +109,10 @@ func (cp *CollectingProcess) Start() {
 }
 
 func (cp *CollectingProcess) Stop() {
-	cp.closeAllClients()
 	close(cp.stopChan)
-	cp.wg.Wait()
+	cp.closeAllClients()
 	// wait for all connections to be safely deleted and returned
+	cp.wg.Wait()
 	klog.V(4).Info("stopping the collecting process")
 }
 
@@ -148,12 +148,6 @@ func (cp *CollectingProcess) addClient(address string, client *clientHandler) {
 func (cp *CollectingProcess) deleteClient(name string) {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
-	client, exist := cp.clients[name]
-	if !exist {
-		klog.Warning("client does not exist or already been deleted.")
-		return
-	}
-	close(client.errChan)
 	delete(cp.clients, name)
 }
 
@@ -166,9 +160,8 @@ func (cp *CollectingProcess) getClientCount() int {
 func (cp *CollectingProcess) closeAllClients() {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
-	for name, client := range cp.clients {
+	for _, client := range cp.clients {
 		close(client.errChan)
-		delete(cp.clients, name)
 	}
 }
 

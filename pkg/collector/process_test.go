@@ -136,6 +136,9 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	time.Sleep(time.Millisecond)
 	_, err = conn.Write(validDataPacket)
 	assert.Error(t, err)
+	// Check if connection has closed properly or not by creating a new connection.
+	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
+	assert.Error(t, err)
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -368,6 +371,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 	waitForCollectorReady(t, cp)
 	collectorAddr := cp.GetAddress()
 	var conn net.Conn
+	var config *tls.Config
 	go func() {
 		roots := x509.NewCertPool()
 		ok := roots.AppendCertsFromPEM([]byte(test.FakeCACert))
@@ -378,7 +382,7 @@ func TestTLSCollectingProcess(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		config := &tls.Config{
+		config = &tls.Config{
 			RootCAs:      roots,
 			Certificates: []tls.Certificate{cert},
 		}
@@ -388,7 +392,6 @@ func TestTLSCollectingProcess(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		defer conn.Close()
 		_, err = conn.Write(validTemplatePacket)
 		assert.NoError(t, err)
 	}()
@@ -397,7 +400,11 @@ func TestTLSCollectingProcess(t *testing.T) {
 	assert.NotNil(t, cp.templatesMap[1], "TLS Collecting Process should receive and store the received template.")
 	// Check if connection has closed properly or not by writing to it
 	_, _ = conn.Write(validDataPacket)
+	time.Sleep(time.Millisecond)
 	_, err = conn.Write(validDataPacket)
+	assert.Error(t, err)
+	// Check if connection has closed properly or not by creating a new connection.
+	_, err = tls.Dial(collectorAddr.Network(), collectorAddr.String(), config)
 	assert.Error(t, err)
 }
 

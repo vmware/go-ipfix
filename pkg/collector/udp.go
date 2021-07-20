@@ -54,6 +54,7 @@ func (cp *CollectingProcess) startUDPServer() {
 			klog.Error(err)
 			return
 		}
+		defer listener.Close()
 		cp.updateAddress(listener.Addr())
 		klog.Infof("Start dtls collecting process on %s", cp.netAddress)
 		conn, err = listener.Accept()
