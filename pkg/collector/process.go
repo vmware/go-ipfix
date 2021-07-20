@@ -57,6 +57,7 @@ type CollectingProcess struct {
 	caCert     []byte
 	serverCert []byte
 	serverKey  []byte
+	wg         sync.WaitGroup
 }
 
 type CollectorInput struct {
@@ -108,8 +109,11 @@ func (cp *CollectingProcess) Start() {
 }
 
 func (cp *CollectingProcess) Stop() {
-	klog.V(4).Info("stopping the collecting process")
 	close(cp.stopChan)
+	cp.closeAllClients()
+	// wait for all connections to be safely deleted and returned
+	cp.wg.Wait()
+	klog.V(4).Info("stopping the collecting process")
 }
 
 func (cp *CollectingProcess) GetAddress() net.Addr {
@@ -157,7 +161,7 @@ func (cp *CollectingProcess) closeAllClients() {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 	for _, client := range cp.clients {
-		client.errChan <- true
+		close(client.errChan)
 	}
 }
 

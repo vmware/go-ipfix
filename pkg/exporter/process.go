@@ -252,12 +252,15 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 	}
 	// Send the message on the exporter connection.
 	bytesSent, err := ep.connToCollector.Write(bytesSlice)
+	klog.Info(ep.connToCollector.RemoteAddr())
+	klog.Info(ep.connToCollector.LocalAddr())
 	if err != nil {
 		return bytesSent, fmt.Errorf("error when sending message on the connection: %v", err)
 	} else if bytesSent != msgLen {
 		return bytesSent, fmt.Errorf("could not send the complete message on the connection")
 	}
-
+	_, err = net.DialTimeout(ep.connToCollector.RemoteAddr().Network(), ep.connToCollector.RemoteAddr().String(), time.Second)
+	klog.Info(err)
 	return bytesSent, nil
 }
 
