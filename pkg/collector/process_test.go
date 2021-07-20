@@ -235,7 +235,6 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 	// there should be two messages received
 	<-cp.GetMsgChan()
 	<-cp.GetMsgChan()
-	time.Sleep(2 * time.Millisecond)
 	cp.Stop()
 }
 

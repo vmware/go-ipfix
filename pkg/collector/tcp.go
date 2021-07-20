@@ -64,9 +64,9 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn, stopChan chan struct
 	client := cp.createClient()
 	cp.addClient(address, client)
 	buff := make([]byte, cp.maxBufferSize)
+	defer cp.wg.Done()
 	defer conn.Close()
 	go func() {
-		defer cp.wg.Done()
 		for {
 			size, err := conn.Read(buff)
 			if err != nil {
