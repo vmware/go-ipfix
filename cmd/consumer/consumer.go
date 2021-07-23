@@ -20,10 +20,12 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/Shopify/sarama"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/component-base/logs"
 	"k8s.io/klog/v2"
 
@@ -86,9 +88,18 @@ func run() error {
 	}
 	consumer := consumer.NewKafkaConsumer(input)
 	go func() {
-		if err := consumer.InitSaramaConsumer(); err != nil {
+		err := wait.PollImmediateInfinite(500*time.Millisecond, func() (bool, error) {
+			if err := consumer.InitSaramaConsumer(); err != nil {
+				return false, nil
+			} else {
+				klog.Infof("Kafka consumer has run successfully")
+				return true, nil
+			}
+		})
+		if err != nil {
 			klog.Error(err)
 		}
+		return
 	}()
 
 	stopCh := make(chan struct{})
