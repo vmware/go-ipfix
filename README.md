@@ -42,7 +42,9 @@ kubectl apply -f ./build/yamls/kafka-flow-collector.yaml
 ``` 
 Broker address will be `kafka-service.kafka.svc:9092`.
 Notice that `KAFKA_ADVERTISED_LISTENERS` for kafka-broker and broker address should be consistent and accessible
-from other namespaces.
+from other namespaces. Also, versioned images of kafka-broker `projects.registry.vmware.com/antrea/confluentinc-kafka:v6.2.0` 
+and zookeeper `projects.registry.vmware.com/antrea/confluentinc-zookeeper:v6.2.0` are used in the set-up. Proper
+upload of Docker images is required to support more versions.
 
 Currently, `antrea/kafka-consumer` only supports decoding and logging messages with AntreaFlowMsg proto schema.
 
