@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.5 07-26-2021
+### Added
+- Add convertor interface input into Kafka producer. (#223, @stati)
+- Add consumer, broker and related deployment yaml for consuming records from Kafka producer. (#214, @zyiou)
+### Changed
+- Cleanup unnecessary producer files. (#228, @stati)
+- Improve Kafka consumer application by adding retry mechanism for consumer initialization. (#230, @stati)
+- Change Docker version of images used in kafka server deployment yaml. (#224, @zyiou)
+### Fixed
+- Fix bug that after stopping the TCP collector process, new connections should not be established. (#227, @stati)
+- Fix bug that after stopping the collector process, no write should be processed on existing connections. (#229, @zyiou)
 ## 0.5.4 07-06-2021
 ### Changed
 - Clear original export fields in the aggregation process. (#220, @stati)
