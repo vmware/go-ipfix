@@ -15,8 +15,10 @@
 package exporter
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -282,25 +284,36 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 	}
 	msg.SetSequenceNum(ep.seqNumber)
 
-	bytesSlice := make([]byte, msgLen)
-	copy(bytesSlice[:entities.MsgHeaderLength], msg.GetMsgHeader())
-	copy(bytesSlice[entities.MsgHeaderLength:entities.MsgHeaderLength+entities.SetHeaderLen], set.GetHeaderBuffer())
-	index := entities.MsgHeaderLength + entities.SetHeaderLen
-	for _, record := range set.GetRecords() {
-		len := record.GetRecordLength()
-		copy(bytesSlice[index:index+len], record.GetBuffer())
-		index += len
+	//bytesSlice := make([]byte, msgLen)
+	//copy(bytesSlice[:entities.MsgHeaderLength], msg.GetMsgHeader())
+	//copy(bytesSlice[entities.MsgHeaderLength:entities.MsgHeaderLength+entities.SetHeaderLen], set.GetHeaderBuffer())
+	//index := entities.MsgHeaderLength + entities.SetHeaderLen
+	//for _, record := range set.GetRecords() {
+	//	len := record.GetRecordLength()
+	//	copy(bytesSlice[index:index+len], record.GetBuffer())
+	//	index += len
+	//}
+
+	message := make(map[string]interface{})
+	record := set.GetRecords()[0]
+	for _, element := range record.GetOrderedElementList() {
+		message[element.Element.Name] = element.Value
 	}
+	message["@timestamp"] = time.Now().Format(time.RFC3339)
+	writer := bytes.NewBuffer(make([]byte, 0, msgLen))
+	encoder := json.NewEncoder(writer)
+	encoder.Encode(message)
 
 	// Send the message on the exporter connection.
 	ep.connMutex.Lock()
 	defer ep.connMutex.Unlock()
-	bytesSent, err := ep.connToCollector.Write(bytesSlice)
+	bytesSent, err := ep.connToCollector.Write(writer.Bytes())
 	if err != nil {
 		return bytesSent, fmt.Errorf("error when sending message on the connection: %v", err)
-	} else if bytesSent != msgLen {
-		return bytesSent, fmt.Errorf("could not send the complete message on the connection")
 	}
+	//else if bytesSent != msgLen {
+	//	return bytesSent, fmt.Errorf("could not send the complete message on the connection")
+	//}
 
 	return bytesSent, nil
 }
