@@ -318,6 +318,7 @@ func (ep *ExportingProcess) createAndSendIPFIXMsg(set entities.Set) (int, error)
 	ep.connMutex.Lock()
 	defer ep.connMutex.Unlock()
 	bytesSent, err := ep.connToCollector.Write(bytesSlice)
+
 	if err != nil {
 		return bytesSent, fmt.Errorf("error when sending message on the connection: %v", err)
 	} else if bytesSent != msgLen {

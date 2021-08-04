@@ -30,7 +30,7 @@ import (
 )
 
 var (
-	MaxRetries    = 5
+	MaxRetries    = 2
 	MinExpiryTime = 100 * time.Millisecond
 )
 
