@@ -15,8 +15,10 @@
 package exporter
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net"
@@ -31,6 +33,7 @@ import (
 
 const startTemplateID uint16 = 255
 const defaultCheckConnInterval = 10 * time.Second
+const defaultJSONBufferLen = 5000
 
 type templateValue struct {
 	elements      []*entities.InfoElement
@@ -53,6 +56,8 @@ type ExportingProcess struct {
 	templateRefCh   chan struct{}
 	templateMutex   sync.Mutex
 	connMutex       sync.Mutex
+	sendJSONRecord  bool
+	jsonBufferLen   int
 }
 
 type ExporterInput struct {
@@ -69,6 +74,8 @@ type ExporterInput struct {
 	ClientCert          []byte
 	ClientKey           []byte
 	IsIPv6              bool
+	SendJSONRecord      bool
+	JSONBufferLen       int
 	CheckConnInterval   time.Duration
 }
 
@@ -81,10 +88,11 @@ type ExporterInput struct {
 // 0 or a value more than 1500, we consider a default value of 512B as per RFC7011.
 // PathMTU is optional for TCP as we use max socket buffer size of 65535. It can
 // be provided as 0.
+// JSONBufferLen is recommended for sending json record. If not given a valid value,
+// we consider a default 5000B.
 func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	var conn net.Conn
 	var err error
-
 	if input.IsEncrypted {
 		if input.CollectorProtocol == "tcp" { // use TLS
 			config, configErr := createClientConfig(input.CACert, input.ClientCert, input.ClientKey)
@@ -129,6 +137,7 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 		pathMTU:         input.PathMTU,
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
+		sendJSONRecord:  input.SendJSONRecord,
 	}
 
 	// Start a goroutine for checking whether connection to collector is still open
@@ -182,6 +191,13 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			}
 		}()
 	}
+	if expProc.sendJSONRecord {
+		if input.JSONBufferLen <= 0 {
+			expProc.jsonBufferLen = defaultJSONBufferLen
+		} else {
+			expProc.jsonBufferLen = input.JSONBufferLen
+		}
+	}
 	return expProc, nil
 }
 
@@ -203,11 +219,17 @@ func (ep *ExportingProcess) SendSet(set entities.Set) (int, error) {
 	}
 	// Update the length in set header before sending the message.
 	set.UpdateLenInHeader()
-	bytesSent, err := ep.createAndSendMsg(set)
+
+	var bytesSent int
+	var err error
+	if !ep.sendJSONRecord {
+		bytesSent, err = ep.createAndSendIPFIXMsg(set)
+	} else {
+		bytesSent, err = ep.createAndSendJSONMsg(set)
+	}
 	if err != nil {
 		return bytesSent, err
 	}
-
 	return bytesSent, nil
 }
 
@@ -251,9 +273,9 @@ func (ep *ExportingProcess) NewTemplateID() uint16 {
 	return ep.templateID
 }
 
-// createAndSendMsg takes in a set as input, creates the message, and sends it out.
+// createAndSendIPFIXMsg takes in a set as input, creates the IPFIX message, and sends it out.
 // TODO: This method will change when we support sending multiple sets.
-func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
+func (ep *ExportingProcess) createAndSendIPFIXMsg(set entities.Set) (int, error) {
 	// Create a new message and use it to send the set.
 	msg := entities.NewMessage(false)
 
@@ -302,6 +324,35 @@ func (ep *ExportingProcess) createAndSendMsg(set entities.Set) (int, error) {
 		return bytesSent, fmt.Errorf("could not send the complete message on the connection")
 	}
 
+	return bytesSent, nil
+}
+
+// createAndSendJSONMsg takes in a set as input, creates the JSON record, and sends it out.
+func (ep *ExportingProcess) createAndSendJSONMsg(set entities.Set) (int, error) {
+	var bytesSent int
+	for _, record := range set.GetRecords() {
+		elements := make(map[string]interface{})
+		for _, element := range record.GetOrderedElementList() {
+			elements[element.Element.Name] = element.Value
+		}
+		message := make(map[string]interface{}, 2)
+		message["ipfix"] = elements
+		message["@timestamp"] = time.Now().Format(time.RFC3339)
+		writer := bytes.NewBuffer(make([]byte, 0, ep.jsonBufferLen))
+		encoder := json.NewEncoder(writer)
+		err := encoder.Encode(message)
+		if err != nil {
+			return bytesSent, fmt.Errorf("error when encoding message to JSON: %v", err)
+		}
+		// Send the message on the exporter connection.
+		ep.connMutex.Lock()
+		bytes, err := ep.connToCollector.Write(writer.Bytes())
+		ep.connMutex.Unlock()
+		if err != nil {
+			return bytes, fmt.Errorf("error when sending message on the connection: %v", err)
+		}
+		bytesSent += bytes
+	}
 	return bytesSent, nil
 }
 
