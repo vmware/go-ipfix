@@ -254,9 +254,10 @@ func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMa
 		}
 		// Reset the expireTime for the popped item and push it to the priority queue.
 		if pqItem.activeExpireTime.Before(currTime) {
-			// Reset the active expire timeout and push the record into priority
-			// queue.
+			// Reset the active and inactive expire timeout and push the record into
+			// priority queue.
 			pqItem.activeExpireTime = currTime.Add(a.activeExpiryTimeout)
+			pqItem.inactiveExpireTime = currTime.Add(a.inactiveExpiryTimeout)
 			heap.Push(&a.expirePriorityQueue, pqItem)
 		}
 	}
