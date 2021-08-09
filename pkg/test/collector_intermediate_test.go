@@ -243,8 +243,8 @@ func waitForAggregationToFinish(t *testing.T, ap *intermediate.AggregationProces
 	checkConn := func() (bool, error) {
 		ap.ForAllRecordsDo(copyFlowKeyRecordMap)
 		if len(flowKeyRecordMap) > 0 {
-			ie1, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("sourcePodName")
-			ie2, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("destinationPodName")
+			ie1, _, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("sourcePodName")
+			ie2, _, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("destinationPodName")
 			if ie1.Value == "pod1" && ie2.Value == "pod2" {
 				return true, nil
 			} else {

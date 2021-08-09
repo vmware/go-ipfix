@@ -36,8 +36,9 @@ type Record interface {
 	GetBuffer() []byte
 	GetTemplateID() uint16
 	GetFieldCount() uint16
-	GetOrderedElementList() []*InfoElementWithValue
-	GetInfoElementWithValue(name string) (*InfoElementWithValue, bool)
+	GetOrderedElementList() []InfoElementWithValue
+	GetInfoElementWithValue(name string) (*InfoElementWithValue, int, bool)
+	SetInfoElementWithValue(index int, infoElement InfoElementWithValue) error
 	GetRecordLength() int
 	GetMinDataRecordLen() uint16
 }
@@ -46,7 +47,7 @@ type baseRecord struct {
 	buffer             []byte
 	fieldCount         uint16
 	templateID         uint16
-	orderedElementList []*InfoElementWithValue
+	orderedElementList []InfoElementWithValue
 	isDecoding         bool
 	len                int
 	Record
@@ -56,13 +57,13 @@ type dataRecord struct {
 	baseRecord
 }
 
-func NewDataRecord(id uint16, numElements int, isDecoding bool) *dataRecord {
+func NewDataRecord(id uint16, numElements, numExtraElements int, isDecoding bool) *dataRecord {
 	return &dataRecord{
 		baseRecord{
 			fieldCount:         0,
 			templateID:         id,
 			isDecoding:         isDecoding,
-			orderedElementList: make([]*InfoElementWithValue, numElements),
+			orderedElementList: make([]InfoElementWithValue, numElements, numElements+numExtraElements),
 		},
 	}
 }
@@ -83,7 +84,7 @@ func NewTemplateRecord(id uint16, numElements int, isDecoding bool) *templateRec
 			fieldCount:         uint16(numElements),
 			templateID:         id,
 			isDecoding:         isDecoding,
-			orderedElementList: make([]*InfoElementWithValue, numElements),
+			orderedElementList: make([]InfoElementWithValue, numElements, numElements),
 		},
 		0,
 		0,
@@ -98,17 +99,25 @@ func (b *baseRecord) GetFieldCount() uint16 {
 	return b.fieldCount
 }
 
-func (b *baseRecord) GetOrderedElementList() []*InfoElementWithValue {
+func (b *baseRecord) GetOrderedElementList() []InfoElementWithValue {
 	return b.orderedElementList
 }
 
-func (b *baseRecord) GetInfoElementWithValue(name string) (*InfoElementWithValue, bool) {
-	for _, element := range b.orderedElementList {
+func (b *baseRecord) GetInfoElementWithValue(name string) (*InfoElementWithValue, int, bool) {
+	for i, element := range b.orderedElementList {
 		if element.Element.Name == name {
-			return element, true
+			return &element, i, true
 		}
 	}
-	return nil, false
+	return nil, 0, false
+}
+
+func (b *baseRecord) SetInfoElementWithValue(index int, infoElement InfoElementWithValue) error {
+	if b.orderedElementList[index].Element.Name != infoElement.Element.Name {
+		return fmt.Errorf("element not present in the record")
+	}
+	b.orderedElementList[index] = infoElement
+	return nil
 }
 
 func (d *dataRecord) PrepareRecord() error {
@@ -150,9 +159,9 @@ func (d *dataRecord) AddInfoElement(element *InfoElementWithValue) error {
 		d.len += element.Length
 	}
 	if len(d.orderedElementList) <= int(d.fieldCount) {
-		d.orderedElementList = append(d.orderedElementList, element)
+		d.orderedElementList = append(d.orderedElementList, *element)
 	} else {
-		d.orderedElementList[d.fieldCount] = element
+		d.orderedElementList[d.fieldCount] = *element
 	}
 	d.fieldCount++
 	return nil
@@ -183,7 +192,7 @@ func (t *templateRecord) AddInfoElement(element *InfoElementWithValue) error {
 		binary.BigEndian.PutUint32(addBytes, element.Element.EnterpriseId)
 		t.buffer = append(t.buffer, addBytes...)
 	}
-	t.orderedElementList[t.index] = element
+	t.orderedElementList[t.index] = *element
 	t.index++
 	// Keep track of minimum data record length required for sanity check
 	if element.Element.Len == VariableLength {

@@ -357,7 +357,7 @@ func (ep *ExportingProcess) createAndSendJSONMsg(set entities.Set) (int, error) 
 	return bytesSent, nil
 }
 
-func (ep *ExportingProcess) updateTemplate(id uint16, elements []*entities.InfoElementWithValue, minDataRecLen uint16) {
+func (ep *ExportingProcess) updateTemplate(id uint16, elements []entities.InfoElementWithValue, minDataRecLen uint16) {
 	ep.templateMutex.Lock()
 	defer ep.templateMutex.Unlock()
 
@@ -379,7 +379,7 @@ func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 	defer ep.templateMutex.Unlock()
 
 	if _, exist := ep.templatesMap[id]; !exist {
-		return fmt.Errorf("process: template %d does not exist in exporting process", id)
+		return fmt.Errorf("template %d does not exist in exporting process", id)
 	}
 	delete(ep.templatesMap, id)
 	return nil
@@ -395,11 +395,11 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 		if err := tempSet.PrepareSet(entities.Template, templateID); err != nil {
 			return err
 		}
-		elements := make([]*entities.InfoElementWithValue, len(tempValue.elements))
+		elements := make([]entities.InfoElementWithValue, len(tempValue.elements))
 		for i, element := range tempValue.elements {
 			elements[i] = entities.NewInfoElementWithValue(element, nil)
 		}
-		err := tempSet.AddRecord(elements, templateID)
+		err := tempSet.AddRecord(elements, 0, templateID)
 		if err != nil {
 			return err
 		}
