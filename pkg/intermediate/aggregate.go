@@ -290,7 +290,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 	defer a.mutex.Unlock()
 
 	var flowType uint8
-	if flowTypeIE, exist := record.GetInfoElementWithValue("flowType"); exist {
+	if flowTypeIE, _, exist := record.GetInfoElementWithValue("flowType"); exist {
 		flowType = flowTypeIE.Value.(uint8)
 	} else {
 		klog.Warning("FlowType does not exist in current record.")
@@ -385,59 +385,65 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 // fields. This is called for records whose flowType is InterNode(pkg/registry/registry.go).
 func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord entities.Record) {
 	for _, field := range a.correlateFields {
-		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(field); exist {
+		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(field); exist {
 			switch ieWithValue.Element.DataType {
 			case entities.String:
 				if ieWithValue.Value != "" {
-					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(field)
 					if existingIeWithValue.Value != "" {
 						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
+					existingRecord.SetInfoElementWithValue(index, *existingIeWithValue)
 				}
 			case entities.Unsigned8:
 				if ieWithValue.Value != uint8(0) {
-					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(field)
 					if existingIeWithValue.Value != uint8(0) {
 						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
+					existingRecord.SetInfoElementWithValue(index, *existingIeWithValue)
 				}
 			case entities.Unsigned16:
 				if ieWithValue.Value != uint16(0) {
-					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(field)
 					if existingIeWithValue.Value != uint16(0) {
 						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
+					existingRecord.SetInfoElementWithValue(index, *existingIeWithValue)
 				}
 			case entities.Signed32:
 				if ieWithValue.Value != int32(0) {
-					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(field)
 					if existingIeWithValue.Value != int32(0) {
 						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
+					existingRecord.SetInfoElementWithValue(index, *existingIeWithValue)
 				}
 			case entities.Ipv4Address:
 				ipInString := ieWithValue.Value.(net.IP).To4().String()
 				if ipInString != "0.0.0.0" {
-					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(field)
 					ipInString = existingIeWithValue.Value.(net.IP).To4().String()
 					if ipInString != "0.0.0.0" {
 						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
+					existingRecord.SetInfoElementWithValue(index, *existingIeWithValue)
 				}
 			case entities.Ipv6Address:
 				ipInString := ieWithValue.Value.(net.IP).To16().String()
 				if ipInString != net.ParseIP("::0").To16().String() {
-					existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(field)
+					existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(field)
 					ipInString = existingIeWithValue.Value.(net.IP).To16().String()
 					if ipInString != net.ParseIP("::0").To16().String() {
 						klog.Warningf("%v field should not have been filled in the existing record; existing value: %v and current value: %v", field, existingIeWithValue.Value, ieWithValue.Value)
 					}
 					existingIeWithValue.Value = ieWithValue.Value
+					existingRecord.SetInfoElementWithValue(index, *existingIeWithValue)
 				}
 			default:
 				klog.Errorf("Fields with dataType %v is not supported in correlation fields list.", ieWithValue.Element.DataType)
@@ -453,32 +459,41 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		return nil
 	}
 	isLatest := false
-	if ieWithValue, exist := incomingRecord.GetInfoElementWithValue("flowEndSeconds"); exist {
-		if existingIeWithValue, exist2 := existingRecord.GetInfoElementWithValue("flowEndSeconds"); exist2 {
+	if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue("flowEndSeconds"); exist {
+		if existingIeWithValue, _, exist2 := existingRecord.GetInfoElementWithValue("flowEndSeconds"); exist2 {
 			if ieWithValue.Value.(uint32) > existingIeWithValue.Value.(uint32) {
 				isLatest = true
 			}
 		}
 	}
 	for _, element := range a.aggregateElements.NonStatsElements {
-		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(element); exist {
-			existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(element)
+		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(element); exist {
+			existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(element)
 			switch ieWithValue.Element.Name {
 			case "flowEndSeconds":
 				// Update flow end timestamp if it is latest.
 				if isLatest {
 					existingIeWithValue.Value = ieWithValue.Value
+					if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+						return err
+					}
 				}
 			case "flowEndReason":
 				// If the aggregated flow is set with flowEndReason as "EndOfFlowReason",
 				// then we do not have to set again.
 				if existingIeWithValue.Value.(uint8) != registry.EndOfFlowReason {
 					existingIeWithValue.Value = ieWithValue.Value
+					if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+						return err
+					}
 				}
 			case "tcpState":
 				// Update tcpState when flow end timestamp is the latest
 				if isLatest {
 					existingIeWithValue.Value = ieWithValue.Value
+					if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+						return err
+					}
 				}
 			default:
 				klog.Errorf("Fields with name %v is not supported in aggregation fields list.", element)
@@ -496,8 +511,8 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		if strings.Contains(element, "Delta") {
 			isDelta = true
 		}
-		if ieWithValue, exist := incomingRecord.GetInfoElementWithValue(element); exist {
-			existingIeWithValue, _ := existingRecord.GetInfoElementWithValue(element)
+		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(element); exist {
+			existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(element)
 			// Update the corresponding element in existing record.
 			if !isDelta {
 				if existingIeWithValue.Value.(uint64) < ieWithValue.Value.(uint64) {
@@ -512,22 +527,31 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 				// stats.
 				existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
 			}
+			if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+				return err
+			}
 			// Update the corresponding source element in antreaStatsElement list.
 			if fillSrcStats {
-				existingIeWithValue, _ = existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
+				existingIeWithValue, index, _ = existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
 				if !isDelta {
 					existingIeWithValue.Value = ieWithValue.Value
 				} else {
 					existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
 				}
+				if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+					return err
+				}
 			}
 			// Update the corresponding destination element in antreaStatsElement list.
 			if fillDstStats {
-				existingIeWithValue, _ = existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
+				existingIeWithValue, index, _ = existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
 				if !isDelta {
 					existingIeWithValue.Value = ieWithValue.Value
 				} else {
 					existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+				}
+				if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+					return err
 				}
 			}
 		} else {
@@ -545,18 +569,27 @@ func (a *AggregationProcess) ResetStatElementsInRecord(record entities.Record) e
 	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
 	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
 	for i, element := range statsElementList {
-		if ieWithValue, exist := record.GetInfoElementWithValue(element); exist {
+		if ieWithValue, index, exist := record.GetInfoElementWithValue(element); exist {
 			ieWithValue.Value = uint64(0)
+			if err := record.SetInfoElementWithValue(index, *ieWithValue); err != nil {
+				return err
+			}
 		} else {
 			return fmt.Errorf("element with name %v in statsElements is not present in the record", element)
 		}
-		if ieWithValue, exist := record.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
+		if ieWithValue, index, exist := record.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
 			ieWithValue.Value = uint64(0)
+			if err := record.SetInfoElementWithValue(index, *ieWithValue); err != nil {
+				return err
+			}
 		} else {
 			return fmt.Errorf("element with name %v in statsElements is not present in the record", antreaSourceStatsElements[i])
 		}
-		if ieWithValue, exist := record.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
+		if ieWithValue, index, exist := record.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
 			ieWithValue.Value = uint64(0)
+			if err := record.SetInfoElementWithValue(index, *ieWithValue); err != nil {
+				return err
+			}
 		} else {
 			return fmt.Errorf("element with name %v in statsElements is not present in the record", antreaDestinationStatsElements[i])
 		}
@@ -571,45 +604,51 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 	statsElementList := a.aggregateElements.StatsElements
 	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
 	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
-
-	for _, element := range antreaSourceStatsElements {
+	newStatElements := make([]entities.InfoElementWithValue, len(antreaSourceStatsElements)+len(antreaDestinationStatsElements))
+	buffBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(buffBytes, uint64(0))
+	for i, element := range antreaSourceStatsElements {
 		ie, err := registry.GetInfoElement(element, registry.AntreaEnterpriseID)
 		if err != nil {
 			return err
 		}
-		buffBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(buffBytes, uint64(0))
-		ieWithValue := entities.NewInfoElementWithValue(ie, buffBytes)
-		err = record.AddInfoElement(ieWithValue)
+		newStatElements[i].Element = ie
+		newStatElements[i].Value = buffBytes
+		err = record.AddInfoElement(&newStatElements[i])
 		if err != nil {
 			return err
 		}
 	}
-	for _, element := range antreaDestinationStatsElements {
+	for i, element := range antreaDestinationStatsElements {
 		ie, err := registry.GetInfoElement(element, registry.AntreaEnterpriseID)
 		if err != nil {
 			return err
 		}
-		buffBytes := make([]byte, 8)
-		binary.BigEndian.PutUint64(buffBytes, uint64(0))
-		ieWithValue := entities.NewInfoElementWithValue(ie, buffBytes)
-		err = record.AddInfoElement(ieWithValue)
+		newStatElements[i+len(antreaSourceStatsElements)].Element = ie
+		newStatElements[i+len(antreaSourceStatsElements)].Value = buffBytes
+		err = record.AddInfoElement(&newStatElements[i+len(antreaSourceStatsElements)])
 		if err != nil {
 			return err
 		}
 	}
 	// Initialize the values of newly added stats info elements.
 	for i, element := range statsElementList {
-		if ieWithValue, exist := record.GetInfoElementWithValue(element); exist {
+		if ieWithValue, _, exist := record.GetInfoElementWithValue(element); exist {
 			// Initialize the corresponding source element in antreaStatsElement list.
 			if fillSrcStats {
-				existingIeWithValue, _ := record.GetInfoElementWithValue(antreaSourceStatsElements[i])
+				existingIeWithValue, index, _ := record.GetInfoElementWithValue(antreaSourceStatsElements[i])
 				existingIeWithValue.Value = ieWithValue.Value
+				if err := record.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+					return err
+				}
 			}
 			// Initialize the corresponding destination element in antreaStatsElement list.
 			if fillDstStats {
-				existingIeWithValue, _ := record.GetInfoElementWithValue(antreaDestinationStatsElements[i])
+				existingIeWithValue, index, _ := record.GetInfoElementWithValue(antreaDestinationStatsElements[i])
 				existingIeWithValue.Value = ieWithValue.Value
+				if err := record.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -618,11 +657,11 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 
 // isRecordFromSrc returns true if record belongs to inter-node flow and from source node.
 func isRecordFromSrc(record entities.Record) bool {
-	srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
+	srcIEWithValue, _, exist := record.GetInfoElementWithValue("sourcePodName")
 	if !exist || srcIEWithValue.Value == "" {
 		return false
 	}
-	dstIEWithValue, exist := record.GetInfoElementWithValue("destinationPodName")
+	dstIEWithValue, _, exist := record.GetInfoElementWithValue("destinationPodName")
 	if exist && dstIEWithValue.Value != "" {
 		return false
 	}
@@ -631,11 +670,11 @@ func isRecordFromSrc(record entities.Record) bool {
 
 // isRecordFromDst returns true if record belongs to inter-node flow and from destination node.
 func isRecordFromDst(record entities.Record) bool {
-	dstIEWithValue, exist := record.GetInfoElementWithValue("destinationPodName")
+	dstIEWithValue, _, exist := record.GetInfoElementWithValue("destinationPodName")
 	if !exist || dstIEWithValue.Value == "" {
 		return false
 	}
-	srcIEWithValue, exist := record.GetInfoElementWithValue("sourcePodName")
+	srcIEWithValue, _, exist := record.GetInfoElementWithValue("sourcePodName")
 	if exist && srcIEWithValue.Value != "" {
 		return false
 	}
@@ -670,7 +709,7 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 	for _, name := range elementList {
 		switch name {
 		case "sourceTransportPort", "destinationTransportPort":
-			element, exist := record.GetInfoElementWithValue(name)
+			element, _, exist := record.GetInfoElementWithValue(name)
 			if !exist {
 				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
@@ -684,7 +723,7 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 				flowKey.DestinationPort = port
 			}
 		case "sourceIPv4Address", "destinationIPv4Address":
-			element, exist := record.GetInfoElementWithValue(name)
+			element, _, exist := record.GetInfoElementWithValue(name)
 			if !exist {
 				break
 			}
@@ -701,7 +740,7 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 				flowKey.DestinationAddress = addr.String()
 			}
 		case "sourceIPv6Address", "destinationIPv6Address":
-			element, exist := record.GetInfoElementWithValue(name)
+			element, _, exist := record.GetInfoElementWithValue(name)
 			if (isSrcIPv4Filled && strings.Contains(name, "source")) || (isDstIPv4Filled && strings.Contains(name, "destination")) {
 				if exist {
 					klog.Warning("Two ip versions (IPv4 and IPv6) are not supported for flow key.")
@@ -721,7 +760,7 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 				flowKey.DestinationAddress = addr.String()
 			}
 		case "protocolIdentifier":
-			element, exist := record.GetInfoElementWithValue(name)
+			element, _, exist := record.GetInfoElementWithValue(name)
 			if !exist {
 				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
@@ -751,14 +790,14 @@ func validateDataRecord(record entities.Record) bool {
 // the ingressNetworkPolicyRuleAction is not reject.
 func isCorrelationRequired(flowType uint8, record entities.Record) bool {
 	if flowType == registry.FlowTypeInterNode {
-		if egressRuleActionIe, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
+		if egressRuleActionIe, _, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
 			if egressRuleAction, ok := egressRuleActionIe.Value.(uint8); ok {
 				if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
 					return false
 				}
 			}
 		}
-		if ingressRuleActionIe, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
+		if ingressRuleActionIe, _, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
 			if ingressRuleAction, ok := ingressRuleActionIe.Value.(uint8); ok {
 				if ingressRuleAction == registry.NetworkPolicyRuleActionReject {
 					return false

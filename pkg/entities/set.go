@@ -47,7 +47,7 @@ type Set interface {
 	GetSetLength() int
 	GetSetType() ContentType
 	UpdateLenInHeader()
-	AddRecord(elements []*InfoElementWithValue, templateID uint16) error
+	AddRecord(elements []InfoElementWithValue, numExtraElements int, templateID uint16) error
 	GetRecords() []Record
 	GetNumberOfRecords() uint32
 }
@@ -120,10 +120,10 @@ func (s *set) UpdateLenInHeader() {
 	}
 }
 
-func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) error {
+func (s *set) AddRecord(elements []InfoElementWithValue, numExtraElements int, templateID uint16) error {
 	var record Record
 	if s.setType == Data {
-		record = NewDataRecord(templateID, len(elements), s.isDecoding)
+		record = NewDataRecord(templateID, len(elements), numExtraElements, s.isDecoding)
 	} else if s.setType == Template {
 		record = NewTemplateRecord(templateID, len(elements), s.isDecoding)
 		err := record.PrepareRecord()
@@ -133,9 +133,8 @@ func (s *set) AddRecord(elements []*InfoElementWithValue, templateID uint16) err
 	} else {
 		return fmt.Errorf("set type is not supported")
 	}
-
-	for _, element := range elements {
-		err := record.AddInfoElement(element)
+	for i := range elements {
+		err := record.AddInfoElement(&elements[i])
 		if err != nil {
 			return err
 		}

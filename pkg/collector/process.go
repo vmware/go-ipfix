@@ -53,6 +53,9 @@ type CollectingProcess struct {
 	clients map[string]*clientHandler
 	// isEncrypted indicates whether to use TLS/DTLS for communication
 	isEncrypted bool
+	// numExtraElements specifies number of elements that could be added after
+	// decoding the IPFIX data packet.
+	numExtraElements int
 	// caCert, serverCert and serverKey are for storing encryption info when using TLS/DTLS
 	caCert     []byte
 	serverCert []byte
@@ -61,6 +64,8 @@ type CollectingProcess struct {
 }
 
 type CollectorInput struct {
+	IsIPv6      bool
+	IsEncrypted bool
 	// Address needs to be provided in hostIP:port format.
 	Address string
 	// Protocol needs to be provided in lower case format.
@@ -68,12 +73,11 @@ type CollectorInput struct {
 	Protocol      string
 	MaxBufferSize uint16
 	TemplateTTL   uint32
-	IsEncrypted   bool
 	// TODO: group following fields into struct to be reuse in exporter
-	CACert     []byte
-	ServerCert []byte
-	ServerKey  []byte
-	IsIPv6     bool
+	CACert           []byte
+	ServerCert       []byte
+	ServerKey        []byte
+	NumExtraElements int
 }
 
 type clientHandler struct {
@@ -82,19 +86,20 @@ type clientHandler struct {
 
 func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 	collectProc := &CollectingProcess{
-		templatesMap:  make(map[uint32]map[uint16][]*entities.InfoElement),
-		mutex:         sync.RWMutex{},
-		templateTTL:   input.TemplateTTL,
-		address:       input.Address,
-		protocol:      input.Protocol,
-		maxBufferSize: input.MaxBufferSize,
-		stopChan:      make(chan struct{}),
-		messageChan:   make(chan *entities.Message),
-		clients:       make(map[string]*clientHandler),
-		isEncrypted:   input.IsEncrypted,
-		caCert:        input.CACert,
-		serverCert:    input.ServerCert,
-		serverKey:     input.ServerKey,
+		templatesMap:     make(map[uint32]map[uint16][]*entities.InfoElement),
+		mutex:            sync.RWMutex{},
+		templateTTL:      input.TemplateTTL,
+		address:          input.Address,
+		protocol:         input.Protocol,
+		maxBufferSize:    input.MaxBufferSize,
+		stopChan:         make(chan struct{}),
+		messageChan:      make(chan *entities.Message),
+		clients:          make(map[string]*clientHandler),
+		isEncrypted:      input.IsEncrypted,
+		caCert:           input.CACert,
+		serverCert:       input.ServerCert,
+		serverKey:        input.ServerKey,
+		numExtraElements: input.NumExtraElements,
 	}
 	return collectProc, nil
 }
@@ -209,7 +214,7 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 	if err := templateSet.PrepareSet(entities.Template, templateID); err != nil {
 		return nil, err
 	}
-	elementsWithValue := make([]*entities.InfoElementWithValue, int(fieldCount))
+	elementsWithValue := make([]entities.InfoElementWithValue, int(fieldCount))
 	for i := 0; i < int(fieldCount); i++ {
 		var element *entities.InfoElement
 		var enterpriseID uint32
@@ -258,7 +263,7 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		}
 		elementsWithValue[i] = entities.NewInfoElementWithValue(element, nil)
 	}
-	err := templateSet.AddRecord(elementsWithValue, templateID)
+	err := templateSet.AddRecord(elementsWithValue, 0, templateID)
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +283,7 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	}
 
 	for dataBuffer.Len() > 0 {
-		elements := make([]*entities.InfoElementWithValue, len(template))
+		elements := make([]entities.InfoElementWithValue, len(template))
 		for i, element := range template {
 			var length int
 			if element.Len == entities.VariableLength { // string
@@ -288,7 +293,7 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 			}
 			elements[i] = entities.NewInfoElementWithValue(element, dataBuffer.Next(length))
 		}
-		err = dataSet.AddRecord(elements, templateID)
+		err = dataSet.AddRecord(elements, cp.numExtraElements, templateID)
 		if err != nil {
 			return nil, err
 		}
@@ -296,7 +301,7 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	return dataSet, nil
 }
 
-func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []*entities.InfoElementWithValue) {
+func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []entities.InfoElementWithValue) {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 	if _, exists := cp.templatesMap[obsDomainID]; !exists {
