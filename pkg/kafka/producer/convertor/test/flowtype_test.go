@@ -36,7 +36,8 @@ func init() {
 func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 	set := entities.NewSet(true)
 	_ = set.PrepareSet(entities.Data, 256)
-	elements := make([]*entities.InfoElementWithValue, 0)
+	elements := make([]entities.InfoElementWithValue, 0)
+
 	ieNamesIANA := []string{
 		"flowStartSeconds",
 		"flowEndSeconds",
@@ -176,7 +177,7 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 		ieWithValue.Value = value
 		elements = append(elements, ieWithValue)
 	}
-	if err := set.AddRecord(elements, 256); err != nil {
+	if err := set.AddRecord(elements, 0, 256); err != nil {
 		t.Fatal("Error when adding elements to the record")
 	}
 	msg := entities.NewMessage(true)

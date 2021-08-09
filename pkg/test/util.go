@@ -130,7 +130,7 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 	templateSet := entities.NewSet(false)
 	templateSet.PrepareSet(entities.Template, templateID)
-	elements := make([]*entities.InfoElementWithValue, 0)
+	elements := make([]entities.InfoElementWithValue, 0)
 	ianaFields := ianaIPv4Fields
 	if isIPv6 {
 		ianaFields = ianaIPv6Fields
@@ -157,7 +157,7 @@ func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 		ie := entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 	}
-	templateSet.AddRecord(elements, templateID)
+	templateSet.AddRecord(elements, 0, templateID)
 	return templateSet
 }
 
@@ -165,17 +165,17 @@ func createDataSet(templateID uint16, isSrcNode, isIPv6 bool, isMultipleRecord b
 	dataSet := entities.NewSet(false)
 	dataSet.PrepareSet(entities.Data, templateID)
 	elements := getDataRecordElements(isSrcNode, isIPv6)
-	dataSet.AddRecord(elements, templateID)
+	dataSet.AddRecord(elements, 0, templateID)
 	if isMultipleRecord {
 		elements = getDataRecordElements(isSrcNode, isIPv6)
-		dataSet.AddRecord(elements, templateID)
+		dataSet.AddRecord(elements, 0, templateID)
 	}
 	return dataSet
 }
 
-func getDataRecordElements(isSrcNode, isIPv6 bool) []*entities.InfoElementWithValue {
+func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithValue {
 	testRec := getTestRecord(isSrcNode, isIPv6)
-	elements := make([]*entities.InfoElementWithValue, 0)
+	elements := make([]entities.InfoElementWithValue, 0)
 	ianaFields := ianaIPv4Fields
 	if isIPv6 {
 		ianaFields = ianaIPv6Fields
@@ -183,7 +183,7 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []*entities.InfoElementWithVa
 	ianaFields = append(ianaFields, commonFields...)
 	for _, name := range ianaFields {
 		element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
-		var ie *entities.InfoElementWithValue
+		var ie entities.InfoElementWithValue
 		switch name {
 		case "sourceIPv4Address", "sourceIPv6Address":
 			ie = entities.NewInfoElementWithValue(element, testRec.srcIP)
@@ -214,7 +214,7 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []*entities.InfoElementWithVa
 	}
 	for _, name := range antreaFields {
 		element, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
-		var ie *entities.InfoElementWithValue
+		var ie entities.InfoElementWithValue
 		switch name {
 		case "destinationClusterIPv4", "destinationClusterIPv6":
 			ie = entities.NewInfoElementWithValue(element, testRec.dstClusterIP)
@@ -233,7 +233,7 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []*entities.InfoElementWithVa
 	}
 	for _, name := range reverseFields {
 		element, _ := registry.GetInfoElement(name, registry.IANAReversedEnterpriseID)
-		var ie *entities.InfoElementWithValue
+		var ie entities.InfoElementWithValue
 		switch name {
 		case "reversePacketTotalCount":
 			ie = entities.NewInfoElementWithValue(element, testRec.revPktCount)

@@ -83,14 +83,14 @@ const (
 func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Template, testTemplateID)
-	elements := make([]*entities.InfoElementWithValue, 0)
+	elements := make([]entities.InfoElementWithValue, 0)
 	ie3 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourceTransportPort", 7, 2, 0, 2), nil)
 	ie4 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationTransportPort", 11, 2, 0, 2), nil)
 	ie5 := entities.NewInfoElementWithValue(entities.NewInfoElement("protocolIdentifier", 4, 1, 0, 1), nil)
 	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), nil)
 	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), nil)
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), nil)
-	var ie1, ie2, ie8 *entities.InfoElementWithValue
+	var ie1, ie2, ie8 entities.InfoElementWithValue
 	if !isIPv6 {
 		ie1 = entities.NewInfoElementWithValue(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
 		ie2 = entities.NewInfoElementWithValue(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
@@ -107,7 +107,7 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	ie14 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, registry.AntreaEnterpriseID, 4), nil)
 
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14)
-	set.AddRecord(elements, 256)
+	set.AddRecord(elements, 0, 256)
 
 	message := entities.NewMessage(true)
 	message.SetVersion(10)
@@ -128,7 +128,7 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool, isToExternal bool, isEgressDeny bool) *entities.Message {
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
-	elements := make([]*entities.InfoElementWithValue, 0)
+	elements := make([]entities.InfoElementWithValue, 0)
 	var egressNetworkPolicyRuleAction, ingressNetworkPolicyRulePriority, svcPort, srcAddr, dstAddr, svcAddr, flowEndTime, flowEndReason, tcpState, antreaFlowType []byte
 	var srcPod, dstPod string
 
@@ -154,7 +154,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), []byte(srcPod))
 	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), []byte(dstPod))
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), svcPort)
-	var ie1, ie2, ie8, ie11 *entities.InfoElementWithValue
+	var ie1, ie2, ie8, ie11 entities.InfoElementWithValue
 	if !isIPv6 {
 		srcAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.1").To4())
 		dstAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.2").To4())
@@ -229,7 +229,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		elements = append(elements, ieWithValue)
 	}
 
-	err := set.AddRecord(elements, 256)
+	err := set.AddRecord(elements, 0, 256)
 	assert.NoError(t, err)
 
 	message := entities.NewMessage(true)
@@ -251,7 +251,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool, isIngressReject bool, isIngressDrop bool) *entities.Message {
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
-	elements := make([]*entities.InfoElementWithValue, 0)
+	elements := make([]entities.InfoElementWithValue, 0)
 	var ingressNetworkPolicyRuleAction, svcPort, srcAddr, dstAddr, svcAddr, flowEndTime, flowEndReason, tcpState, antreaFlowType []byte
 	var srcPod, dstPod string
 	srcPort, _ := entities.EncodeToIEDataType(entities.Unsigned16, uint16(1234))
@@ -281,7 +281,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie6 := entities.NewInfoElementWithValue(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), []byte(srcPod))
 	ie7 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), []byte(dstPod))
 	ie9 := entities.NewInfoElementWithValue(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), svcPort)
-	var ie1, ie2, ie8, ie11 *entities.InfoElementWithValue
+	var ie1, ie2, ie8, ie11 entities.InfoElementWithValue
 	if !isIPv6 {
 		srcAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.1").To4())
 		dstAddr, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.ParseIP("10.0.0.2").To4())
@@ -354,7 +354,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		ieWithValue.Value = value
 		elements = append(elements, ieWithValue)
 	}
-	err := set.AddRecord(elements, 256)
+	err := set.AddRecord(elements, 0, 256)
 	assert.NoError(t, err)
 
 	message := entities.NewMessage(true)
@@ -427,7 +427,7 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
 	item := aggregationProcess.expirePriorityQueue.Peek()
 	assert.NotNil(t, item)
-	ieWithValue, exist := aggRecord.Record.GetInfoElementWithValue("sourceIPv4Address")
+	ieWithValue, _, exist := aggRecord.Record.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ieWithValue.Value)
 	assert.Equal(t, message.GetSet().GetRecords()[0], aggRecord.Record)
@@ -448,14 +448,17 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	flowKey = FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
 	aggRecord = aggregationProcess.flowKeyRecordMap[flowKey]
-	ieWithValue, exist = aggRecord.Record.GetInfoElementWithValue("sourceIPv6Address")
+	ieWithValue, _, exist = aggRecord.Record.GetInfoElementWithValue("sourceIPv6Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ieWithValue.Value)
 	assert.Equal(t, message.GetSet().GetRecords()[0], aggRecord.Record)
 
 	// Test data record with invalid "flowEndSeconds" field
-	element, _ := message.GetSet().GetRecords()[0].GetInfoElementWithValue("flowEndSeconds")
+	element, index, exists := message.GetSet().GetRecords()[0].GetInfoElementWithValue("flowEndSeconds")
+	assert.True(t, exists)
 	element.Value = nil
+	err = message.GetSet().GetRecords()[0].SetInfoElementWithValue(index, *element)
+	assert.NoError(t, err)
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.Error(t, err)
 }
@@ -839,28 +842,28 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 	}
 	if !isIntraNode && !needsCorrleation {
 		// for inter-Node deny connections, either src or dst Pod info will be resolved.
-		sourcePodName, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
-		destinationPodName, _ := aggRecord.Record.GetInfoElementWithValue("destinationPodName")
+		sourcePodName, _, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
+		destinationPodName, _, _ := aggRecord.Record.GetInfoElementWithValue("destinationPodName")
 		assert.True(t, sourcePodName.Value == "" || destinationPodName.Value == "")
-		egress, _ := aggRecord.Record.GetInfoElementWithValue("egressNetworkPolicyRuleAction")
-		ingress, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
+		egress, _, _ := aggRecord.Record.GetInfoElementWithValue("egressNetworkPolicyRuleAction")
+		ingress, _, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
 		assert.True(t, egress.Value != 0 || ingress.Value != 0)
 		assert.False(t, ap.AreCorrelatedFieldsFilled(*aggRecord))
 	} else {
-		ieWithValue, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
+		ieWithValue, _, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
 		assert.Equal(t, "pod1", ieWithValue.Value)
-		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
 		assert.Equal(t, "pod2", ieWithValue.Value)
 		if !isIPv6 {
-			ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
+			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
 			assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.Value)
 		} else {
-			ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv6")
+			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv6")
 			assert.Equal(t, net.ParseIP("2001:0:3238:BBBB:63::AAAA"), ieWithValue.Value)
 		}
-		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 		assert.Equal(t, uint16(4739), ieWithValue.Value)
-		ingressPriority, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRulePriority")
+		ingressPriority, _, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRulePriority")
 		assert.Equal(t, ingressPriority.Value, int32(50000))
 		assert.True(t, ap.AreCorrelatedFieldsFilled(*aggRecord))
 	}
@@ -893,39 +896,39 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 	if !isIntraNode {
 		assert.NotEqual(t, oldInactiveExpiryTime, item.inactiveExpireTime)
 	}
-	ieWithValue, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
+	ieWithValue, _, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
 	assert.Equal(t, "pod1", ieWithValue.Value)
-	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
+	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
 	assert.Equal(t, "pod2", ieWithValue.Value)
-	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
+	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
 	assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.Value)
-	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
+	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 	assert.Equal(t, uint16(4739), ieWithValue.Value)
-	ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
+	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
 	assert.Equal(t, registry.NetworkPolicyRuleActionNoAction, ieWithValue.Value)
 	for _, e := range nonStatsElementList {
-		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue(e)
-		expectedIE, _ := dstRecordLatest.GetInfoElementWithValue(e)
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
+		expectedIE, _, _ := dstRecordLatest.GetInfoElementWithValue(e)
 		assert.Equal(t, expectedIE.Value, ieWithValue.Value)
 	}
 	for _, e := range statsElementList {
-		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue(e)
-		latestRecord, _ := dstRecordLatest.GetInfoElementWithValue(e)
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
+		latestRecord, _, _ := dstRecordLatest.GetInfoElementWithValue(e)
 		if !strings.Contains(e, "Delta") {
 			assert.Equalf(t, latestRecord.Value, ieWithValue.Value, "values should be equal for element %v", e)
 		} else {
-			prevRecord, _ := srcRecordLatest.GetInfoElementWithValue(e)
+			prevRecord, _, _ := srcRecordLatest.GetInfoElementWithValue(e)
 			assert.Equalf(t, prevRecord.Value.(uint64)+latestRecord.Value.(uint64), ieWithValue.Value, "values should be equal for element %v", e)
 		}
 	}
 	for i, e := range antreaSourceStatsElementList {
-		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue(e)
-		latestRecord, _ := srcRecordLatest.GetInfoElementWithValue(statsElementList[i])
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
+		latestRecord, _, _ := srcRecordLatest.GetInfoElementWithValue(statsElementList[i])
 		assert.Equalf(t, latestRecord.Value, ieWithValue.Value, "values should be equal for element %v", e)
 	}
 	for i, e := range antreaDestinationStatsElementList {
-		ieWithValue, _ = aggRecord.Record.GetInfoElementWithValue(e)
-		latestRecord, _ := dstRecordLatest.GetInfoElementWithValue(statsElementList[i])
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
+		latestRecord, _, _ := dstRecordLatest.GetInfoElementWithValue(statsElementList[i])
 		assert.Equalf(t, latestRecord.Value, ieWithValue.Value, "values should be equal for element %v", e)
 	}
 }
