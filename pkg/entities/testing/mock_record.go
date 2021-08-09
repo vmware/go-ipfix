@@ -90,12 +90,13 @@ func (mr *MockRecordMockRecorder) GetFieldCount() *gomock.Call {
 }
 
 // GetInfoElementWithValue mocks base method
-func (m *MockRecord) GetInfoElementWithValue(arg0 string) (*entities.InfoElementWithValue, bool) {
+func (m *MockRecord) GetInfoElementWithValue(arg0 string) (*entities.InfoElementWithValue, int, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetInfoElementWithValue", arg0)
 	ret0, _ := ret[0].(*entities.InfoElementWithValue)
-	ret1, _ := ret[1].(bool)
-	return ret0, ret1
+	ret1, _ := ret[1].(int)
+	ret2, _ := ret[2].(bool)
+	return ret0, ret1, ret2
 }
 
 // GetInfoElementWithValue indicates an expected call of GetInfoElementWithValue
@@ -119,10 +120,10 @@ func (mr *MockRecordMockRecorder) GetMinDataRecordLen() *gomock.Call {
 }
 
 // GetOrderedElementList mocks base method
-func (m *MockRecord) GetOrderedElementList() []*entities.InfoElementWithValue {
+func (m *MockRecord) GetOrderedElementList() []entities.InfoElementWithValue {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOrderedElementList")
-	ret0, _ := ret[0].([]*entities.InfoElementWithValue)
+	ret0, _ := ret[0].([]entities.InfoElementWithValue)
 	return ret0
 }
 
@@ -172,4 +173,18 @@ func (m *MockRecord) PrepareRecord() error {
 func (mr *MockRecordMockRecorder) PrepareRecord() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareRecord", reflect.TypeOf((*MockRecord)(nil).PrepareRecord))
+}
+
+// SetInfoElementWithValue mocks base method
+func (m *MockRecord) SetInfoElementWithValue(arg0 int, arg1 entities.InfoElementWithValue) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetInfoElementWithValue", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetInfoElementWithValue indicates an expected call of SetInfoElementWithValue
+func (mr *MockRecordMockRecorder) SetInfoElementWithValue(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetInfoElementWithValue", reflect.TypeOf((*MockRecord)(nil).SetInfoElementWithValue), arg0, arg1)
 }

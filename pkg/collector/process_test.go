@@ -44,7 +44,7 @@ const (
 	hostPortIPv6 = "[::1]:0"
 )
 
-var elementsWithValueIPv4 = []*entities.InfoElementWithValue{
+var elementsWithValueIPv4 = []entities.InfoElementWithValue{
 	{Element: &entities.InfoElement{Name: "sourceIPv4Address", ElementId: 8, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
 	{Element: &entities.InfoElement{Name: "destinationIPv4Address", ElementId: 12, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
 	{Element: &entities.InfoElement{Name: "destinationNodeName", ElementId: 105, DataType: 13, EnterpriseId: 55829, Len: 65535}, Value: nil},
@@ -262,7 +262,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 
 	templateSet := message.GetSet()
 	assert.NotNil(t, templateSet, "Template record should be stored in message flowset")
-	sourceIPv4Address, exist := templateSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
+	sourceIPv4Address, _, exist := templateSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, uint32(0), sourceIPv4Address.Element.EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
@@ -306,7 +306,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	set := message.GetSet()
 	assert.NotNil(t, set, "Data set should be stored in message set")
 	ipAddress := net.IP([]byte{1, 2, 3, 4})
-	sourceIPv4Address, exist := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
+	sourceIPv4Address, _, exist := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	assert.Equal(t, ipAddress, sourceIPv4Address.Value, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
@@ -464,7 +464,7 @@ func TestTCPCollectingProcessIPv6(t *testing.T) {
 	cp.Stop()
 	template, _ := cp.getTemplate(1, 256)
 	assert.NotNil(t, template)
-	ie, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
+	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
 	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.Value)
 }
@@ -493,7 +493,7 @@ func TestUDPCollectingProcessIPv6(t *testing.T) {
 	cp.Stop()
 	template, _ := cp.getTemplate(1, 256)
 	assert.NotNil(t, template)
-	ie, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
+	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
 	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.Value)
 }

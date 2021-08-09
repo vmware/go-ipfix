@@ -110,8 +110,8 @@ func NewInfoElement(name string, ieID uint16, ieType IEDataType, entID uint32, l
 	}
 }
 
-func NewInfoElementWithValue(element *InfoElement, value interface{}) *InfoElementWithValue {
-	return &InfoElementWithValue{
+func NewInfoElementWithValue(element *InfoElement, value interface{}) InfoElementWithValue {
+	return InfoElementWithValue{
 		element, value, 0,
 	}
 }

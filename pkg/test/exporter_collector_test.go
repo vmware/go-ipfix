@@ -231,7 +231,7 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 	}
 	ianaFields = append(ianaFields, commonFields...)
 	for _, name := range ianaFields {
-		element, exist := record.GetInfoElementWithValue(name)
+		element, _, exist := record.GetInfoElementWithValue(name)
 		assert.True(t, exist)
 		switch name {
 		case "sourceIPv4Address", "sourceIPv6Address":
@@ -255,7 +255,7 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		}
 	}
 	for _, name := range antreaCommonFields {
-		element, exist := record.GetInfoElementWithValue(name)
+		element, _, exist := record.GetInfoElementWithValue(name)
 		assert.True(t, exist)
 		switch name {
 		case "destinationClusterIPv4", "destinationClusterIPv6":
@@ -273,7 +273,7 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		}
 	}
 	for _, name := range reverseFields {
-		element, exist := record.GetInfoElementWithValue(name)
+		element, _, exist := record.GetInfoElementWithValue(name)
 		assert.True(t, exist)
 		switch name {
 		case "reversePacketTotalCount":
