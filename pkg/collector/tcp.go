@@ -85,21 +85,21 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 				length, err := getMessageLength(bytes.NewBuffer(buffBytes))
 				if err != nil {
 					klog.Error(err)
-					cp.deleteClient(address)
-					return
+					buffBytes = nil
+					break
 				}
 				if size < length {
 					klog.Errorf("Message length %v is larger than size read from buffer %v", length, size)
-					cp.deleteClient(address)
-					return
+					buffBytes = nil
+					break
 				}
 				size = size - length
 				// get the message here
 				message, err := cp.decodePacket(bytes.NewBuffer(buffBytes[0:length]), address)
 				if err != nil {
 					klog.Error(err)
-					cp.deleteClient(address)
-					return
+					buffBytes = nil
+					break
 				}
 				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
 					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
