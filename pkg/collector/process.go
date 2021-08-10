@@ -15,6 +15,7 @@
 package collector
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"fmt"
@@ -160,10 +161,9 @@ func (cp *CollectingProcess) getClientCount() int {
 }
 
 func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
-	var version, msgLen, setID, setLen uint16
+	var length, version, setID, setLen uint16
 	var exportTime, sequencNum, obsDomainID uint32
-	err := util.Decode(packetBuffer, binary.BigEndian, &version, &msgLen, &exportTime, &sequencNum, &obsDomainID, &setID, &setLen)
-	if err != nil {
+	if err := util.Decode(packetBuffer, binary.BigEndian, &version, &length, &exportTime, &sequencNum, &obsDomainID, &setID, &setLen); err != nil {
 		return nil, err
 	}
 	if version != uint16(10) {
@@ -172,7 +172,7 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 
 	message := entities.NewMessage(true)
 	message.SetVersion(version)
-	message.SetMessageLen(msgLen)
+	message.SetMessageLen(length)
 	message.SetExportTime(exportTime)
 	message.SetSequenceNum(sequencNum)
 	message.SetObsDomainID(obsDomainID)
@@ -185,6 +185,7 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 	message.SetExportAddress(exportAddress)
 
 	var set entities.Set
+	var err error
 	if setID == entities.TemplateSetID {
 		set, err = cp.decodeTemplateSet(packetBuffer, obsDomainID)
 		if err != nil {
@@ -356,11 +357,13 @@ func (cp *CollectingProcess) updateAddress(address net.Addr) {
 }
 
 // getMessageLength returns buffer length by decoding the header
-func getMessageLength(msgBuffer *bytes.Buffer) (int, error) {
-	var version, msgLen uint16
-	// We do not really need to decode whole header. Support an utility function
-	// that decodes header based on the offset.
-	err := util.Decode(msgBuffer, binary.BigEndian, &version, &msgLen)
+func getMessageLength(reader *bufio.Reader) (int, error) {
+	partialHeader, err := reader.Peek(4)
+	if err != nil {
+		return 0, err
+	}
+	var msgLen uint16
+	err = util.Decode(bytes.NewBuffer(partialHeader[2:]), binary.BigEndian, &msgLen)
 	if err != nil {
 		return 0, fmt.Errorf("cannot decode message: %v", err)
 	}
