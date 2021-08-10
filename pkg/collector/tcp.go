@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/tls"
 	"crypto/x509"
@@ -63,48 +64,31 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	address := conn.RemoteAddr().String()
 	client := cp.createClient()
 	cp.addClient(address, client)
-	buff := make([]byte, cp.maxBufferSize)
 	defer cp.wg.Done()
 	defer conn.Close()
 	go func() {
+		reader := bufio.NewReader(conn)
 		for {
-			size, err := conn.Read(buff)
+			length, err := getMessageLength(reader)
 			if err != nil {
-				if err == io.EOF {
-					klog.Infof("Connection from %s has been closed.", address)
-				} else {
-					klog.Errorf("Error in collecting process: %v", err)
-				}
+				klog.Errorf("error when retrieving message length: %v", err)
 				cp.deleteClient(address)
 				return
 			}
-			klog.V(2).Infof("Receiving %d bytes from %s", size, address)
-			buffBytes := make([]byte, size)
-			copy(buffBytes, buff[:size])
-			for size > 0 {
-				length, err := getMessageLength(bytes.NewBuffer(buffBytes))
-				if err != nil {
-					klog.Error(err)
-					buffBytes = nil
-					break
-				}
-				if size < length {
-					klog.Errorf("Message length %v is larger than size read from buffer %v", length, size)
-					buffBytes = nil
-					break
-				}
-				size = size - length
-				// get the message here
-				message, err := cp.decodePacket(bytes.NewBuffer(buffBytes[0:length]), address)
-				if err != nil {
-					klog.Error(err)
-					buffBytes = nil
-					break
-				}
-				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
-					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
-				buffBytes = buffBytes[length:]
+			buff := make([]byte, length)
+			_, err = io.ReadFull(reader, buff)
+			if err != nil {
+				klog.Errorf("error when reading the message: %v", err)
+				cp.deleteClient(address)
+				return
 			}
+			message, err := cp.decodePacket(bytes.NewBuffer(buff), address)
+			if err != nil {
+				klog.Error(err)
+				continue
+			}
+			klog.V(4).Infof("Processed message from exporter with observation domain ID: %v ser type: %v number of records: %v",
+				message.GetObsDomainID(), message.GetSet().GetSetType(), message.GetSet().GetNumberOfRecords())
 		}
 	}()
 	<-cp.stopChan

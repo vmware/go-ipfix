@@ -54,15 +54,15 @@ const (
 	PASS
 	ok      github.com/vmware/go-ipfix/pkg/test     1.847s
 */
+// TODO: This should not be benchmark test if it is not run multiple times. Test should use "b.N".
 func BenchmarkMultipleExportersToCollector(b *testing.B) {
 	disableLogToStderr()
 	ctrl := gomock.NewController(b)
 	defer ctrl.Finish()
 	collectorInput := collector.CollectorInput{
-		Address:       "127.0.0.1:0",
-		Protocol:      "tcp",
-		MaxBufferSize: 65535,
-		TemplateTTL:   0,
+		Address:     "127.0.0.1:0",
+		Protocol:    "tcp",
+		TemplateTTL: 0,
 	}
 	cp, err := collector.InitCollectingProcess(collectorInput)
 	if err != nil {
