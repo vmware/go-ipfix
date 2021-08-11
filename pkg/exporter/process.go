@@ -225,7 +225,9 @@ func (ep *ExportingProcess) SendSet(set entities.Set) (int, error) {
 	if !ep.sendJSONRecord {
 		bytesSent, err = ep.createAndSendIPFIXMsg(set)
 	} else {
-		bytesSent, err = ep.createAndSendJSONMsg(set)
+		if setType == entities.Data {
+			bytesSent, err = ep.createAndSendJSONMsg(set)
+		}
 	}
 	if err != nil {
 		return bytesSent, err
