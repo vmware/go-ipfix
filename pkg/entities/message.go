@@ -19,10 +19,8 @@ import (
 )
 
 const (
-	MaxTcpSocketMsgSize int = 65535
-	DefaultUDPMsgSize   int = 512
-	MaxUDPMsgSize       int = 1500
-	MsgHeaderLength     int = 16
+	MaxSocketMsgSize int = 65535
+	MsgHeaderLength  int = 16
 )
 
 // Message represents IPFIX message.

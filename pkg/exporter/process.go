@@ -45,13 +45,15 @@ type templateValue struct {
 // 2. Only one observation point per observation domain is supported,
 //    so observation point ID not defined.
 // 3. Supports only TCP and UDP; one session at a time. SCTP is not supported.
-// TODO:UDP needs to send MTU size packets as per RFC7011
+// 4. UDP needs to send MTU size packets as per RFC7011. We are not honoring that,
+//    and relying on IP fragmentation and assuming data loss in the network is minimal.
+//    We will revisit this if there are any issues, and get PathMTU from the user
+//    as part of exporter input.
 type ExportingProcess struct {
 	connToCollector net.Conn
 	obsDomainID     uint32
 	seqNumber       uint32
 	templateID      uint16
-	pathMTU         int
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
 	templateMutex   sync.Mutex
@@ -67,7 +69,6 @@ type ExporterInput struct {
 	CollectorProtocol   string
 	ObservationDomainID uint32
 	TempRefTimeout      uint32
-	PathMTU             int
 	IsEncrypted         bool
 	CACert              []byte
 	ClientCert          []byte
@@ -133,7 +134,6 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 		obsDomainID:     input.ObservationDomainID,
 		seqNumber:       0,
 		templateID:      startTemplateID,
-		pathMTU:         input.PathMTU,
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
 		sendJSONRecord:  input.SendJSONRecord,
@@ -165,9 +165,6 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 
 	// Template refresh logic is only for UDP transport.
 	if input.CollectorProtocol == "udp" {
-		if expProc.pathMTU == 0 || expProc.pathMTU > entities.MaxUDPMsgSize {
-			expProc.pathMTU = entities.DefaultUDPMsgSize
-		}
 		if input.TempRefTimeout == 0 {
 			// Default value
 			input.TempRefTimeout = entities.TemplateRefreshTimeOut
@@ -235,11 +232,7 @@ func (ep *ExportingProcess) SendSet(set entities.Set) (int, error) {
 }
 
 func (ep *ExportingProcess) GetMsgSizeLimit() int {
-	if ep.connToCollector.LocalAddr().Network() == "tcp" {
-		return entities.MaxTcpSocketMsgSize
-	} else {
-		return ep.pathMTU
-	}
+	return entities.MaxSocketMsgSize
 }
 
 func (ep *ExportingProcess) CloseConnToCollector() {
@@ -279,14 +272,9 @@ func (ep *ExportingProcess) createAndSendIPFIXMsg(set entities.Set) (int, error)
 	// Check if message is exceeding the limit after adding the set. Include message
 	// header length too.
 	msgLen := entities.MsgHeaderLength + set.GetSetLength()
-	if ep.connToCollector.LocalAddr().Network() == "tcp" {
-		if msgLen > entities.MaxTcpSocketMsgSize {
-			return 0, fmt.Errorf("TCP transport: message size exceeds max socket buffer size")
-		}
-	} else {
-		if msgLen > ep.pathMTU {
-			return 0, fmt.Errorf("UDP transport: message size exceeds max pathMTU (set as %v)", ep.pathMTU)
-		}
+	if msgLen > entities.MaxSocketMsgSize {
+		// This is applicable for both TCP and UDP sockets.
+		return 0, fmt.Errorf("message size exceeds max socket buffer size")
 	}
 
 	// Set the fields in the message header.
