@@ -93,7 +93,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 	}
 	ie = entities.NewInfoElementWithValue(element, nil)
 	elements = append(elements, ie)
-	templateSet.AddRecord(elements, 0, templateID)
+	templateSet.AddRecord(elements, templateID)
 
 	bytesSent, err := exporter.SendSet(templateSet)
 	if err != nil {
@@ -174,7 +174,7 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	ie = entities.NewInfoElementWithValue(element, nil)
 	elements = append(elements, ie)
 
-	templateSet.AddRecord(elements, 0, templateID)
+	templateSet.AddRecord(elements, templateID)
 
 	bytesSent, err := exporter.SendSet(templateSet)
 	if err != nil {
@@ -272,7 +272,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
 	elements = append(elements, ie)
 
-	dataSet.AddRecord(elements, 0, templateID)
+	dataSet.AddRecord(elements, templateID)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 
 	bytesSent, err := exporter.SendSet(dataSet)
@@ -288,7 +288,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	err = dataSet.PrepareSet(entities.Data, templateID)
 	assert.NoError(t, err)
 	for i := 0; i < 10000; i++ {
-		err := dataSet.AddRecord(elements, 0, templateID)
+		err := dataSet.AddRecord(elements, templateID)
 		assert.NoError(t, err)
 	}
 	_, err = exporter.SendSet(dataSet)
@@ -372,7 +372,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	ie = entities.NewInfoElementWithValue(element, net.ParseIP("5.6.7.8"))
 	elements = append(elements, ie)
 
-	dataSet.AddRecord(elements, 0, templateID)
+	dataSet.AddRecord(elements, templateID)
 	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
 
 	bytesSent, err := exporter.SendSet(dataSet)
@@ -388,7 +388,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	err = dataSet.PrepareSet(entities.Data, templateID)
 	assert.NoError(t, err)
 	for i := 0; i < 100; i++ {
-		dataSet.AddRecord(elements, 0, templateID)
+		dataSet.AddRecord(elements, templateID)
 	}
 	_, err = exporter.SendSet(dataSet)
 	assert.Error(t, err)
@@ -466,7 +466,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 	}
 	ie = entities.NewInfoElementWithValue(element, nil)
 	elements = append(elements, ie)
-	templateSet.AddRecord(elements, 0, templateID)
+	templateSet.AddRecord(elements, templateID)
 
 	bytesSent, err := exporter.SendSet(templateSet)
 	if err != nil {
@@ -551,7 +551,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 	}
 	ie = entities.NewInfoElementWithValue(element, nil)
 	elements = append(elements, ie)
-	templateSet.AddRecord(elements, 0, templateID)
+	templateSet.AddRecord(elements, templateID)
 
 	bytesSent, err := exporter.SendSet(templateSet)
 	if err != nil {
