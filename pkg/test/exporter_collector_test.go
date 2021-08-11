@@ -135,7 +135,6 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 		CollectorProtocol:   cp.GetAddress().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
-		PathMTU:             0,
 		IsEncrypted:         isEncrypted,
 		CACert:              nil,
 		CheckConnInterval:   time.Millisecond,
