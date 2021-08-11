@@ -401,7 +401,7 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 		for i, element := range tempValue.elements {
 			elements[i] = entities.NewInfoElementWithValue(element, nil)
 		}
-		err := tempSet.AddRecord(elements, 0, templateID)
+		err := tempSet.AddRecord(elements, templateID)
 		if err != nil {
 			return err
 		}
