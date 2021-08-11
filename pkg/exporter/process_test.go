@@ -67,7 +67,6 @@ func TestExportingProcess_SendingTemplateRecordToLocalTCPServer(t *testing.T) {
 		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
-		PathMTU:             0,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -146,7 +145,6 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      1,
-		PathMTU:             0,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -229,7 +227,6 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
-		PathMTU:             0,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -329,7 +326,6 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
-		PathMTU:             0,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -382,8 +378,8 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	assert.Equal(t, dataRecBuff, <-buffCh)
 	assert.Equal(t, uint32(1), exporter.seqNumber)
 
-	// Create data set with multiple data records to test invalid message length
-	// logic for UDP transport.
+	// Create data set with multiple data records to test bigger message length
+	// (typically more than MTU) logic for UDP transport.
 	dataSet.ResetSet()
 	err = dataSet.PrepareSet(entities.Data, templateID)
 	assert.NoError(t, err)
@@ -391,7 +387,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 		dataSet.AddRecord(elements, templateID)
 	}
 	_, err = exporter.SendSet(dataSet)
-	assert.Error(t, err)
+	assert.NoError(t, err)
 
 	exporter.CloseConnToCollector()
 }
@@ -581,14 +577,13 @@ func TestExportingProcess_GetMsgSizeLimit(t *testing.T) {
 		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      1,
-		PathMTU:             0,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
-	assert.Equal(t, entities.DefaultUDPMsgSize, exporter.GetMsgSizeLimit())
+	assert.Equal(t, entities.MaxSocketMsgSize, exporter.GetMsgSizeLimit())
 }
 
 func TestExportingProcess_CheckConnToCollector(t *testing.T) {
