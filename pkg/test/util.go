@@ -157,7 +157,7 @@ func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 		ie := entities.NewInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 	}
-	templateSet.AddRecord(elements, 0, templateID)
+	templateSet.AddRecord(elements, templateID)
 	return templateSet
 }
 
@@ -165,10 +165,10 @@ func createDataSet(templateID uint16, isSrcNode, isIPv6 bool, isMultipleRecord b
 	dataSet := entities.NewSet(false)
 	dataSet.PrepareSet(entities.Data, templateID)
 	elements := getDataRecordElements(isSrcNode, isIPv6)
-	dataSet.AddRecord(elements, 0, templateID)
+	dataSet.AddRecord(elements, templateID)
 	if isMultipleRecord {
 		elements = getDataRecordElements(isSrcNode, isIPv6)
-		dataSet.AddRecord(elements, 0, templateID)
+		dataSet.AddRecord(elements, templateID)
 	}
 	return dataSet
 }

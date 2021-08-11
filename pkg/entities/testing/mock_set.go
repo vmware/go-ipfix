@@ -48,17 +48,31 @@ func (m *MockSet) EXPECT() *MockSetMockRecorder {
 }
 
 // AddRecord mocks base method
-func (m *MockSet) AddRecord(arg0 []entities.InfoElementWithValue, arg1 int, arg2 uint16) error {
+func (m *MockSet) AddRecord(arg0 []entities.InfoElementWithValue, arg1 uint16) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRecord", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "AddRecord", arg0, arg1)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRecord indicates an expected call of AddRecord
-func (mr *MockSetMockRecorder) AddRecord(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockSetMockRecorder) AddRecord(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), arg0, arg1)
+}
+
+// AddRecordWithExtraElements mocks base method
+func (m *MockSet) AddRecordWithExtraElements(arg0 []entities.InfoElementWithValue, arg1 int, arg2 uint16) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddRecordWithExtraElements", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddRecordWithExtraElements indicates an expected call of AddRecordWithExtraElements
+func (mr *MockSetMockRecorder) AddRecordWithExtraElements(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordWithExtraElements", reflect.TypeOf((*MockSet)(nil).AddRecordWithExtraElements), arg0, arg1, arg2)
 }
 
 // GetHeaderBuffer mocks base method

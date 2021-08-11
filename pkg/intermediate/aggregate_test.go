@@ -107,7 +107,7 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	ie14 := entities.NewInfoElementWithValue(entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, registry.AntreaEnterpriseID, 4), nil)
 
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14)
-	set.AddRecord(elements, 0, 256)
+	set.AddRecord(elements, 256)
 
 	message := entities.NewMessage(true)
 	message.SetVersion(10)
@@ -229,7 +229,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		elements = append(elements, ieWithValue)
 	}
 
-	err := set.AddRecord(elements, 0, 256)
+	err := set.AddRecord(elements, 256)
 	assert.NoError(t, err)
 
 	message := entities.NewMessage(true)
@@ -354,7 +354,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		ieWithValue.Value = value
 		elements = append(elements, ieWithValue)
 	}
-	err := set.AddRecord(elements, 0, 256)
+	err := set.AddRecord(elements, 256)
 	assert.NoError(t, err)
 
 	message := entities.NewMessage(true)
