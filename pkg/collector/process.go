@@ -264,7 +264,7 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		}
 		elementsWithValue[i] = entities.NewInfoElementWithValue(element, nil)
 	}
-	err := templateSet.AddRecord(elementsWithValue, 0, templateID)
+	err := templateSet.AddRecord(elementsWithValue, templateID)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 			}
 			elements[i] = entities.NewInfoElementWithValue(element, dataBuffer.Next(length))
 		}
-		err = dataSet.AddRecord(elements, cp.numExtraElements, templateID)
+		err = dataSet.AddRecordWithExtraElements(elements, cp.numExtraElements, templateID)
 		if err != nil {
 			return nil, err
 		}

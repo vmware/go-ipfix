@@ -21,7 +21,7 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 	encodingSet := NewSet(false)
 	err := encodingSet.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
-	encodingSet.AddRecord(elements, 0, 256)
+	encodingSet.AddRecord(elements, 256)
 	_, _, exist := encodingSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
 	_, _, exist = encodingSet.GetRecords()[0].GetInfoElementWithValue("destinationIPv4Address")
@@ -34,7 +34,7 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 	ie1 = NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1").To4())
 	ie2 = NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP("10.0.0.2").To4())
 	elements = append(elements, ie1, ie2)
-	err = encodingSet.AddRecord(elements, 0, 256)
+	err = encodingSet.AddRecord(elements, 256)
 	assert.NoError(t, err)
 	assert.Equal(t, []byte{0xa, 0x0, 0x0, 0x1, 0xa, 0x0, 0x0, 0x2}, encodingSet.GetRecords()[0].GetBuffer())
 }
@@ -48,7 +48,7 @@ func TestAddRecordIPv6Addresses(t *testing.T) {
 	newSet := NewSet(false)
 	err := newSet.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
-	newSet.AddRecord(elements, 0, 256)
+	newSet.AddRecord(elements, 256)
 	assert.Equal(t, []byte{0x1, 0x0, 0x0, 0x2, 0x0, 0x1b, 0x0, 0x10, 0x0, 0x1c, 0x0, 0x10}, newSet.GetRecords()[0].GetBuffer())
 	newSet.ResetSet()
 	// Test with data record
@@ -58,7 +58,7 @@ func TestAddRecordIPv6Addresses(t *testing.T) {
 	ie1 = NewInfoElementWithValue(NewInfoElement("sourceIPv6Address", 27, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
 	ie2 = NewInfoElementWithValue(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 	elements = append(elements, ie1, ie2)
-	newSet.AddRecord(elements, 0, 256)
+	newSet.AddRecord(elements, 256)
 	srcIP := []byte(net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
 	dstIP := []byte(net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 	assert.Equal(t, append(srcIP, dstIP...), newSet.GetRecords()[0].GetBuffer())
@@ -93,7 +93,7 @@ func TestGetRecords(t *testing.T) {
 	newSet := NewSet(true)
 	err := newSet.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
-	newSet.AddRecord(elements, 0, testTemplateID)
+	newSet.AddRecord(elements, testTemplateID)
 	assert.Equal(t, 2, len(newSet.GetRecords()[0].GetOrderedElementList()))
 }
 
@@ -105,7 +105,7 @@ func TestGetNumberOfRecords(t *testing.T) {
 	newSet := NewSet(true)
 	err := newSet.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
-	newSet.AddRecord(elements, 0, testTemplateID)
+	newSet.AddRecord(elements, testTemplateID)
 	assert.Equal(t, uint32(1), newSet.GetNumberOfRecords())
 }
 
@@ -120,7 +120,7 @@ func TestSet_UpdateLenInHeader(t *testing.T) {
 	setForEncoding := NewSet(false)
 	err = setForEncoding.PrepareSet(Template, testTemplateID)
 	assert.NoError(t, err)
-	setForEncoding.AddRecord(elements, 0, testTemplateID)
+	setForEncoding.AddRecord(elements, testTemplateID)
 	setForDecoding.UpdateLenInHeader()
 	setForEncoding.UpdateLenInHeader()
 	// Nothing should be written in setForDecoding
