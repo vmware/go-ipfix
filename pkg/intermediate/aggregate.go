@@ -775,7 +775,9 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 }
 
 func validateDataRecord(record entities.Record) bool {
-	for _, element := range record.GetOrderedElementList() {
+	elements := record.GetOrderedElementList()
+	for i := range elements {
+		element := &elements[i]
 		if element.Value == nil {
 			// All element values should have been filled after decoding.
 			// If not, it is an invalid data record.
