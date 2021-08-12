@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.6 08-11-2021
+### Added
+- Add support for sending JSON record. (#237, @zyiou)
+- Add new method for adding record with extra elements. (#243, @stati)
+### Changes
+- Skip sending template record for JSON records. (#242, @zyiou)
+### Fixed
+- Fix image tag in kafka flow collector manifest. (#233, @stati)
+- Fix collector close issue and add perf test for multiple exporters to collector. (#236, @zyiou)
+- Performance fix for collecting and intermediate process. (#239, @stati)
+- Fix partial buffer read issues on TCP connection. (#240, @stati)
 ## 0.5.5 07-26-2021
 ### Added
 - Add convertor interface input into Kafka producer. (#223, @stati)
