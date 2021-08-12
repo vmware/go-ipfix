@@ -335,7 +335,9 @@ func (ep *ExportingProcess) createAndSendJSONMsg(set entities.Set) (int, error) 
 	var bytesSent int
 	for _, record := range set.GetRecords() {
 		elements := make(map[string]interface{})
-		for _, element := range record.GetOrderedElementList() {
+		orderedElements := record.GetOrderedElementList()
+		for i := range orderedElements {
+			element := &orderedElements[i]
 			elements[element.Element.Name] = element.Value
 		}
 		message := make(map[string]interface{}, 2)

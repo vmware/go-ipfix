@@ -104,9 +104,10 @@ func (b *baseRecord) GetOrderedElementList() []InfoElementWithValue {
 }
 
 func (b *baseRecord) GetInfoElementWithValue(name string) (*InfoElementWithValue, int, bool) {
-	for i, element := range b.orderedElementList {
+	for i := range b.orderedElementList {
+		element := &b.orderedElementList[i]
 		if element.Element.Name == name {
-			return &element, i, true
+			return element, i, true
 		}
 	}
 	return nil, 0, false
