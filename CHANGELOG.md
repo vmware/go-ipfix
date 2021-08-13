@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.7 08-12-2021
+### Fixed
+- Fix unnecessary allocations in the code related to iterating through
+  list of elements and casting to interface pointer. (#246 @stati)
 ## 0.5.6 08-11-2021
 ### Added
 - Add support for sending JSON record. (#237, @zyiou)
