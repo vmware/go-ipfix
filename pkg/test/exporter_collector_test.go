@@ -185,20 +185,20 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	} else {
 		assert.Equal(t, len(templateElements), len(commonFields)+len(ianaIPv6Fields)+len(antreaCommonFields)+len(antreaIPv6)+len(reverseFields))
 	}
-	assert.Equal(t, uint32(0), templateElements[0].Element.EnterpriseId, "Template record is not stored correctly.")
+	assert.Equal(t, uint32(0), templateElements[0].GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
 	if !isIPv6 {
-		assert.Equal(t, "sourceIPv4Address", templateElements[0].Element.Name, "Template record is not stored correctly.")
-		assert.Equal(t, "destinationIPv4Address", templateElements[1].Element.Name, "Template record is not stored correctly.")
+		assert.Equal(t, "sourceIPv4Address", templateElements[0].GetInfoElement().Name, "Template record is not stored correctly.")
+		assert.Equal(t, "destinationIPv4Address", templateElements[1].GetInfoElement().Name, "Template record is not stored correctly.")
 	} else {
-		assert.Equal(t, "sourceIPv6Address", templateElements[0].Element.Name, "Template record is not stored correctly.")
-		assert.Equal(t, "destinationIPv6Address", templateElements[1].Element.Name, "Template record is not stored correctly.")
+		assert.Equal(t, "sourceIPv6Address", templateElements[0].GetInfoElement().Name, "Template record is not stored correctly.")
+		assert.Equal(t, "destinationIPv6Address", templateElements[1].GetInfoElement().Name, "Template record is not stored correctly.")
 	}
 	if !isIPv6 {
-		assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[len(commonFields)+len(ianaIPv4Fields)+len(antreaCommonFields)+len(antreaIPv4)+1].Element.EnterpriseId, "Template record is not stored correctly.")
-		assert.Equal(t, registry.AntreaEnterpriseID, templateElements[len(commonFields)+len(ianaIPv4Fields)+1].Element.EnterpriseId, "Template record is not stored correctly.")
+		assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[len(commonFields)+len(ianaIPv4Fields)+len(antreaCommonFields)+len(antreaIPv4)+1].GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
+		assert.Equal(t, registry.AntreaEnterpriseID, templateElements[len(commonFields)+len(ianaIPv4Fields)+1].GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
 	} else {
-		assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[len(commonFields)+len(ianaIPv6Fields)+len(antreaCommonFields)+len(antreaIPv6)+1].Element.EnterpriseId, "Template record is not stored correctly.")
-		assert.Equal(t, registry.AntreaEnterpriseID, templateElements[len(commonFields)+len(ianaIPv6Fields)+1].Element.EnterpriseId, "Template record is not stored correctly.")
+		assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[len(commonFields)+len(ianaIPv6Fields)+len(antreaCommonFields)+len(antreaIPv6)+1].GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
+		assert.Equal(t, registry.AntreaEnterpriseID, templateElements[len(commonFields)+len(ianaIPv6Fields)+1].GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
 	}
 	dataMsg := messages[1]
 	assert.Equal(t, uint16(10), dataMsg.GetVersion(), "Version of flow record (template) should be 10.")
@@ -218,7 +218,7 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 			return false, nil
 		}
 	}
-	if err := wait.Poll(time.Millisecond, 10*time.Millisecond, checkError); err != nil {
+	if err = wait.Poll(time.Millisecond, 10*time.Millisecond, checkError); err != nil {
 		t.Errorf("Collector process does not close correctly.")
 	}
 }
@@ -235,23 +235,32 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		assert.True(t, exist)
 		switch name {
 		case "sourceIPv4Address", "sourceIPv6Address":
-			assert.Equal(t, testRec.srcIP, element.Value)
+			val, _ := element.GetIPAddressValue()
+			assert.Equal(t, testRec.srcIP, val)
 		case "destinationIPv4Address", "destinationIPv6Address":
-			assert.Equal(t, testRec.dstIP, element.Value)
+			val, _ := element.GetIPAddressValue()
+			assert.Equal(t, testRec.dstIP, val)
 		case "sourceTransportPort":
-			assert.Equal(t, testRec.srcPort, element.Value)
+			val, _ := element.GetUnsigned16Value()
+			assert.Equal(t, testRec.srcPort, val)
 		case "destinationTransportPort":
-			assert.Equal(t, testRec.dstPort, element.Value)
+			val, _ := element.GetUnsigned16Value()
+			assert.Equal(t, testRec.dstPort, val)
 		case "protocolIdentifier":
-			assert.Equal(t, testRec.proto, element.Value)
+			val, _ := element.GetUnsigned8Value()
+			assert.Equal(t, testRec.proto, val)
 		case "packetTotalCount":
-			assert.Equal(t, testRec.pktCount, element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, testRec.pktCount, val)
 		case "packetDeltaCount":
-			assert.Equal(t, testRec.pktDelta, element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, testRec.pktDelta, val)
 		case "flowEndSeconds":
-			assert.Equal(t, testRec.flowEnd, element.Value)
+			val, _ := element.GetUnsigned32Value()
+			assert.Equal(t, testRec.flowEnd, val)
 		case "flowEndReason":
-			assert.Equal(t, testRec.flowEndReason, element.Value)
+			val, _ := element.GetUnsigned8Value()
+			assert.Equal(t, testRec.flowEndReason, val)
 		}
 	}
 	for _, name := range antreaCommonFields {
@@ -259,17 +268,23 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		assert.True(t, exist)
 		switch name {
 		case "destinationClusterIPv4", "destinationClusterIPv6":
-			assert.Equal(t, testRec.dstClusterIP, element.Value)
+			val, _ := element.GetIPAddressValue()
+			assert.Equal(t, testRec.dstClusterIP, val)
 		case "sourcePodName":
-			assert.Equal(t, testRec.srcPod, element.Value)
+			val, _ := element.GetStringValue()
+			assert.Equal(t, testRec.srcPod, val)
 		case "destinationPodName":
-			assert.Equal(t, testRec.dstPod, element.Value)
+			val, _ := element.GetStringValue()
+			assert.Equal(t, testRec.dstPod, val)
 		case "destinationServicePort":
-			assert.Equal(t, testRec.dstSvcPort, element.Value)
+			val, _ := element.GetUnsigned16Value()
+			assert.Equal(t, testRec.dstSvcPort, val)
 		case "flowType":
-			assert.Equal(t, testRec.flowType, element.Value)
+			val, _ := element.GetUnsigned8Value()
+			assert.Equal(t, testRec.flowType, val)
 		case "tcpState":
-			assert.Equal(t, testRec.tcpState, element.Value)
+			val, _ := element.GetStringValue()
+			assert.Equal(t, testRec.tcpState, val)
 		}
 	}
 	for _, name := range reverseFields {
@@ -277,9 +292,11 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		assert.True(t, exist)
 		switch name {
 		case "reversePacketTotalCount":
-			assert.Equal(t, testRec.revPktCount, element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, testRec.revPktCount, val)
 		case "reversePacketDeltaCount":
-			assert.Equal(t, testRec.revPktDelta, element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, testRec.revPktDelta, val)
 		}
 	}
 }

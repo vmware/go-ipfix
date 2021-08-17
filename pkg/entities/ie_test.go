@@ -37,13 +37,13 @@ func TestDecodeToIEDataType(t *testing.T) {
 	for _, data := range valData {
 		buff, err := EncodeToIEDataType(data.dataType, data.value)
 		assert.Nil(t, err)
-		v, err := DecodeToIEDataType(data.dataType, buff)
+		v, err := decodeToIEDataType(data.dataType, buff)
 		assert.Nil(t, err)
 		assert.Equal(t, data.expectedDecode, v)
 	}
 	// Handle string differently since it cannot be directly write to buffer
 	s := "Test String"
-	v, err := DecodeToIEDataType(String, []byte(s))
+	v, err := decodeToIEDataType(String, []byte(s))
 	assert.Nil(t, err)
 	assert.Equal(t, s, v)
 }
@@ -66,28 +66,10 @@ func TestEncodeToIEDataType(t *testing.T) {
 	assert.Equal(t, []byte{0x4, 0x54, 0x65, 0x73, 0x74}, buff)
 }
 
-func TestEncodeToBuff(t *testing.T) {
-	for _, data := range valData {
-		var err error
-		buff := make([]byte, InfoElementLength[data.dataType])
-		if data.dataType == Boolean {
-			err = encodeToBuff(data.dataType, data.expectedDecode, data.length, buff, 0)
-		} else {
-			err = encodeToBuff(data.dataType, data.value, data.length, buff, 0)
-		}
-		assert.Nil(t, err)
-		assert.Equal(t, data.expectedEncode, buff)
-	}
-	buff := make([]byte, 5)
-	s := "Test"
-	err := encodeToBuff(String, s, 5, buff, 0)
-	assert.Nil(t, err)
-	assert.Equal(t, []byte{0x4, 0x54, 0x65, 0x73, 0x74}, buff)
-}
-
 func TestNewInfoElementWithValue(t *testing.T) {
 	ip := net.ParseIP("10.0.0.1")
-	element := NewInfoElementWithValue(&InfoElement{"sourceIPv4Address", 8, 18, 0, 4}, ip)
-	assert.Equal(t, element.Element.Name, "sourceIPv4Address")
-	assert.Equal(t, element.Value, ip)
+	element := NewIPAddressInfoElement(&InfoElement{"sourceIPv4Address", 8, 18, 0, 4}, ip)
+	assert.Equal(t, element.GetInfoElement().Name, "sourceIPv4Address")
+	val, _ := element.GetIPAddressValue()
+	assert.Equal(t, val, ip)
 }

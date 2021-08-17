@@ -173,50 +173,70 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 	}
 	assert.Equal(t, 25, len(record.GetOrderedElementList()))
 	for _, element := range record.GetOrderedElementList() {
-		switch element.Element.Name {
+		infoElem := element.GetInfoElement()
+		switch infoElem.Name {
 		case "sourcePodName":
-			assert.Equal(t, "pod1", element.Value)
+			val, _ := element.GetStringValue()
+			assert.Equal(t, "pod1", val)
 		case "destinationPodName":
-			assert.Equal(t, "pod2", element.Value)
+			val, _ := element.GetStringValue()
+			assert.Equal(t, "pod2", val)
 		case "flowEndSeconds":
-			assert.Equal(t, uint32(1257896000), element.Value)
+			val, _ := element.GetUnsigned32Value()
+			assert.Equal(t, uint32(1257896000), val)
 		case "flowEndReason":
-			assert.Equal(t, registry.ActiveTimeoutReason, element.Value)
+			val, _ := element.GetUnsigned8Value()
+			assert.Equal(t, registry.ActiveTimeoutReason, val)
 		case "tcpState":
-			assert.Equal(t, "ESTABLISHED", element.Value)
-		case "packetTotalCount":
-			assert.Equal(t, uint64(1000), element.Value)
+			val, _ := element.GetStringValue()
+			assert.Equal(t, "ESTABLISHED", val)
 		case "packetDeltaCount":
-			assert.Equal(t, uint64(1000), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(1000), val)
+		case "packetTotalCount":
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(1000), val)
 		case "destinationClusterIPv4":
-			assert.Equal(t, net.IP{10, 0, 0, 3}, element.Value)
+			val, _ := element.GetIPAddressValue()
+			assert.Equal(t, net.IP{10, 0, 0, 3}, val)
 		case "destinationClusterIPv6":
-			assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xbb, 0xbb, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xaa, 0xaa}, element.Value)
+			val, _ := element.GetIPAddressValue()
+			assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xbb, 0xbb, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xaa, 0xaa}, val)
 		case "destinationServicePort":
-			assert.Equal(t, uint16(4739), element.Value)
+			val, _ := element.GetUnsigned16Value()
+			assert.Equal(t, uint16(4739), val)
 		case "reversePacketDeltaCount":
-			assert.Equal(t, uint64(350), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(350), val)
 		case "reversePacketTotalCount":
-			assert.Equal(t, uint64(400), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(400), val)
 		case "packetTotalCountFromSourceNode":
-			assert.Equal(t, uint64(800), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(800), val)
 		case "packetDeltaCountFromSourceNode":
-			assert.Equal(t, uint64(500), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(500), val)
 		case "packetTotalCountFromDestinationNode":
-			assert.Equal(t, uint64(1000), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(1000), val)
 		case "packetDeltaCountFromDestinationNode":
-			assert.Equal(t, uint64(500), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(500), val)
 		case "reversePacketTotalCountFromSourceNode":
-			assert.Equal(t, uint64(300), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(300), val)
 		case "reversePacketDeltaCountFromSourceNode":
-			assert.Equal(t, uint64(150), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(150), val)
 		case "reversePacketTotalCountFromDestinationNode":
-			assert.Equal(t, uint64(400), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(400), val)
 		case "reversePacketDeltaCountFromDestinationNode":
-			assert.Equal(t, uint64(200), element.Value)
+			val, _ := element.GetUnsigned64Value()
+			assert.Equal(t, uint64(200), val)
 		}
 	}
-
 }
 
 func copyFlowKeyRecordMap(key intermediate.FlowKey, aggregationFlowRecord *intermediate.AggregationFlowRecord) error {
@@ -244,8 +264,10 @@ func waitForAggregationToFinish(t *testing.T, ap *intermediate.AggregationProces
 		ap.ForAllRecordsDo(copyFlowKeyRecordMap)
 		if len(flowKeyRecordMap) > 0 {
 			ie1, _, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("sourcePodName")
+			ie1Val, _ := ie1.GetStringValue()
 			ie2, _, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("destinationPodName")
-			if ie1.Value == "pod1" && ie2.Value == "pod2" {
+			ie2Val, _ := ie2.GetStringValue()
+			if ie1Val == "pod1" && ie2Val == "pod2" {
 				return true, nil
 			} else {
 				return false, nil

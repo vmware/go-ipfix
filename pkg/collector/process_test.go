@@ -45,9 +45,9 @@ const (
 )
 
 var elementsWithValueIPv4 = []entities.InfoElementWithValue{
-	{Element: &entities.InfoElement{Name: "sourceIPv4Address", ElementId: 8, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
-	{Element: &entities.InfoElement{Name: "destinationIPv4Address", ElementId: 12, DataType: 18, EnterpriseId: 0, Len: 4}, Value: nil},
-	{Element: &entities.InfoElement{Name: "destinationNodeName", ElementId: 105, DataType: 13, EnterpriseId: 55829, Len: 65535}, Value: nil},
+	entities.NewIPAddressInfoElement(&entities.InfoElement{Name: "sourceIPv4Address", ElementId: 8, DataType: 18, EnterpriseId: 0, Len: 4}, nil),
+	entities.NewIPAddressInfoElement(&entities.InfoElement{Name: "destinationIPv4Address", ElementId: 12, DataType: 18, EnterpriseId: 0, Len: 4}, nil),
+	entities.NewStringInfoElement(&entities.InfoElement{Name: "destinationNodeName", ElementId: 105, DataType: 13, EnterpriseId: 55829, Len: 65535}, ""),
 }
 
 func init() {
@@ -264,7 +264,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	assert.NotNil(t, templateSet, "Template record should be stored in message flowset")
 	sourceIPv4Address, _, exist := templateSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
-	assert.Equal(t, uint32(0), sourceIPv4Address.Element.EnterpriseId, "Template record is not stored correctly.")
+	assert.Equal(t, uint32(0), sourceIPv4Address.GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
 	// Invalid version
 	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
 	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord), address.String())
@@ -308,7 +308,8 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	ipAddress := net.IP([]byte{1, 2, 3, 4})
 	sourceIPv4Address, _, exist := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
-	assert.Equal(t, ipAddress, sourceIPv4Address.Value, "sourceIPv4Address should be decoded and stored correctly.")
+	ipVal, _ := sourceIPv4Address.GetIPAddressValue()
+	assert.Equal(t, ipAddress, ipVal, "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
 	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord), address.String())
@@ -466,7 +467,8 @@ func TestTCPCollectingProcessIPv6(t *testing.T) {
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
-	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.Value)
+	ipVal, _ := ie.GetIPAddressValue()
+	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ipVal)
 }
 
 func TestUDPCollectingProcessIPv6(t *testing.T) {
@@ -495,7 +497,8 @@ func TestUDPCollectingProcessIPv6(t *testing.T) {
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
-	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.Value)
+	ipVal, _ := ie.GetIPAddressValue()
+	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ipVal)
 }
 
 func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorInput {
