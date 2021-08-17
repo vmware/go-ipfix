@@ -138,7 +138,7 @@ func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 	ianaFields = append(ianaFields, commonFields...)
 	for _, name := range ianaFields {
 		element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
-		ie := entities.NewInfoElementWithValue(element, nil)
+		ie, _ := entities.DecodeAndCreateInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 	}
 	antreaFields := antreaCommonFields
@@ -149,12 +149,12 @@ func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 	}
 	for _, name := range antreaFields {
 		element, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
-		ie := entities.NewInfoElementWithValue(element, nil)
+		ie, _ := entities.DecodeAndCreateInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 	}
 	for _, name := range reverseFields {
 		element, _ := registry.GetInfoElement(name, registry.IANAReversedEnterpriseID)
-		ie := entities.NewInfoElementWithValue(element, nil)
+		ie, _ := entities.DecodeAndCreateInfoElementWithValue(element, nil)
 		elements = append(elements, ie)
 	}
 	templateSet.AddRecord(elements, templateID)
@@ -167,6 +167,7 @@ func createDataSet(templateID uint16, isSrcNode, isIPv6 bool, isMultipleRecord b
 	elements := getDataRecordElements(isSrcNode, isIPv6)
 	dataSet.AddRecord(elements, templateID)
 	if isMultipleRecord {
+		dataSet.PrepareSet(entities.Data, templateID)
 		elements = getDataRecordElements(isSrcNode, isIPv6)
 		dataSet.AddRecord(elements, templateID)
 	}
@@ -186,23 +187,23 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 		var ie entities.InfoElementWithValue
 		switch name {
 		case "sourceIPv4Address", "sourceIPv6Address":
-			ie = entities.NewInfoElementWithValue(element, testRec.srcIP)
+			ie = entities.NewIPAddressInfoElement(element, testRec.srcIP)
 		case "destinationIPv4Address", "destinationIPv6Address":
-			ie = entities.NewInfoElementWithValue(element, testRec.dstIP)
+			ie = entities.NewIPAddressInfoElement(element, testRec.dstIP)
 		case "sourceTransportPort":
-			ie = entities.NewInfoElementWithValue(element, testRec.srcPort)
+			ie = entities.NewUnsigned16InfoElement(element, testRec.srcPort)
 		case "destinationTransportPort":
-			ie = entities.NewInfoElementWithValue(element, testRec.dstPort)
+			ie = entities.NewUnsigned16InfoElement(element, testRec.dstPort)
 		case "protocolIdentifier":
-			ie = entities.NewInfoElementWithValue(element, testRec.proto)
+			ie = entities.NewUnsigned8InfoElement(element, testRec.proto)
 		case "packetTotalCount":
-			ie = entities.NewInfoElementWithValue(element, testRec.pktCount)
+			ie = entities.NewUnsigned64InfoElement(element, testRec.pktCount)
 		case "packetDeltaCount":
-			ie = entities.NewInfoElementWithValue(element, testRec.pktDelta)
+			ie = entities.NewUnsigned64InfoElement(element, testRec.pktDelta)
 		case "flowEndSeconds":
-			ie = entities.NewInfoElementWithValue(element, testRec.flowEnd)
+			ie = entities.NewDateTimeSecondsInfoElement(element, testRec.flowEnd)
 		case "flowEndReason":
-			ie = entities.NewInfoElementWithValue(element, testRec.flowEndReason)
+			ie = entities.NewUnsigned8InfoElement(element, testRec.flowEndReason)
 		}
 		elements = append(elements, ie)
 	}
@@ -217,17 +218,17 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 		var ie entities.InfoElementWithValue
 		switch name {
 		case "destinationClusterIPv4", "destinationClusterIPv6":
-			ie = entities.NewInfoElementWithValue(element, testRec.dstClusterIP)
+			ie = entities.NewIPAddressInfoElement(element, testRec.dstClusterIP)
 		case "sourcePodName":
-			ie = entities.NewInfoElementWithValue(element, testRec.srcPod)
+			ie = entities.NewStringInfoElement(element, testRec.srcPod)
 		case "destinationPodName":
-			ie = entities.NewInfoElementWithValue(element, testRec.dstPod)
+			ie = entities.NewStringInfoElement(element, testRec.dstPod)
 		case "destinationServicePort":
-			ie = entities.NewInfoElementWithValue(element, testRec.dstSvcPort)
+			ie = entities.NewUnsigned16InfoElement(element, testRec.dstSvcPort)
 		case "flowType":
-			ie = entities.NewInfoElementWithValue(element, testRec.flowType)
+			ie = entities.NewUnsigned8InfoElement(element, testRec.flowType)
 		case "tcpState":
-			ie = entities.NewInfoElementWithValue(element, testRec.tcpState)
+			ie = entities.NewStringInfoElement(element, testRec.tcpState)
 		}
 		elements = append(elements, ie)
 	}
@@ -236,9 +237,9 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 		var ie entities.InfoElementWithValue
 		switch name {
 		case "reversePacketTotalCount":
-			ie = entities.NewInfoElementWithValue(element, testRec.revPktCount)
+			ie = entities.NewUnsigned64InfoElement(element, testRec.revPktCount)
 		case "reversePacketDeltaCount":
-			ie = entities.NewInfoElementWithValue(element, testRec.revPktDelta)
+			ie = entities.NewUnsigned64InfoElement(element, testRec.revPktDelta)
 		}
 		elements = append(elements, ie)
 	}

@@ -95,7 +95,7 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 		if err != nil {
 			t.Fatalf("Error when fetching element with name %v: %v", ieName, err)
 		}
-		ieWithValue := entities.NewInfoElementWithValue(ie, nil)
+
 		var value []byte
 		switch ieName {
 		case "flowStartSeconds", "flowEndSeconds":
@@ -120,7 +120,7 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 		default:
 			t.Fatalf("information element with name: %v is not present in the element list", ieName)
 		}
-		ieWithValue.Value = value
+		ieWithValue, _ := entities.DecodeAndCreateInfoElementWithValue(ie, value)
 		elements = append(elements, ieWithValue)
 	}
 
@@ -129,7 +129,6 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 		if err != nil {
 			t.Fatalf("Error when fetching element with name %v: %v", ieName, err)
 		}
-		ieWithValue := entities.NewInfoElementWithValue(ie, nil)
 		var value []byte
 		switch ieName {
 		case "reversePacketTotalCount", "reverseOctetTotalCount", "reversePacketDeltaCount", "reverseOctetDeltaCount":
@@ -137,7 +136,7 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 		default:
 			t.Fatalf("information element with name: %v is not present in the element list", ieName)
 		}
-		ieWithValue.Value = value
+		ieWithValue, _ := entities.DecodeAndCreateInfoElementWithValue(ie, value)
 		elements = append(elements, ieWithValue)
 	}
 
@@ -146,7 +145,6 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 		if err != nil {
 			t.Fatalf("Error when fetching element with name %v: %v", ieName, err)
 		}
-		ieWithValue := entities.NewInfoElementWithValue(ie, nil)
 		var value []byte
 		switch ieName {
 		case "sourcePodNamespace":
@@ -174,7 +172,7 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 		default:
 			t.Fatalf("information element with name: %v is not present in the element list", ieName)
 		}
-		ieWithValue.Value = value
+		ieWithValue, _ := entities.DecodeAndCreateInfoElementWithValue(ie, value)
 		elements = append(elements, ieWithValue)
 	}
 	if err := set.AddRecord(elements, 256); err != nil {

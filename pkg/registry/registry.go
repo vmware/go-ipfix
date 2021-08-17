@@ -67,9 +67,9 @@ const (
 )
 
 var (
-	// globalRegistryByID shows mapping EnterpriseID -> Info Element ID -> Info Element
+	// globalRegistryByID shows mapping EnterpriseID -> Info element ID -> Info element
 	globalRegistryByID map[uint32]map[uint16]*entities.InfoElement
-	// globalRegistryByName shows mapping EnterpriseID -> Info Element name -> Info Element
+	// globalRegistryByName shows mapping EnterpriseID -> Info element name -> Info element
 	globalRegistryByName map[uint32]map[string]*entities.InfoElement
 )
 
@@ -93,7 +93,7 @@ func GetInfoElementFromID(elementID uint16, enterpriseID uint32) (*entities.Info
 		return nil, fmt.Errorf("Registry with EnterpriseID %d is not supported.", enterpriseID)
 	}
 	if element, exist := globalRegistryByID[enterpriseID][elementID]; !exist {
-		return element, fmt.Errorf("Information Element with elementID %d in registry with enterpriseID %d cannot be found.", elementID, enterpriseID)
+		return element, fmt.Errorf("Information element with elementID %d in registry with enterpriseID %d cannot be found.", elementID, enterpriseID)
 	} else {
 		return element, nil
 	}
@@ -104,7 +104,7 @@ func GetInfoElement(name string, enterpriseID uint32) (*entities.InfoElement, er
 		return nil, fmt.Errorf("Registry with EnterpriseID %d is not supported.", enterpriseID)
 	}
 	if element, exist := globalRegistryByName[enterpriseID][name]; !exist {
-		return element, fmt.Errorf("Information Element with name %s in registry with enterpriseID %d cannot be found.", name, enterpriseID)
+		return element, fmt.Errorf("Information element with name %s in registry with enterpriseID %d cannot be found.", name, enterpriseID)
 	} else {
 		return element, nil
 	}
