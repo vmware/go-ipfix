@@ -15,8 +15,8 @@ const (
 func TestAddRecordIPv4Addresses(t *testing.T) {
 	// Test with template encodingSet
 	elements := make([]InfoElementWithValue, 0)
-	ie1 := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
-	ie2 := NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
+	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
+	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
 	elements = append(elements, ie1, ie2)
 	encodingSet := NewSet(false)
 	err := encodingSet.PrepareSet(Template, testTemplateID)
@@ -31,8 +31,8 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 	err = encodingSet.PrepareSet(Data, testTemplateID)
 	assert.NoError(t, err)
 	elements = make([]InfoElementWithValue, 0)
-	ie1 = NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1").To4())
-	ie2 = NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP("10.0.0.2").To4())
+	ie1 = NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1").To4())
+	ie2 = NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP("10.0.0.2").To4())
 	elements = append(elements, ie1, ie2)
 	err = encodingSet.AddRecord(elements, 256)
 	assert.NoError(t, err)
@@ -42,8 +42,8 @@ func TestAddRecordIPv4Addresses(t *testing.T) {
 func TestAddRecordIPv6Addresses(t *testing.T) {
 	// Test with template record
 	elements := make([]InfoElementWithValue, 0)
-	ie1 := NewInfoElementWithValue(NewInfoElement("sourceIPv6Address", 27, 19, 0, 16), nil)
-	ie2 := NewInfoElementWithValue(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), nil)
+	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv6Address", 27, 19, 0, 16), nil)
+	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), nil)
 	elements = append(elements, ie1, ie2)
 	newSet := NewSet(false)
 	err := newSet.PrepareSet(Template, testTemplateID)
@@ -55,8 +55,8 @@ func TestAddRecordIPv6Addresses(t *testing.T) {
 	err = newSet.PrepareSet(Data, testTemplateID)
 	assert.NoError(t, err)
 	elements = make([]InfoElementWithValue, 0)
-	ie1 = NewInfoElementWithValue(NewInfoElement("sourceIPv6Address", 27, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
-	ie2 = NewInfoElementWithValue(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
+	ie1 = NewIPAddressInfoElement(NewInfoElement("sourceIPv6Address", 27, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
+	ie2 = NewIPAddressInfoElement(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 	elements = append(elements, ie1, ie2)
 	newSet.AddRecord(elements, 256)
 	srcIP := []byte(net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
@@ -87,8 +87,8 @@ func TestGetHeaderBuffer(t *testing.T) {
 
 func TestGetRecords(t *testing.T) {
 	elements := make([]InfoElementWithValue, 0)
-	ie1 := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
-	ie2 := NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
+	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
+	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
 	elements = append(elements, ie1, ie2)
 	newSet := NewSet(true)
 	err := newSet.PrepareSet(Template, testTemplateID)
@@ -99,8 +99,8 @@ func TestGetRecords(t *testing.T) {
 
 func TestGetNumberOfRecords(t *testing.T) {
 	elements := make([]InfoElementWithValue, 0)
-	ie1 := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
-	ie2 := NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
+	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
+	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
 	elements = append(elements, ie1, ie2)
 	newSet := NewSet(true)
 	err := newSet.PrepareSet(Template, testTemplateID)
@@ -111,8 +111,8 @@ func TestGetNumberOfRecords(t *testing.T) {
 
 func TestSet_UpdateLenInHeader(t *testing.T) {
 	elements := make([]InfoElementWithValue, 0)
-	ie1 := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
-	ie2 := NewInfoElementWithValue(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
+	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
+	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
 	elements = append(elements, ie1, ie2)
 	setForDecoding := NewSet(true)
 	err := setForDecoding.PrepareSet(Template, testTemplateID)

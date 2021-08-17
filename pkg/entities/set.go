@@ -134,8 +134,8 @@ func (s *set) AddRecord(elements []InfoElementWithValue, templateID uint16) erro
 	} else {
 		return fmt.Errorf("set type is not supported")
 	}
-	for i := range elements {
-		err := record.AddInfoElement(&elements[i])
+	for _, element := range elements {
+		err := record.AddInfoElement(element)
 		if err != nil {
 			return err
 		}
@@ -159,7 +159,7 @@ func (s *set) AddRecordWithExtraElements(elements []InfoElementWithValue, numExt
 		return fmt.Errorf("set type is not supported")
 	}
 	for i := range elements {
-		err := record.AddInfoElement(&elements[i])
+		err := record.AddInfoElement(elements[i])
 		if err != nil {
 			return err
 		}

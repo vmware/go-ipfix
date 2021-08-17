@@ -329,9 +329,62 @@ func (ep *ExportingProcess) createAndSendJSONMsg(set entities.Set) (int, error) 
 	for _, record := range set.GetRecords() {
 		elements := make(map[string]interface{})
 		orderedElements := record.GetOrderedElementList()
-		for i := range orderedElements {
-			element := &orderedElements[i]
-			elements[element.Element.Name] = element.Value
+		for _, element := range orderedElements {
+			infoElem := element.GetInfoElement()
+			switch infoElem.DataType {
+			case entities.Unsigned8:
+				val, _ := element.GetUnsigned8Value()
+				elements[infoElem.Name] = val
+			case entities.Unsigned16:
+				val, _ := element.GetUnsigned16Value()
+				elements[infoElem.Name] = val
+			case entities.Unsigned32:
+				val, _ := element.GetUnsigned32Value()
+				elements[infoElem.Name] = val
+			case entities.Unsigned64:
+				val, _ := element.GetUnsigned64Value()
+				elements[infoElem.Name] = val
+			case entities.Signed8:
+				val, _ := element.GetSigned8Value()
+				elements[infoElem.Name] = val
+			case entities.Signed16:
+				val, _ := element.GetSigned16Value()
+				elements[infoElem.Name] = val
+			case entities.Signed32:
+				val, _ := element.GetSigned32Value()
+				elements[infoElem.Name] = val
+			case entities.Signed64:
+				val, _ := element.GetSigned64Value()
+				elements[infoElem.Name] = val
+			case entities.Float32:
+				val, _ := element.GetFloat32Value()
+				elements[infoElem.Name] = val
+			case entities.Float64:
+				val, _ := element.GetFloat64Value()
+				elements[infoElem.Name] = val
+			case entities.Boolean:
+				val, _ := element.GetBooleanValue()
+				elements[infoElem.Name] = val
+			case entities.DateTimeSeconds:
+				val, _ := element.GetUnsigned32Value()
+				elements[infoElem.Name] = val
+			case entities.DateTimeMilliseconds:
+				val, _ := element.GetUnsigned64Value()
+				elements[infoElem.Name] = val
+			case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
+				return bytesSent, fmt.Errorf("API does not support micro and nano seconds types yet")
+			case entities.MacAddress:
+				val, _ := element.GetMacAddressValue()
+				elements[infoElem.Name] = val
+			case entities.Ipv4Address, entities.Ipv6Address:
+				val, _ := element.GetIPAddressValue()
+				elements[infoElem.Name] = val
+			case entities.String:
+				val, _ := element.GetStringValue()
+				elements[infoElem.Name] = val
+			default:
+				return bytesSent, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
+			}
 		}
 		message := make(map[string]interface{}, 2)
 		message["ipfix"] = elements
@@ -364,7 +417,7 @@ func (ep *ExportingProcess) updateTemplate(id uint16, elements []entities.InfoEl
 		minDataRecLen,
 	}
 	for i, elem := range elements {
-		ep.templatesMap[id].elements[i] = elem.Element
+		ep.templatesMap[id].elements[i] = elem.GetInfoElement()
 	}
 	return
 }
@@ -391,10 +444,13 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 			return err
 		}
 		elements := make([]entities.InfoElementWithValue, len(tempValue.elements))
+		var err error
 		for i, element := range tempValue.elements {
-			elements[i] = entities.NewInfoElementWithValue(element, nil)
+			if elements[i], err = entities.DecodeAndCreateInfoElementWithValue(element, nil); err != nil {
+				return err
+			}
 		}
-		err := tempSet.AddRecord(elements, templateID)
+		err = tempSet.AddRecord(elements, templateID)
 		if err != nil {
 			return err
 		}
