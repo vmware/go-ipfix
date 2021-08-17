@@ -61,7 +61,21 @@ func TestAddInfoElements(t *testing.T) {
 		NewInfoElement("flowStartMilliseconds", 152, 15, 0, 8),   // dateTimeMilliseconds
 	}
 	macAddress, _ := net.ParseMAC("aa:bb:cc:dd:ee:ff")
-	valData := []interface{}{
+	type valData struct {
+		proto              uint8
+		srcPort            uint16
+		ingressInt         uint32
+		pktCount           uint64
+		minObjVal          int32
+		samplingProb       float64
+		dataReliable       bool
+		macAddr            net.HardwareAddr
+		ipAddr             net.IP
+		stringVal          string
+		flowStartSecs      uint32
+		flowStartMillisecs uint64
+	}
+	values := valData{
 		uint8(0x1),                  // ICMP proto
 		uint16(443),                 // https port
 		uint32(1000),                // ingress interface ID
@@ -78,29 +92,49 @@ func TestAddInfoElements(t *testing.T) {
 	addIETests := []struct {
 		record  Record
 		ieList  []*InfoElement
-		valList []interface{}
+		valList valData
 	}{
-		{NewTemplateRecord(uniqueTemplateID, 12, false), testIEs, nil},
-		{NewDataRecord(uniqueTemplateID, len(testIEs), 0, false), testIEs, valData},
+		{NewTemplateRecord(uniqueTemplateID, 12, false), testIEs, valData{}},
+		{NewDataRecord(uniqueTemplateID, len(testIEs), 0, false), testIEs, values},
 	}
 
 	for i, test := range addIETests {
-		for j, testIE := range test.ieList {
+		for _, testIE := range test.ieList {
 			var actualErr error
 			if i == 0 {
 				// For template record
-				ie := NewInfoElementWithValue(testIE, nil)
-				actualErr = test.record.AddInfoElement(&ie)
+				ie, _ := DecodeAndCreateInfoElementWithValue(testIE, nil)
+				actualErr = test.record.AddInfoElement(ie)
 			} else {
 				// For data record
-				ie := NewInfoElementWithValue(testIE, test.valList[j])
-				actualErr = test.record.AddInfoElement(&ie)
-				if testIE.Len == VariableLength {
-					_, ok := test.valList[j].(string)
-					if !ok {
-						t.Errorf("val argument is not of valid type string")
-					}
+				var ie InfoElementWithValue
+				switch testIE.Name {
+				case "protocolIdentifier":
+					ie = NewUnsigned8InfoElement(testIE, test.valList.proto)
+				case "sourceTransportPort":
+					ie = NewUnsigned16InfoElement(testIE, test.valList.srcPort)
+				case "ingressInterface":
+					ie = NewUnsigned32InfoElement(testIE, test.valList.ingressInt)
+				case "packetDeltaCount":
+					ie = NewUnsigned64InfoElement(testIE, test.valList.pktCount)
+				case "mibObjectValueInteger":
+					ie = NewSigned32InfoElement(testIE, test.valList.minObjVal)
+				case "samplingProbability":
+					ie = NewFloat64InfoElement(testIE, test.valList.samplingProb)
+				case "dataRecordsReliability":
+					ie = NewBoolInfoElement(testIE, test.valList.dataReliable)
+				case "flowStartSeconds":
+					ie = NewDateTimeSecondsInfoElement(testIE, test.valList.flowStartSecs)
+				case "flowStartMilliseconds":
+					ie = NewDateTimeMillisecondsInfoElement(testIE, test.valList.flowStartMillisecs)
+				case "sourceMacAddress":
+					ie = NewMacAddressInfoElement(testIE, test.valList.macAddr)
+				case "sourceIPv4Address":
+					ie = NewIPAddressInfoElement(testIE, test.valList.ipAddr)
+				case "interfaceDescription":
+					ie = NewStringInfoElement(testIE, test.valList.stringVal)
 				}
+				actualErr = test.record.AddInfoElement(ie)
 			}
 			assert.Equal(t, nil, actualErr, "Error returned is not nil")
 		}
@@ -116,7 +150,7 @@ func TestAddInfoElements(t *testing.T) {
 func TestGetInfoElementWithValue(t *testing.T) {
 	templateRec := NewTemplateRecord(256, 1, true)
 	templateRec.orderedElementList = make([]InfoElementWithValue, 0)
-	ie := NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
+	ie := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
 	templateRec.orderedElementList = append(templateRec.orderedElementList, ie)
 	_, _, exist := templateRec.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
@@ -124,10 +158,11 @@ func TestGetInfoElementWithValue(t *testing.T) {
 	assert.Equal(t, false, exist)
 	dataRec := NewDataRecord(256, 1, 0, true)
 	dataRec.orderedElementList = make([]InfoElementWithValue, 0)
-	ie = NewInfoElementWithValue(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
+	ie = NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
 	dataRec.orderedElementList = append(dataRec.orderedElementList, ie)
 	infoElementWithValue, _, _ := dataRec.GetInfoElementWithValue("sourceIPv4Address")
-	assert.Equal(t, net.ParseIP("10.0.0.1"), infoElementWithValue.Value)
+	ipVal, _ := infoElementWithValue.GetIPAddressValue()
+	assert.Equal(t, net.ParseIP("10.0.0.1"), ipVal)
 	infoElementWithValue, _, _ = dataRec.GetInfoElementWithValue("destinationIPv4Address")
 	assert.Empty(t, infoElementWithValue)
 }

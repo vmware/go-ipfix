@@ -241,12 +241,12 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				 0                   1                   2                   3
 				 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
 				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-				|1| Information Element id. = 15 | Field Length = 4  (16 bits)  |
+				|1| Information element id. = 15 | Field Length = 4  (16 bits)  |
 				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 				| Enterprise number (32 bits)                                   |
 				+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 				1: 1 bit
-				Information Element id: 15 bits
+				Information element id: 15 bits
 				Field Length: 16 bits
 				Enterprise ID: 32 bits
 				(Reference: https://tools.ietf.org/html/rfc7011#appendix-A.2.2)
@@ -262,7 +262,9 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				return nil, err
 			}
 		}
-		elementsWithValue[i] = entities.NewInfoElementWithValue(element, nil)
+		if elementsWithValue[i], err = entities.DecodeAndCreateInfoElementWithValue(element, nil); err != nil {
+			return nil, err
+		}
 	}
 	err := templateSet.AddRecord(elementsWithValue, templateID)
 	if err != nil {
@@ -292,7 +294,9 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 			} else {
 				length = int(element.Len)
 			}
-			elements[i] = entities.NewInfoElementWithValue(element, dataBuffer.Next(length))
+			if elements[i], err = entities.DecodeAndCreateInfoElementWithValue(element, dataBuffer.Next(length)); err != nil {
+				return nil, err
+			}
 		}
 		err = dataSet.AddRecordWithExtraElements(elements, cp.numExtraElements, templateID)
 		if err != nil {
@@ -310,7 +314,7 @@ func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 	}
 	elements := make([]*entities.InfoElement, 0)
 	for _, elementWithValue := range elementsWithValue {
-		elements = append(elements, elementWithValue.Element)
+		elements = append(elements, elementWithValue.GetInfoElement())
 	}
 	cp.templatesMap[obsDomainID][templateID] = elements
 	// template lifetime management
