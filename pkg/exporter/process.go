@@ -55,7 +55,6 @@ type ExportingProcess struct {
 	templatesMap    map[uint16]templateValue
 	templateRefCh   chan struct{}
 	templateMutex   sync.Mutex
-	connMutex       sync.Mutex
 	sendJSONRecord  bool
 	jsonBufferLen   int
 }
@@ -247,8 +246,6 @@ func (ep *ExportingProcess) CloseConnToCollector() {
 	if !isChanClosed(ep.templateRefCh) {
 		close(ep.templateRefCh) // Close template refresh channel
 	}
-	ep.connMutex.Lock()
-	defer ep.connMutex.Unlock()
 	err := ep.connToCollector.Close()
 	// Just log the error that happened when closing the connection. Not returning error as we do not expect library
 	// consumers to exit their programs with this error.
@@ -260,8 +257,6 @@ func (ep *ExportingProcess) CloseConnToCollector() {
 // checkConnToCollector checks whether the connection from exporter is still open
 // by trying to read from connection. Closed connection will return EOF from read.
 func (ep *ExportingProcess) checkConnToCollector(oneByteForRead []byte) bool {
-	ep.connMutex.Lock()
-	defer ep.connMutex.Unlock()
 	ep.connToCollector.SetReadDeadline(time.Now().Add(time.Millisecond))
 	if _, err := ep.connToCollector.Read(oneByteForRead); err == io.EOF {
 		return false
@@ -317,8 +312,6 @@ func (ep *ExportingProcess) createAndSendIPFIXMsg(set entities.Set) (int, error)
 	}
 
 	// Send the message on the exporter connection.
-	ep.connMutex.Lock()
-	defer ep.connMutex.Unlock()
 	bytesSent, err := ep.connToCollector.Write(bytesSlice)
 
 	if err != nil {
@@ -350,9 +343,7 @@ func (ep *ExportingProcess) createAndSendJSONMsg(set entities.Set) (int, error) 
 			return bytesSent, fmt.Errorf("error when encoding message to JSON: %v", err)
 		}
 		// Send the message on the exporter connection.
-		ep.connMutex.Lock()
 		bytes, err := ep.connToCollector.Write(writer.Bytes())
-		ep.connMutex.Unlock()
 		if err != nil {
 			return bytes, fmt.Errorf("error when sending message on the connection: %v", err)
 		}
