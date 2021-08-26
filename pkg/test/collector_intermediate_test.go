@@ -187,7 +187,7 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 		case "packetTotalCount":
 			assert.Equal(t, uint64(1000), element.Value)
 		case "packetDeltaCount":
-			assert.Equal(t, uint64(1000), element.Value)
+			assert.Equal(t, uint64(500), element.Value)
 		case "destinationClusterIPv4":
 			assert.Equal(t, net.IP{10, 0, 0, 3}, element.Value)
 		case "destinationClusterIPv6":
@@ -195,7 +195,7 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 		case "destinationServicePort":
 			assert.Equal(t, uint16(4739), element.Value)
 		case "reversePacketDeltaCount":
-			assert.Equal(t, uint64(350), element.Value)
+			assert.Equal(t, uint64(200), element.Value)
 		case "reversePacketTotalCount":
 			assert.Equal(t, uint64(400), element.Value)
 		case "packetTotalCountFromSourceNode":

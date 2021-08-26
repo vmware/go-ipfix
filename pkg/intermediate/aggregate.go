@@ -27,6 +27,7 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
+	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 var (
@@ -506,53 +507,50 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	statsElementList := a.aggregateElements.StatsElements
 	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
 	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
+	var srcDeltaVal, dstDeltaVal uint64
 	for i, element := range statsElementList {
-		isDelta := false
-		if strings.Contains(element, "Delta") {
-			isDelta = true
-		}
+		isDelta := strings.Contains(element, "Delta")
 		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(element); exist {
-			existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(element)
-			// Update the corresponding element in existing record.
-			if !isDelta {
-				if existingIeWithValue.Value.(uint64) < ieWithValue.Value.(uint64) {
-					existingIeWithValue.Value = ieWithValue.Value
-				}
-			} else {
-				// We are simply adding the delta stats now. We expect delta stats to be
-				// reset after sending the record from flowKeyMap in aggregation process.
-				// Delta stats from source and destination nodes are added, so we will have
-				// two times the stats approximately.
-				// For delta stats, it is better to use source and destination specific
-				// stats.
-				existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
-			}
-			if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
-				return err
-			}
 			// Update the corresponding source element in antreaStatsElement list.
 			if fillSrcStats {
-				existingIeWithValue, index, _ = existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
+				srcExistingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
 				if !isDelta {
-					existingIeWithValue.Value = ieWithValue.Value
+					srcExistingIeWithValue.Value = ieWithValue.Value
 				} else {
-					existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+					srcExistingIeWithValue.Value = srcExistingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+					srcDeltaVal = srcExistingIeWithValue.Value.(uint64)
 				}
-				if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+				if err := existingRecord.SetInfoElementWithValue(index, *srcExistingIeWithValue); err != nil {
 					return err
 				}
 			}
 			// Update the corresponding destination element in antreaStatsElement list.
 			if fillDstStats {
-				existingIeWithValue, index, _ = existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
+				dstExistingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
 				if !isDelta {
-					existingIeWithValue.Value = ieWithValue.Value
+					dstExistingIeWithValue.Value = ieWithValue.Value
 				} else {
-					existingIeWithValue.Value = existingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+					dstExistingIeWithValue.Value = dstExistingIeWithValue.Value.(uint64) + ieWithValue.Value.(uint64)
+					dstDeltaVal = dstExistingIeWithValue.Value.(uint64)
 				}
-				if err := existingRecord.SetInfoElementWithValue(index, *existingIeWithValue); err != nil {
+				if err := existingRecord.SetInfoElementWithValue(index, *dstExistingIeWithValue); err != nil {
 					return err
 				}
+			}
+			// Update the corresponding common element in statsElement list.
+			commonExistingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(element)
+			if !isDelta {
+				commonExistingIeWithValue.Value = util.MaxUint64(commonExistingIeWithValue.Value.(uint64), ieWithValue.Value.(uint64))
+			} else {
+				if fillSrcStats {
+					commonExistingIeWithValue.Value = util.MaxUint64(commonExistingIeWithValue.Value.(uint64), srcDeltaVal)
+				}
+				if fillDstStats {
+					commonExistingIeWithValue.Value = util.MaxUint64(commonExistingIeWithValue.Value.(uint64), dstDeltaVal)
+				}
+			}
+			if err := existingRecord.SetInfoElementWithValue(index, *commonExistingIeWithValue); err != nil {
+				return err
 			}
 		} else {
 			return fmt.Errorf("element with name %v in statsElements not present in the incoming record", element)

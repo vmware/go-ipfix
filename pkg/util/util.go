@@ -38,3 +38,10 @@ func Decode(buffer io.Reader, byteOrder binary.ByteOrder, outputs ...interface{}
 	}
 	return nil
 }
+
+func MaxUint64(num1, num2 uint64) uint64 {
+	if num1 >= num2 {
+		return num1
+	}
+	return num2
+}

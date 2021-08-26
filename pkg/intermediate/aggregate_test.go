@@ -25,6 +25,7 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
+	"github.com/vmware/go-ipfix/pkg/util"
 )
 
 var (
@@ -918,7 +919,7 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 			assert.Equalf(t, latestRecord.Value, ieWithValue.Value, "values should be equal for element %v", e)
 		} else {
 			prevRecord, _, _ := srcRecordLatest.GetInfoElementWithValue(e)
-			assert.Equalf(t, prevRecord.Value.(uint64)+latestRecord.Value.(uint64), ieWithValue.Value, "values should be equal for element %v", e)
+			assert.Equalf(t, util.MaxUint64(prevRecord.Value.(uint64), latestRecord.Value.(uint64)), ieWithValue.Value, "values should be equal for element %v", e)
 		}
 	}
 	for i, e := range antreaSourceStatsElementList {
