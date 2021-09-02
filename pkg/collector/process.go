@@ -58,10 +58,11 @@ type CollectingProcess struct {
 	// decoding the IPFIX data packet.
 	numExtraElements int
 	// caCert, serverCert and serverKey are for storing encryption info when using TLS/DTLS
-	caCert     []byte
-	serverCert []byte
-	serverKey  []byte
-	wg         sync.WaitGroup
+	caCert               []byte
+	serverCert           []byte
+	serverKey            []byte
+	wg                   sync.WaitGroup
+	numOfRecordsReceived uint64
 }
 
 type CollectorInput struct {
@@ -136,6 +137,24 @@ func (cp *CollectingProcess) CloseMsgChan() {
 	close(cp.messageChan)
 }
 
+func (cp *CollectingProcess) GetNumOfRecordsReceived() uint64 {
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
+	return cp.numOfRecordsReceived
+}
+
+func (cp *CollectingProcess) GetNumOfConnToCollector() int {
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
+	return len(cp.clients)
+}
+
+func (cp *CollectingProcess) incrementNumOfRecordsReceived() {
+	cp.mutex.Lock()
+	defer cp.mutex.Unlock()
+	cp.numOfRecordsReceived = cp.numOfRecordsReceived + 1
+}
+
 func (cp *CollectingProcess) createClient() *clientHandler {
 	return &clientHandler{
 		packetChan: make(chan *bytes.Buffer),
@@ -152,12 +171,6 @@ func (cp *CollectingProcess) deleteClient(name string) {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 	delete(cp.clients, name)
-}
-
-func (cp *CollectingProcess) getClientCount() int {
-	cp.mutex.RLock()
-	defer cp.mutex.RUnlock()
-	return len(cp.clients)
 }
 
 func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
@@ -201,6 +214,7 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 
 	// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
 	cp.messageChan <- message
+	cp.incrementNumOfRecordsReceived()
 	return message, nil
 }
 
