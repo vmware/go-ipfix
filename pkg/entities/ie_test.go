@@ -70,6 +70,5 @@ func TestNewInfoElementWithValue(t *testing.T) {
 	ip := net.ParseIP("10.0.0.1")
 	element := NewIPAddressInfoElement(&InfoElement{"sourceIPv4Address", 8, 18, 0, 4}, ip)
 	assert.Equal(t, element.GetInfoElement().Name, "sourceIPv4Address")
-	val, _ := element.GetIPAddressValue()
-	assert.Equal(t, val, ip)
+	assert.Equal(t, element.GetIPAddressValue(), ip)
 }
