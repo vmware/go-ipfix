@@ -235,32 +235,23 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		assert.True(t, exist)
 		switch name {
 		case "sourceIPv4Address", "sourceIPv6Address":
-			val, _ := element.GetIPAddressValue()
-			assert.Equal(t, testRec.srcIP, val)
+			assert.Equal(t, testRec.srcIP, element.GetIPAddressValue())
 		case "destinationIPv4Address", "destinationIPv6Address":
-			val, _ := element.GetIPAddressValue()
-			assert.Equal(t, testRec.dstIP, val)
+			assert.Equal(t, testRec.dstIP, element.GetIPAddressValue())
 		case "sourceTransportPort":
-			val, _ := element.GetUnsigned16Value()
-			assert.Equal(t, testRec.srcPort, val)
+			assert.Equal(t, testRec.srcPort, element.GetUnsigned16Value())
 		case "destinationTransportPort":
-			val, _ := element.GetUnsigned16Value()
-			assert.Equal(t, testRec.dstPort, val)
+			assert.Equal(t, testRec.dstPort, element.GetUnsigned16Value())
 		case "protocolIdentifier":
-			val, _ := element.GetUnsigned8Value()
-			assert.Equal(t, testRec.proto, val)
+			assert.Equal(t, testRec.proto, element.GetUnsigned8Value())
 		case "packetTotalCount":
-			val, _ := element.GetUnsigned64Value()
-			assert.Equal(t, testRec.pktCount, val)
+			assert.Equal(t, testRec.pktCount, element.GetUnsigned64Value())
 		case "packetDeltaCount":
-			val, _ := element.GetUnsigned64Value()
-			assert.Equal(t, testRec.pktDelta, val)
+			assert.Equal(t, testRec.pktDelta, element.GetUnsigned64Value())
 		case "flowEndSeconds":
-			val, _ := element.GetUnsigned32Value()
-			assert.Equal(t, testRec.flowEnd, val)
+			assert.Equal(t, testRec.flowEnd, element.GetUnsigned32Value())
 		case "flowEndReason":
-			val, _ := element.GetUnsigned8Value()
-			assert.Equal(t, testRec.flowEndReason, val)
+			assert.Equal(t, testRec.flowEndReason, element.GetUnsigned8Value())
 		}
 	}
 	for _, name := range antreaCommonFields {
@@ -268,23 +259,17 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		assert.True(t, exist)
 		switch name {
 		case "destinationClusterIPv4", "destinationClusterIPv6":
-			val, _ := element.GetIPAddressValue()
-			assert.Equal(t, testRec.dstClusterIP, val)
+			assert.Equal(t, testRec.dstClusterIP, element.GetIPAddressValue())
 		case "sourcePodName":
-			val, _ := element.GetStringValue()
-			assert.Equal(t, testRec.srcPod, val)
+			assert.Equal(t, testRec.srcPod, element.GetStringValue())
 		case "destinationPodName":
-			val, _ := element.GetStringValue()
-			assert.Equal(t, testRec.dstPod, val)
+			assert.Equal(t, testRec.dstPod, element.GetStringValue())
 		case "destinationServicePort":
-			val, _ := element.GetUnsigned16Value()
-			assert.Equal(t, testRec.dstSvcPort, val)
+			assert.Equal(t, testRec.dstSvcPort, element.GetUnsigned16Value())
 		case "flowType":
-			val, _ := element.GetUnsigned8Value()
-			assert.Equal(t, testRec.flowType, val)
+			assert.Equal(t, testRec.flowType, element.GetUnsigned8Value())
 		case "tcpState":
-			val, _ := element.GetStringValue()
-			assert.Equal(t, testRec.tcpState, val)
+			assert.Equal(t, testRec.tcpState, element.GetStringValue())
 		}
 	}
 	for _, name := range reverseFields {
@@ -292,11 +277,9 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		assert.True(t, exist)
 		switch name {
 		case "reversePacketTotalCount":
-			val, _ := element.GetUnsigned64Value()
-			assert.Equal(t, testRec.revPktCount, val)
+			assert.Equal(t, testRec.revPktCount, element.GetUnsigned64Value())
 		case "reversePacketDeltaCount":
-			val, _ := element.GetUnsigned64Value()
-			assert.Equal(t, testRec.revPktDelta, val)
+			assert.Equal(t, testRec.revPktDelta, element.GetUnsigned64Value())
 		}
 	}
 }

@@ -413,8 +413,7 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	assert.NotNil(t, item)
 	ieWithValue, _, exist := aggRecord.Record.GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
-	ipVal, _ := ieWithValue.GetIPAddressValue()
-	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ipVal)
+	assert.Equal(t, net.IP{0xa, 0x0, 0x0, 0x1}, ieWithValue.GetIPAddressValue())
 	assert.Equal(t, message.GetSet().GetRecords()[0], aggRecord.Record)
 
 	// Template records with IPv6 fields should be ignored
@@ -435,8 +434,7 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	aggRecord = aggregationProcess.flowKeyRecordMap[flowKey]
 	ieWithValue, _, exist = aggRecord.Record.GetInfoElementWithValue("sourceIPv6Address")
 	assert.Equal(t, true, exist)
-	ipVal, _ = ieWithValue.GetIPAddressValue()
-	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ipVal)
+	assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}, ieWithValue.GetIPAddressValue())
 	assert.Equal(t, message.GetSet().GetRecords()[0], aggRecord.Record)
 
 	// Test data record with invalid "flowEndSeconds" field
@@ -827,38 +825,28 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 	if !isIntraNode && !needsCorrleation {
 		// for inter-Node deny connections, either src or dst Pod info will be resolved.
 		sourcePodName, _, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
-		srcPod, _ := sourcePodName.GetStringValue()
 		destinationPodName, _, _ := aggRecord.Record.GetInfoElementWithValue("destinationPodName")
-		dstPod, _ := destinationPodName.GetStringValue()
-		assert.True(t, srcPod == "" || dstPod == "")
+		assert.True(t, sourcePodName.GetStringValue() == "" || destinationPodName.GetStringValue() == "")
 		egress, _, _ := aggRecord.Record.GetInfoElementWithValue("egressNetworkPolicyRuleAction")
-		egressVal, _ := egress.GetUnsigned8Value()
 		ingress, _, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
-		ingressVal, _ := ingress.GetUnsigned8Value()
-		assert.True(t, egressVal != 0 || ingressVal != 0)
+		assert.True(t, egress.GetUnsigned8Value() != 0 || ingress.GetUnsigned8Value() != 0)
 		assert.False(t, ap.AreCorrelatedFieldsFilled(*aggRecord))
 	} else {
 		ieWithValue, _, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
-		pn, _ := ieWithValue.GetStringValue()
-		assert.Equal(t, "pod1", pn)
+		assert.Equal(t, "pod1", ieWithValue.GetStringValue())
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
-		pn, _ = ieWithValue.GetStringValue()
-		assert.Equal(t, "pod2", pn)
+		assert.Equal(t, "pod2", ieWithValue.GetStringValue())
 		if !isIPv6 {
 			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
-			pIP, _ := ieWithValue.GetIPAddressValue()
-			assert.Equal(t, net.ParseIP("192.168.0.1").To4(), pIP)
+			assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.GetIPAddressValue())
 		} else {
 			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv6")
-			pIP, _ := ieWithValue.GetIPAddressValue()
-			assert.Equal(t, net.ParseIP("2001:0:3238:BBBB:63::AAAA"), pIP)
+			assert.Equal(t, net.ParseIP("2001:0:3238:BBBB:63::AAAA"), ieWithValue.GetIPAddressValue())
 		}
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
-		portVal, _ := ieWithValue.GetUnsigned16Value()
-		assert.Equal(t, uint16(4739), portVal)
+		assert.Equal(t, uint16(4739), ieWithValue.GetUnsigned16Value())
 		ingressPriority, _, _ := aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRulePriority")
-		ingressPriorityVal, _ := ingressPriority.GetSigned32Value()
-		assert.Equal(t, ingressPriorityVal, int32(50000))
+		assert.Equal(t, ingressPriority.GetSigned32Value(), int32(50000))
 		assert.True(t, ap.AreCorrelatedFieldsFilled(*aggRecord))
 	}
 }
@@ -891,63 +879,48 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 		assert.NotEqual(t, oldInactiveExpiryTime, item.inactiveExpireTime)
 	}
 	ieWithValue, _, _ := aggRecord.Record.GetInfoElementWithValue("sourcePodName")
-	pn, _ := ieWithValue.GetStringValue()
-	assert.Equal(t, "pod1", pn)
+	assert.Equal(t, "pod1", ieWithValue.GetStringValue())
 	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
-	pn, _ = ieWithValue.GetStringValue()
-	assert.Equal(t, "pod2", pn)
+	assert.Equal(t, "pod2", ieWithValue.GetStringValue())
 	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
-	pIP, _ := ieWithValue.GetIPAddressValue()
-	assert.Equal(t, net.ParseIP("192.168.0.1").To4(), pIP)
+	assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.GetIPAddressValue())
 	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
-	svcPort, _ := ieWithValue.GetUnsigned16Value()
-	assert.Equal(t, uint16(4739), svcPort)
+	assert.Equal(t, uint16(4739), ieWithValue.GetUnsigned16Value())
 	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction")
-	ingressAction, _ := ieWithValue.GetUnsigned8Value()
-	assert.Equal(t, registry.NetworkPolicyRuleActionNoAction, ingressAction)
+	assert.Equal(t, registry.NetworkPolicyRuleActionNoAction, ieWithValue.GetUnsigned8Value())
 	for _, e := range nonStatsElementList {
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
 		expectedIE, _, _ := dstRecordLatest.GetInfoElementWithValue(e)
 		switch ieWithValue.GetInfoElement().DataType {
 		case entities.Unsigned8:
-			currentVal, _ := ieWithValue.GetUnsigned8Value()
-			expectedVal, _ := expectedIE.GetUnsigned8Value()
-			assert.Equal(t, currentVal, expectedVal)
+			assert.Equal(t, ieWithValue.GetUnsigned8Value(), expectedIE.GetUnsigned8Value())
 		case entities.String:
-			currentVal, _ := ieWithValue.GetStringValue()
-			expectedVal, _ := expectedIE.GetStringValue()
-			assert.Equal(t, currentVal, expectedVal)
+			assert.Equal(t, ieWithValue.GetStringValue(), expectedIE.GetStringValue())
 		case entities.Signed32:
-			currentVal, _ := ieWithValue.GetSigned32Value()
-			expectedVal, _ := expectedIE.GetSigned32Value()
-			assert.Equal(t, currentVal, expectedVal)
+			assert.Equal(t, ieWithValue.GetSigned32Value(), expectedIE.GetSigned32Value())
 		}
 	}
 	for _, e := range statsElementList {
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
-		aggVal, _ := ieWithValue.GetUnsigned64Value()
+		aggVal := ieWithValue.GetUnsigned64Value()
 		latestRecord, _, _ := dstRecordLatest.GetInfoElementWithValue(e)
-		latestVal, _ := latestRecord.GetUnsigned64Value()
+		latestVal := latestRecord.GetUnsigned64Value()
 		if !strings.Contains(e, "Delta") {
 			assert.Equalf(t, latestVal, aggVal, "values should be equal for element %v", e)
 		} else {
 			prevRecord, _, _ := srcRecordLatest.GetInfoElementWithValue(e)
-			prevVal, _ := prevRecord.GetUnsigned64Value()
+			prevVal := prevRecord.GetUnsigned64Value()
 			assert.Equalf(t, prevVal+latestVal, aggVal, "values should be equal for element %v", e)
 		}
 	}
 	for i, e := range antreaSourceStatsElementList {
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
-		aggVal, _ := ieWithValue.GetUnsigned64Value()
 		latestRecord, _, _ := srcRecordLatest.GetInfoElementWithValue(statsElementList[i])
-		latestVal, _ := latestRecord.GetUnsigned64Value()
-		assert.Equalf(t, latestVal, aggVal, "values should be equal for element %v", e)
+		assert.Equalf(t, latestRecord.GetUnsigned64Value(), ieWithValue.GetUnsigned64Value(), "values should be equal for element %v", e)
 	}
 	for i, e := range antreaDestinationStatsElementList {
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
-		aggVal, _ := ieWithValue.GetUnsigned64Value()
 		latestRecord, _, _ := dstRecordLatest.GetInfoElementWithValue(statsElementList[i])
-		latestVal, _ := latestRecord.GetUnsigned64Value()
-		assert.Equalf(t, latestVal, aggVal, "values should be equal for element %v", e)
+		assert.Equalf(t, latestRecord.GetUnsigned64Value(), ieWithValue.GetUnsigned64Value(), "values should be equal for element %v", e)
 	}
 }
