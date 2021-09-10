@@ -513,126 +513,56 @@ func encodeInfoElementValueToBuff(element InfoElementWithValue, buffer []byte, i
 	}
 	switch infoElem.DataType {
 	case Unsigned8:
-		v, err := element.GetUnsigned8Value()
-		if err != nil {
-			return err
-		}
-		copy(buffer[index:index+1], []byte{v})
+		copy(buffer[index:index+1], []byte{element.GetUnsigned8Value()})
 	case Unsigned16:
-		v, err := element.GetUnsigned16Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint16(buffer[index:], v)
+		binary.BigEndian.PutUint16(buffer[index:], element.GetUnsigned16Value())
 	case Unsigned32:
-		v, err := element.GetUnsigned32Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint32(buffer[index:], v)
+		binary.BigEndian.PutUint32(buffer[index:], element.GetUnsigned32Value())
 	case Unsigned64:
-		v, err := element.GetUnsigned64Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint64(buffer[index:], v)
+		binary.BigEndian.PutUint64(buffer[index:], element.GetUnsigned64Value())
 	case Signed8:
-		v, err := element.GetSigned8Value()
-		if err != nil {
-			return err
-		}
-		copy(buffer[index:index+1], []byte{byte(v)})
+		copy(buffer[index:index+1], []byte{byte(element.GetSigned8Value())})
 	case Signed16:
-		v, err := element.GetSigned16Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint16(buffer[index:], uint16(v))
+		binary.BigEndian.PutUint16(buffer[index:], uint16(element.GetSigned16Value()))
 	case Signed32:
-		v, err := element.GetSigned32Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint32(buffer[index:], uint32(v))
+		binary.BigEndian.PutUint32(buffer[index:], uint32(element.GetSigned32Value()))
 	case Signed64:
-		v, err := element.GetSigned64Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint64(buffer[index:], uint64(v))
+		binary.BigEndian.PutUint64(buffer[index:], uint64(element.GetSigned64Value()))
 	case Float32:
-		v, err := element.GetFloat32Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint32(buffer[index:], math.Float32bits(v))
+		binary.BigEndian.PutUint32(buffer[index:], math.Float32bits(element.GetFloat32Value()))
 	case Float64:
-		v, err := element.GetFloat64Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint64(buffer[index:], math.Float64bits(v))
+		binary.BigEndian.PutUint64(buffer[index:], math.Float64bits(element.GetFloat64Value()))
 	case Boolean:
-		v, err := element.GetBooleanValue()
-		if err != nil {
-			return err
-		}
 		// Following boolean spec from RFC7011
 		indicator := byte(int8(1))
-		if !v {
+		if !element.GetBooleanValue() {
 			indicator = byte(int8(2))
 		}
 		copy(buffer[index:index+1], []byte{indicator})
 	case DateTimeSeconds:
-		v, err := element.GetUnsigned32Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint32(buffer[index:], v)
+		binary.BigEndian.PutUint32(buffer[index:], element.GetUnsigned32Value())
 	case DateTimeMilliseconds:
-		v, err := element.GetUnsigned64Value()
-		if err != nil {
-			return err
-		}
-		binary.BigEndian.PutUint64(buffer[index:], v)
+		binary.BigEndian.PutUint64(buffer[index:], element.GetUnsigned64Value())
 		// Currently only supporting seconds and milliseconds
 	case DateTimeMicroseconds, DateTimeNanoseconds:
 		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
 		return fmt.Errorf("API does not support micro and nano seconds types yet")
 	case MacAddress:
-		// Expects net.Hardware type
-		v, err := element.GetMacAddressValue()
-		if err != nil {
-			return err
-		}
-		copy(buffer[index:], v)
+		copy(buffer[index:], element.GetMacAddressValue())
 	case Ipv4Address:
-		// Expects net.IP type
-		v, err := element.GetIPAddressValue()
-		if err != nil {
-			return err
-		}
-		if ipv4Add := v.To4(); ipv4Add != nil {
+		if ipv4Add := element.GetIPAddressValue().To4(); ipv4Add != nil {
 			copy(buffer[index:], ipv4Add)
 		} else {
-			return fmt.Errorf("provided IP %v does not belong to IPv4 address family", v)
+			return fmt.Errorf("provided IP %v does not belong to IPv4 address family", element.GetIPAddressValue())
 		}
 	case Ipv6Address:
-		// Expects net.IP type
-		v, err := element.GetIPAddressValue()
-		if err != nil {
-			return err
-		}
-		if ipv6Add := v.To16(); ipv6Add != nil {
+		if ipv6Add := element.GetIPAddressValue().To16(); ipv6Add != nil {
 			copy(buffer[index:], ipv6Add)
 		} else {
-			return fmt.Errorf("provided IPv6 address %v is not of correct length", v)
+			return fmt.Errorf("provided IPv6 address %v is not of correct length", element.GetIPAddressValue())
 		}
 	case String:
-		v, err := element.GetStringValue()
-		if err != nil {
-			return err
-		}
+		v := element.GetStringValue()
 		if len(v) < 255 {
 			buffer[index] = uint8(len(v))
 			for i, b := range v {

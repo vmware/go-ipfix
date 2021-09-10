@@ -161,8 +161,7 @@ func TestGetInfoElementWithValue(t *testing.T) {
 	ie = NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
 	dataRec.orderedElementList = append(dataRec.orderedElementList, ie)
 	infoElementWithValue, _, _ := dataRec.GetInfoElementWithValue("sourceIPv4Address")
-	ipVal, _ := infoElementWithValue.GetIPAddressValue()
-	assert.Equal(t, net.ParseIP("10.0.0.1"), ipVal)
+	assert.Equal(t, net.ParseIP("10.0.0.1"), infoElementWithValue.GetIPAddressValue())
 	infoElementWithValue, _, _ = dataRec.GetInfoElementWithValue("destinationIPv4Address")
 	assert.Empty(t, infoElementWithValue)
 }
