@@ -66,89 +66,83 @@ func (c *convertRecordToFlowType1) ConvertIPFIXRecordToFlowMsg(record entities.R
 
 func addAllFieldsToFlowType1(flowMsg *protobuf.FlowType1, record entities.Record) {
 	for _, ie := range record.GetOrderedElementList() {
-		var err error
 		var ipVal net.IP
 		var portVal uint16
 		var protoVal uint8
 		element := ie.GetInfoElement()
 		switch element.Name {
 		case "flowStartSeconds":
-			flowMsg.TimeFlowStartInSecs, err = ie.GetUnsigned32Value()
+			flowMsg.TimeFlowStartInSecs = ie.GetUnsigned32Value()
 		case "flowEndSeconds":
-			flowMsg.TimeFlowEndInSecs, err = ie.GetUnsigned32Value()
+			flowMsg.TimeFlowEndInSecs = ie.GetUnsigned32Value()
 		case "sourceIPv4Address", "sourceIPv6Address":
 			if flowMsg.SrcIP != "" {
 				klog.Warningf("Do not expect source IP: %v to be filled already", flowMsg.SrcIP)
 			}
-			ipVal, err = ie.GetIPAddressValue()
+			ipVal = ie.GetIPAddressValue()
 			flowMsg.SrcIP = ipVal.String()
 		case "destinationIPv4Address", "destinationIPv6Address":
 			if flowMsg.DstIP != "" {
 				klog.Warningf("Do not expect destination IP: %v to be filled already", flowMsg.DstIP)
 			}
-			ipVal, err = ie.GetIPAddressValue()
+			ipVal = ie.GetIPAddressValue()
 			flowMsg.DstIP = ipVal.String()
 		case "sourceTransportPort":
-			portVal, err = ie.GetUnsigned16Value()
+			portVal = ie.GetUnsigned16Value()
 			flowMsg.SrcPort = uint32(portVal)
 		case "destinationTransportPort":
-			portVal, err = ie.GetUnsigned16Value()
+			portVal = ie.GetUnsigned16Value()
 			flowMsg.DstPort = uint32(portVal)
 		case "protocolIdentifier":
-			protoVal, err = ie.GetUnsigned8Value()
+			protoVal = ie.GetUnsigned8Value()
 			flowMsg.Proto = uint32(protoVal)
 		case "packetTotalCount":
-			flowMsg.PacketsTotal, err = ie.GetUnsigned64Value()
+			flowMsg.PacketsTotal = ie.GetUnsigned64Value()
 		case "octetTotalCount":
-			flowMsg.BytesTotal, err = ie.GetUnsigned64Value()
+			flowMsg.BytesTotal = ie.GetUnsigned64Value()
 		case "packetDeltaCount":
-			flowMsg.PacketsDelta, err = ie.GetUnsigned64Value()
+			flowMsg.PacketsDelta = ie.GetUnsigned64Value()
 		case "octetDeltaCount":
-			flowMsg.BytesDelta, err = ie.GetUnsigned64Value()
+			flowMsg.BytesDelta = ie.GetUnsigned64Value()
 		case "reversePacketTotalCount":
-			flowMsg.ReversePacketsTotal, err = ie.GetUnsigned64Value()
+			flowMsg.ReversePacketsTotal = ie.GetUnsigned64Value()
 		case "reverseOctetTotalCount":
-			flowMsg.ReverseBytesTotal, err = ie.GetUnsigned64Value()
+			flowMsg.ReverseBytesTotal = ie.GetUnsigned64Value()
 		case "reversePacketDeltaCount":
-			flowMsg.ReversePacketsDelta, err = ie.GetUnsigned64Value()
+			flowMsg.ReversePacketsDelta = ie.GetUnsigned64Value()
 		case "reverseOctetDeltaCount":
-			flowMsg.ReverseBytesDelta, err = ie.GetUnsigned64Value()
+			flowMsg.ReverseBytesDelta = ie.GetUnsigned64Value()
 		case "sourcePodNamespace":
-			flowMsg.SrcPodNamespace, err = ie.GetStringValue()
+			flowMsg.SrcPodNamespace = ie.GetStringValue()
 		case "sourcePodName":
-			flowMsg.SrcPodName, err = ie.GetStringValue()
+			flowMsg.SrcPodName = ie.GetStringValue()
 		case "sourceNodeName":
-			flowMsg.SrcNodeName, err = ie.GetStringValue()
+			flowMsg.SrcNodeName = ie.GetStringValue()
 		case "destinationPodNamespace":
-			flowMsg.DstPodNamespace, err = ie.GetStringValue()
+			flowMsg.DstPodNamespace = ie.GetStringValue()
 		case "destinationPodName":
-			flowMsg.DstPodName, err = ie.GetStringValue()
+			flowMsg.DstPodName = ie.GetStringValue()
 		case "destinationNodeName":
-			flowMsg.DstNodeName, err = ie.GetStringValue()
+			flowMsg.DstNodeName = ie.GetStringValue()
 		case "destinationClusterIPv4", "destinationClusterIPv6":
 			if flowMsg.DstClusterIP != "" {
 				klog.Warningf("Do not expect destination cluster IP: %v to be filled already", flowMsg.DstClusterIP)
 			}
-			ipVal, err = ie.GetIPAddressValue()
-			flowMsg.DstClusterIP = ipVal.String()
+			flowMsg.DstClusterIP = ie.GetIPAddressValue().String()
 		case "destinationServicePort":
-			portVal, err = ie.GetUnsigned16Value()
-			flowMsg.DstServicePort = uint32(portVal)
+			flowMsg.DstServicePort = uint32(ie.GetUnsigned16Value())
 		case "destinationServicePortName":
-			flowMsg.DstServicePortName, err = ie.GetStringValue()
+			flowMsg.DstServicePortName = ie.GetStringValue()
 		case "ingressNetworkPolicyName":
-			flowMsg.IngressPolicyName, err = ie.GetStringValue()
+			flowMsg.IngressPolicyName = ie.GetStringValue()
 		case "ingressNetworkPolicyNamespace":
-			flowMsg.IngressPolicyNamespace, err = ie.GetStringValue()
+			flowMsg.IngressPolicyNamespace = ie.GetStringValue()
 		case "egressNetworkPolicyName":
-			flowMsg.EgressPolicyName, err = ie.GetStringValue()
+			flowMsg.EgressPolicyName = ie.GetStringValue()
 		case "egressNetworkPolicyNamespace":
-			flowMsg.EgressPolicyNamespace, err = ie.GetStringValue()
+			flowMsg.EgressPolicyNamespace = ie.GetStringValue()
 		default:
 			klog.Warningf("There is no field with name: %v in flow message (.proto schema)", element.Name)
-		}
-		if err != nil {
-			klog.Errorf("Value format is different from expected in info element: %v", ie)
 		}
 	}
 }

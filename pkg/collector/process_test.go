@@ -308,8 +308,7 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	ipAddress := net.IP([]byte{1, 2, 3, 4})
 	sourceIPv4Address, _, exist := set.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
 	assert.Equal(t, true, exist)
-	ipVal, _ := sourceIPv4Address.GetIPAddressValue()
-	assert.Equal(t, ipAddress, ipVal, "sourceIPv4Address should be decoded and stored correctly.")
+	assert.Equal(t, ipAddress, sourceIPv4Address.GetIPAddressValue(), "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
 	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord), address.String())
@@ -467,8 +466,7 @@ func TestTCPCollectingProcessIPv6(t *testing.T) {
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
-	ipVal, _ := ie.GetIPAddressValue()
-	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ipVal)
+	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.GetIPAddressValue())
 }
 
 func TestUDPCollectingProcessIPv6(t *testing.T) {
@@ -497,8 +495,7 @@ func TestUDPCollectingProcessIPv6(t *testing.T) {
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
-	ipVal, _ := ie.GetIPAddressValue()
-	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ipVal)
+	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.GetIPAddressValue())
 }
 
 func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorInput {

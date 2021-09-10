@@ -291,9 +291,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 	var flowType uint8
 	var err error
 	if flowTypeIE, _, exist := record.GetInfoElementWithValue("flowType"); exist {
-		if flowType, err = flowTypeIE.GetUnsigned8Value(); err != nil {
-			return err
-		}
+		flowType = flowTypeIE.GetUnsigned8Value()
 	} else {
 		klog.Warning("FlowType does not exist in current record.")
 	}
@@ -393,72 +391,42 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 			element := ieWithValue.GetInfoElement()
 			switch element.DataType {
 			case entities.String:
-				val, err := ieWithValue.GetStringValue()
-				if err != nil {
-					return err
-				}
+				val := ieWithValue.GetStringValue()
 				if val != "" {
 					existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(field)
-					if err = existingIeWithValue.SetStringValue(val); err != nil {
-						return err
-					}
+					existingIeWithValue.SetStringValue(val)
 				}
 			case entities.Unsigned8:
-				val, err := ieWithValue.GetUnsigned8Value()
-				if err != nil {
-					return err
-				}
+				val := ieWithValue.GetUnsigned8Value()
 				if val != uint8(0) {
 					existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(field)
-					if err = existingIeWithValue.SetUnsigned8Value(val); err != nil {
-						return err
-					}
+					existingIeWithValue.SetUnsigned8Value(val)
 				}
 			case entities.Unsigned16:
-				val, err := ieWithValue.GetUnsigned16Value()
-				if err != nil {
-					return err
-				}
+				val := ieWithValue.GetUnsigned16Value()
 				if val != uint16(0) {
 					existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(field)
-					if err = existingIeWithValue.SetUnsigned16Value(val); err != nil {
-						return err
-					}
+					existingIeWithValue.SetUnsigned16Value(val)
 				}
 			case entities.Signed32:
-				val, err := ieWithValue.GetSigned32Value()
-				if err != nil {
-					return err
-				}
+				val := ieWithValue.GetSigned32Value()
 				if val != int32(0) {
 					existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(field)
-					if err = existingIeWithValue.SetSigned32Value(val); err != nil {
-						return err
-					}
+					existingIeWithValue.SetSigned32Value(val)
 				}
 			case entities.Ipv4Address:
-				val, err := ieWithValue.GetIPAddressValue()
-				if err != nil {
-					return err
-				}
+				val := ieWithValue.GetIPAddressValue()
 				ipInString := val.To4().String()
 				if ipInString != "0.0.0.0" {
 					existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(field)
-					if err = existingIeWithValue.SetIPAddressValue(val); err != nil {
-						return err
-					}
+					existingIeWithValue.SetIPAddressValue(val)
 				}
 			case entities.Ipv6Address:
-				val, err := ieWithValue.GetIPAddressValue()
-				if err != nil {
-					return err
-				}
+				val := ieWithValue.GetIPAddressValue()
 				ipInString := val.To16().String()
 				if ipInString != net.ParseIP("::0").To16().String() {
 					existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(field)
-					if err = existingIeWithValue.SetIPAddressValue(val); err != nil {
-						return err
-					}
+					existingIeWithValue.SetIPAddressValue(val)
 				}
 			default:
 				klog.Errorf("Fields with dataType %v is not supported in correlation fields list.", element.DataType)
@@ -477,19 +445,11 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	isLatest := false
 	if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue("flowEndSeconds"); exist {
 		if existingIeWithValue, _, exist2 := existingRecord.GetInfoElementWithValue("flowEndSeconds"); exist2 {
-			incomingVal, err := ieWithValue.GetUnsigned32Value()
-			if err != nil {
-				return err
-			}
-			existingVal, err := existingIeWithValue.GetUnsigned32Value()
-			if err != nil {
-				return err
-			}
+			incomingVal := ieWithValue.GetUnsigned32Value()
+			existingVal := existingIeWithValue.GetUnsigned32Value()
 			if incomingVal > existingVal {
 				isLatest = true
-				if err = existingIeWithValue.SetUnsigned32Value(incomingVal); err != nil {
-					return err
-				}
+				existingIeWithValue.SetUnsigned32Value(incomingVal)
 			}
 		}
 	}
@@ -503,29 +463,16 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			case "flowEndReason":
 				// If the aggregated flow is set with flowEndReason as "EndOfFlowReason",
 				// then we do not have to set again.
-				existingVal, err := existingIeWithValue.GetUnsigned8Value()
-				if err != nil {
-					return err
-				}
-				incomingVal, err := ieWithValue.GetUnsigned8Value()
-				if err != nil {
-					return err
-				}
+				existingVal := existingIeWithValue.GetUnsigned8Value()
+				incomingVal := ieWithValue.GetUnsigned8Value()
 				if existingVal != registry.EndOfFlowReason {
-					if err = existingIeWithValue.SetUnsigned8Value(incomingVal); err != nil {
-						return err
-					}
+					existingIeWithValue.SetUnsigned8Value(incomingVal)
 				}
 			case "tcpState":
 				// Update tcpState when flow end timestamp is the latest
 				if isLatest {
-					incomingVal, err := ieWithValue.GetStringValue()
-					if err != nil {
-						return err
-					}
-					if err := existingIeWithValue.SetStringValue(incomingVal); err != nil {
-						return err
-					}
+					incomingVal := ieWithValue.GetStringValue()
+					existingIeWithValue.SetStringValue(incomingVal)
 				}
 			default:
 				klog.Errorf("Fields with name %v is not supported in aggregation fields list.", element)
@@ -546,20 +493,12 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		}
 		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(element); exist {
 			existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(element)
-			incomingVal, err := ieWithValue.GetUnsigned64Value()
-			if err != nil {
-				return err
-			}
-			existingVal, err := existingIeWithValue.GetUnsigned64Value()
-			if err != nil {
-				return err
-			}
+			incomingVal := ieWithValue.GetUnsigned64Value()
+			existingVal := existingIeWithValue.GetUnsigned64Value()
 			// Update the corresponding element in existing record.
 			if !isDelta {
 				if existingVal < incomingVal {
-					if err = existingIeWithValue.SetUnsigned64Value(incomingVal); err != nil {
-						return err
-					}
+					existingIeWithValue.SetUnsigned64Value(incomingVal)
 				}
 			} else {
 				// We are simply adding the delta stats now. We expect delta stats to be
@@ -568,26 +507,16 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 				// two times the stats approximately.
 				// For delta stats, it is better to use source and destination specific
 				// stats.
-				if err = existingIeWithValue.SetUnsigned64Value(existingVal + incomingVal); err != nil {
-					return err
-				}
+				existingIeWithValue.SetUnsigned64Value(existingVal + incomingVal)
 			}
 
 			// Update the corresponding source element in antreaStatsElement list.
 			if fillSrcStats {
 				if existingIeWithValue, _, exist = existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
 					if !isDelta {
-						if err = existingIeWithValue.SetUnsigned64Value(incomingVal); err != nil {
-							return err
-						}
+						existingIeWithValue.SetUnsigned64Value(incomingVal)
 					} else {
-						existingVal, err = existingIeWithValue.GetUnsigned64Value()
-						if err != nil {
-							return err
-						}
-						if err = existingIeWithValue.SetUnsigned64Value(incomingVal + existingVal); err != nil {
-							return err
-						}
+						existingIeWithValue.SetUnsigned64Value(incomingVal + existingIeWithValue.GetUnsigned64Value())
 					}
 				} else {
 					return fmt.Errorf("element does not exist in the record: %v", antreaSourceStatsElements[i])
@@ -597,17 +526,9 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			if fillDstStats {
 				if existingIeWithValue, _, exist = existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
 					if !isDelta {
-						if err = existingIeWithValue.SetUnsigned64Value(incomingVal); err != nil {
-							return err
-						}
+						existingIeWithValue.SetUnsigned64Value(incomingVal)
 					} else {
-						existingVal, err = existingIeWithValue.GetUnsigned64Value()
-						if err != nil {
-							return err
-						}
-						if err = existingIeWithValue.SetUnsigned64Value(incomingVal + existingVal); err != nil {
-							return err
-						}
+						existingIeWithValue.SetUnsigned64Value(incomingVal + existingIeWithValue.GetUnsigned64Value())
 					}
 				} else {
 					return fmt.Errorf("element does not exist in the record: %v", antreaDestinationStatsElements[i])
@@ -665,10 +586,7 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 				return err
 			}
 			if fillSrcStats {
-				value, err = ieWithValue.GetUnsigned64Value()
-				if err != nil {
-					return err
-				}
+				value = ieWithValue.GetUnsigned64Value()
 			}
 			if err = record.AddInfoElement(entities.NewUnsigned64InfoElement(ie, value)); err != nil {
 				return err
@@ -681,10 +599,7 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 			}
 			value = uint64(0)
 			if fillDstStats {
-				value, err = ieWithValue.GetUnsigned64Value()
-				if err != nil {
-					return err
-				}
+				value = ieWithValue.GetUnsigned64Value()
 			}
 			if err = record.AddInfoElement(entities.NewUnsigned64InfoElement(ie, value)); err != nil {
 				return err
@@ -697,16 +612,14 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 // isRecordFromSrc returns true if record belongs to inter-node flow and from source node.
 func isRecordFromSrc(record entities.Record) bool {
 	if srcIEWithValue, _, exist := record.GetInfoElementWithValue("sourcePodName"); exist {
-		srcPodVal, _ := srcIEWithValue.GetStringValue()
-		if srcPodVal == "" {
+		if srcIEWithValue.GetStringValue() == "" {
 			return false
 		}
 	} else {
 		return false
 	}
 	if dstIEWithValue, _, exist := record.GetInfoElementWithValue("destinationPodName"); exist {
-		dstPodVal, _ := dstIEWithValue.GetStringValue()
-		if dstPodVal != "" {
+		if dstIEWithValue.GetStringValue() != "" {
 			return false
 		}
 	}
@@ -716,16 +629,14 @@ func isRecordFromSrc(record entities.Record) bool {
 // isRecordFromDst returns true if record belongs to inter-node flow and from destination node.
 func isRecordFromDst(record entities.Record) bool {
 	if dstIEWithValue, _, exist := record.GetInfoElementWithValue("destinationPodName"); exist {
-		dstPodVal, _ := dstIEWithValue.GetStringValue()
-		if dstPodVal == "" {
+		if dstIEWithValue.GetStringValue() == "" {
 			return false
 		}
 	} else {
 		return false
 	}
 	if srcIEWithValue, _, exist := record.GetInfoElementWithValue("sourcePodName"); exist {
-		srcPodVal, _ := srcIEWithValue.GetStringValue()
-		if srcPodVal != "" {
+		if srcIEWithValue.GetStringValue() != "" {
 			return false
 		}
 	}
@@ -764,30 +675,22 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 			if !exist {
 				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
-			port, err := element.GetUnsigned16Value()
-			if err != nil {
-				return nil, false, err
-			}
 			if name == "sourceTransportPort" {
-				flowKey.SourcePort = port
+				flowKey.SourcePort = element.GetUnsigned16Value()
 			} else {
-				flowKey.DestinationPort = port
+				flowKey.DestinationPort = element.GetUnsigned16Value()
 			}
 		case "sourceIPv4Address", "destinationIPv4Address":
 			element, _, exist := record.GetInfoElementWithValue(name)
 			if !exist {
 				break
 			}
-			addr, err := element.GetIPAddressValue()
-			if err != nil {
-				return nil, false, err
-			}
 			if strings.Contains(name, "source") {
 				isSrcIPv4Filled = true
-				flowKey.SourceAddress = addr.String()
+				flowKey.SourceAddress = element.GetIPAddressValue().String()
 			} else {
 				isDstIPv4Filled = true
-				flowKey.DestinationAddress = addr.String()
+				flowKey.DestinationAddress = element.GetIPAddressValue().String()
 			}
 		case "sourceIPv6Address", "destinationIPv6Address":
 			element, _, exist := record.GetInfoElementWithValue(name)
@@ -800,25 +703,17 @@ func getFlowKeyFromRecord(record entities.Record) (*FlowKey, bool, error) {
 			if !exist {
 				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
-			addr, err := element.GetIPAddressValue()
-			if err != nil {
-				return nil, false, err
-			}
 			if strings.Contains(name, "source") {
-				flowKey.SourceAddress = addr.String()
+				flowKey.SourceAddress = element.GetIPAddressValue().String()
 			} else {
-				flowKey.DestinationAddress = addr.String()
+				flowKey.DestinationAddress = element.GetIPAddressValue().String()
 			}
 		case "protocolIdentifier":
 			element, _, exist := record.GetInfoElementWithValue(name)
 			if !exist {
 				return nil, false, fmt.Errorf("%s does not exist", name)
 			}
-			proto, err := element.GetUnsigned8Value()
-			if err != nil {
-				return nil, false, err
-			}
-			flowKey.Protocol = proto
+			flowKey.Protocol = element.GetUnsigned8Value()
 		}
 	}
 	return flowKey, isSrcIPv4Filled && isDstIPv4Filled, nil
@@ -834,13 +729,13 @@ func validateDataRecord(record entities.Record) bool {
 func isCorrelationRequired(flowType uint8, record entities.Record) bool {
 	if flowType == registry.FlowTypeInterNode {
 		if egressRuleActionIe, _, exist := record.GetInfoElementWithValue("egressNetworkPolicyRuleAction"); exist {
-			egressRuleAction, _ := egressRuleActionIe.GetUnsigned8Value()
+			egressRuleAction := egressRuleActionIe.GetUnsigned8Value()
 			if egressRuleAction == registry.NetworkPolicyRuleActionDrop || egressRuleAction == registry.NetworkPolicyRuleActionReject {
 				return false
 			}
 		}
 		if ingressRuleActionIe, _, exist := record.GetInfoElementWithValue("ingressNetworkPolicyRuleAction"); exist {
-			ingressRuleAction, _ := ingressRuleActionIe.GetUnsigned8Value()
+			ingressRuleAction := ingressRuleActionIe.GetUnsigned8Value()
 			if ingressRuleAction == registry.NetworkPolicyRuleActionReject {
 				return false
 			}

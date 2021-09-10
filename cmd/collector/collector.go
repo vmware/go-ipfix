@@ -85,120 +85,41 @@ func printIPFIXMessage(msg *entities.Message) {
 				elem := ie.GetInfoElement()
 				switch elem.DataType {
 				case entities.Unsigned8:
-					val, err := ie.GetUnsigned8Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned8Value())
 				case entities.Unsigned16:
-					val, err := ie.GetUnsigned16Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned16Value())
 				case entities.Unsigned32:
-					val, err := ie.GetUnsigned32Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
 				case entities.Unsigned64:
-					val, err := ie.GetUnsigned64Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned64Value())
 				case entities.Signed8:
-					val, err := ie.GetSigned8Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned8Value())
 				case entities.Signed16:
-					val, err := ie.GetSigned16Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned16Value())
 				case entities.Signed32:
-					val, err := ie.GetSigned32Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned32Value())
 				case entities.Signed64:
-					val, err := ie.GetSigned64Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned64Value())
 				case entities.Float32:
-					val, err := ie.GetFloat32Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetFloat32Value())
 				case entities.Float64:
-					val, err := ie.GetFloat64Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetFloat64Value())
 				case entities.Boolean:
-					val, err := ie.GetBooleanValue()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetBooleanValue())
 				case entities.DateTimeSeconds:
-					val, err := ie.GetUnsigned32Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
 				case entities.DateTimeMilliseconds:
-					val, err := ie.GetUnsigned64Value()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned64Value())
 				case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
 					err := fmt.Errorf("API does not support micro and nano seconds types yet")
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
 				case entities.MacAddress:
-					val, err := ie.GetMacAddressValue()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetMacAddressValue())
 				case entities.Ipv4Address, entities.Ipv6Address:
-					val, err := ie.GetIPAddressValue()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetIPAddressValue())
 				case entities.String:
-					val, err := ie.GetStringValue()
-					if err != nil {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-					} else {
-						fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, val)
-					}
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetStringValue())
 				default:
 					err := fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)

@@ -333,55 +333,39 @@ func (ep *ExportingProcess) createAndSendJSONMsg(set entities.Set) (int, error) 
 			infoElem := element.GetInfoElement()
 			switch infoElem.DataType {
 			case entities.Unsigned8:
-				val, _ := element.GetUnsigned8Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetUnsigned8Value()
 			case entities.Unsigned16:
-				val, _ := element.GetUnsigned16Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetUnsigned16Value()
 			case entities.Unsigned32:
-				val, _ := element.GetUnsigned32Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetUnsigned32Value()
 			case entities.Unsigned64:
-				val, _ := element.GetUnsigned64Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetUnsigned64Value()
 			case entities.Signed8:
-				val, _ := element.GetSigned8Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetSigned8Value()
 			case entities.Signed16:
-				val, _ := element.GetSigned16Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetSigned16Value()
 			case entities.Signed32:
-				val, _ := element.GetSigned32Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetSigned32Value()
 			case entities.Signed64:
-				val, _ := element.GetSigned64Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetSigned64Value()
 			case entities.Float32:
-				val, _ := element.GetFloat32Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetFloat32Value()
 			case entities.Float64:
-				val, _ := element.GetFloat64Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetFloat64Value()
 			case entities.Boolean:
-				val, _ := element.GetBooleanValue()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetBooleanValue()
 			case entities.DateTimeSeconds:
-				val, _ := element.GetUnsigned32Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetUnsigned32Value()
 			case entities.DateTimeMilliseconds:
-				val, _ := element.GetUnsigned64Value()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetUnsigned64Value()
 			case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
 				return bytesSent, fmt.Errorf("API does not support micro and nano seconds types yet")
 			case entities.MacAddress:
-				val, _ := element.GetMacAddressValue()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetMacAddressValue()
 			case entities.Ipv4Address, entities.Ipv6Address:
-				val, _ := element.GetIPAddressValue()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetIPAddressValue()
 			case entities.String:
-				val, _ := element.GetStringValue()
-				elements[infoElem.Name] = val
+				elements[infoElem.Name] = element.GetStringValue()
 			default:
 				return bytesSent, fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
 			}
