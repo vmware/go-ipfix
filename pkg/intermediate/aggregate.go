@@ -127,6 +127,13 @@ func (a *AggregationProcess) Stop() {
 	a.stopChan <- true
 }
 
+// GetNumberOfFlows returns total number of connections/flows stored in map
+func (a *AggregationProcess) GetNumberOfFlows() uint64 {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+	return uint64(len(a.flowKeyRecordMap))
+}
+
 // AggregateMsgByFlowKey gets flow key from records in message and stores in cache
 func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) error {
 	set := message.GetSet()
