@@ -76,6 +76,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	cp.Stop()
 	template, _ := cp.getTemplate(1, 256)
 	assert.NotNil(t, template, "TCP Collecting Process should receive and store the received template.")
+	assert.Equal(t, uint64(1), cp.GetNumOfRecordsReceived())
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
@@ -104,7 +105,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	cp.Stop()
 	template, _ := cp.getTemplate(1, 256)
 	assert.NotNil(t, template, "UDP Collecting Process should receive and store the received template.")
-
+	assert.Equal(t, uint64(1), cp.GetNumOfRecordsReceived())
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -140,6 +141,7 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	// Check if connection has closed properly or not by trying to create a new connection.
 	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 	assert.Error(t, err)
+	assert.Equal(t, uint64(1), cp.GetNumOfRecordsReceived())
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -177,6 +179,7 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	_, err = conn.Write(validDataPacket)
 	assert.Error(t, err)
 	conn.Close()
+	assert.Equal(t, uint64(1), cp.GetNumOfRecordsReceived())
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
@@ -200,7 +203,7 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
 		time.Sleep(time.Millisecond)
-		assert.GreaterOrEqual(t, cp.getClientCount(), 2, "There should be at least two tcp clients.")
+		assert.GreaterOrEqual(t, cp.GetNumOfConnToCollector(), 2, "There should be at least two tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
@@ -231,7 +234,7 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 	defer conn2.Close()
 	conn2.Write(validTemplatePacket)
 	time.Sleep(time.Millisecond)
-	assert.GreaterOrEqual(t, cp.getClientCount(), 2, "There should be at least two udp clients.")
+	assert.GreaterOrEqual(t, cp.GetNumOfConnToCollector(), 2, "There should be at least two udp clients.")
 	// there should be two messages received
 	<-cp.GetMsgChan()
 	<-cp.GetMsgChan()
