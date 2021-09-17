@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.8 09-17-2021
+### Added
+- Add visibility of collector ingest rate and aggregator connection count. (#253, @zyiou)
+### Changed
+- Remove connection mutex for exporting process. (#248, @antoninbas)
+- Modify the basic structure NewInfoElementWithValue to reduce memory consumption. (#252, @stati)
+- Remove duplicated code in ie_value.go. (#254, @stati)
 ## 0.5.7 08-12-2021
 ### Fixed
 - Fix unnecessary allocations in the code related to iterating through
