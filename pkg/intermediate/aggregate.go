@@ -395,8 +395,7 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord entities.Record) error {
 	for _, field := range a.correlateFields {
 		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(field); exist {
-			element := ieWithValue.GetInfoElement()
-			switch element.DataType {
+			switch ieWithValue.GetDataType() {
 			case entities.String:
 				val := ieWithValue.GetStringValue()
 				if val != "" {
@@ -436,7 +435,7 @@ func (a *AggregationProcess) correlateRecords(incomingRecord, existingRecord ent
 					existingIeWithValue.SetIPAddressValue(val)
 				}
 			default:
-				klog.Errorf("Fields with dataType %v is not supported in correlation fields list.", element.DataType)
+				klog.Errorf("Fields with dataType %v is not supported in correlation fields list.", ieWithValue.GetDataType())
 			}
 		}
 	}
@@ -463,7 +462,7 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	for _, element := range a.aggregateElements.NonStatsElements {
 		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(element); exist {
 			existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(element)
-			switch ieWithValue.GetInfoElement().Name {
+			switch ieWithValue.GetName() {
 			case "flowEndSeconds":
 				// Flow end timestamp is already updated.
 				break
