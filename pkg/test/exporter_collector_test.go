@@ -186,11 +186,11 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	}
 	assert.Equal(t, uint32(0), templateElements[0].GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
 	if !isIPv6 {
-		assert.Equal(t, "sourceIPv4Address", templateElements[0].GetInfoElement().Name, "Template record is not stored correctly.")
-		assert.Equal(t, "destinationIPv4Address", templateElements[1].GetInfoElement().Name, "Template record is not stored correctly.")
+		assert.Equal(t, "sourceIPv4Address", templateElements[0].GetName(), "Template record is not stored correctly.")
+		assert.Equal(t, "destinationIPv4Address", templateElements[1].GetName(), "Template record is not stored correctly.")
 	} else {
-		assert.Equal(t, "sourceIPv6Address", templateElements[0].GetInfoElement().Name, "Template record is not stored correctly.")
-		assert.Equal(t, "destinationIPv6Address", templateElements[1].GetInfoElement().Name, "Template record is not stored correctly.")
+		assert.Equal(t, "sourceIPv6Address", templateElements[0].GetName(), "Template record is not stored correctly.")
+		assert.Equal(t, "destinationIPv6Address", templateElements[1].GetName(), "Template record is not stored correctly.")
 	}
 	if !isIPv6 {
 		assert.Equal(t, registry.IANAReversedEnterpriseID, templateElements[len(commonFields)+len(ianaIPv4Fields)+len(antreaCommonFields)+len(antreaIPv4)+1].GetInfoElement().EnterpriseId, "Template record is not stored correctly.")

@@ -5,6 +5,8 @@ import (
 )
 
 type InfoElementWithValue interface {
+	GetName() string
+	GetDataType() IEDataType
 	// GetInfoElement retrieves the info element. This is called after AddInfoElement.
 	// TODO: Handle error to make it more robust if it is called prior to AddInfoElement.
 	GetInfoElement() *InfoElement
@@ -44,6 +46,14 @@ type InfoElementWithValue interface {
 
 type baseInfoElement struct {
 	element *InfoElement
+}
+
+func (b *baseInfoElement) GetName() string {
+	return b.element.Name
+}
+
+func (b *baseInfoElement) GetDataType() IEDataType {
+	return b.element.DataType
 }
 
 func (b *baseInfoElement) GetInfoElement() *InfoElement {

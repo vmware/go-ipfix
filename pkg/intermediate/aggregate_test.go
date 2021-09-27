@@ -891,7 +891,7 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 	for _, e := range nonStatsElementList {
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
 		expectedIE, _, _ := dstRecordLatest.GetInfoElementWithValue(e)
-		switch ieWithValue.GetInfoElement().DataType {
+		switch ieWithValue.GetDataType() {
 		case entities.Unsigned8:
 			assert.Equal(t, ieWithValue.GetUnsigned8Value(), expectedIE.GetUnsigned8Value())
 		case entities.String:

@@ -69,8 +69,7 @@ func addAllFieldsToFlowType1(flowMsg *protobuf.FlowType1, record entities.Record
 		var ipVal net.IP
 		var portVal uint16
 		var protoVal uint8
-		element := ie.GetInfoElement()
-		switch element.Name {
+		switch ie.GetName() {
 		case "flowStartSeconds":
 			flowMsg.TimeFlowStartInSecs = ie.GetUnsigned32Value()
 		case "flowEndSeconds":
@@ -142,7 +141,7 @@ func addAllFieldsToFlowType1(flowMsg *protobuf.FlowType1, record entities.Record
 		case "egressNetworkPolicyNamespace":
 			flowMsg.EgressPolicyNamespace = ie.GetStringValue()
 		default:
-			klog.Warningf("There is no field with name: %v in flow message (.proto schema)", element.Name)
+			klog.Warningf("There is no field with name: %v in flow message (.proto schema)", ie.GetName())
 		}
 	}
 }
