@@ -155,10 +155,6 @@ func IENameToType(name string) IEDataType {
 	return InvalidDataType
 }
 
-func IsValidDataType(tp IEDataType) bool {
-	return tp != InvalidDataType
-}
-
 // decodeToIEDataType is to decode to specific type. This is only used for testing.
 func decodeToIEDataType(dataType IEDataType, val interface{}) (interface{}, error) {
 	value, ok := val.([]byte)
@@ -507,11 +503,10 @@ func EncodeToIEDataType(dataType IEDataType, val interface{}) ([]byte, error) {
 
 // encodeInfoElementValueToBuff is to encode data to specific type to the buff
 func encodeInfoElementValueToBuff(element InfoElementWithValue, buffer []byte, index int) error {
-	infoElem := element.GetInfoElement()
 	if index+element.GetLength() > len(buffer) {
 		return fmt.Errorf("buffer size is not enough for encoding")
 	}
-	switch infoElem.DataType {
+	switch element.GetDataType() {
 	case Unsigned8:
 		copy(buffer[index:index+1], []byte{element.GetUnsigned8Value()})
 	case Unsigned16:
