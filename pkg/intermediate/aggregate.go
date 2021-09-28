@@ -215,6 +215,71 @@ func (a *AggregationProcess) GetExpiryFromExpirePriorityQueue() time.Duration {
 	return a.inactiveExpiryTimeout
 }
 
+// GetRecordStrings returns the flow records by FlowKey from flowKeyRecordMap.
+// Returns all the flow records if FlowKey is not provided.
+func (a *AggregationProcess) GetRecordStrings(flowKey *FlowKey) []string {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	var records []string
+	for currentFlowKey, record := range a.flowKeyRecordMap {
+		if flowKey != nil {
+			if (flowKey.SourceAddress != "" && flowKey.SourceAddress != currentFlowKey.SourceAddress) ||
+				(flowKey.DestinationAddress != "" && flowKey.DestinationAddress != currentFlowKey.DestinationAddress) ||
+				(flowKey.Protocol != 0 && flowKey.Protocol != currentFlowKey.Protocol) ||
+				(flowKey.SourcePort != 0 && flowKey.SourcePort != currentFlowKey.SourcePort) ||
+				(flowKey.DestinationPort != 0 && flowKey.DestinationPort != currentFlowKey.DestinationPort) {
+				continue
+			}
+		}
+		var recordString string
+		for _, ie := range record.Record.GetOrderedElementList() {
+			switch ie.GetDataType() {
+			case entities.Unsigned8:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned8Value())
+			case entities.Unsigned16:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned16Value())
+			case entities.Unsigned32:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned32Value())
+			case entities.Unsigned64:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned64Value())
+			case entities.Signed8:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned8Value())
+			case entities.Signed16:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned16Value())
+			case entities.Signed32:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned32Value())
+			case entities.Signed64:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned64Value())
+			case entities.Float32:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetFloat32Value())
+			case entities.Float64:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetFloat64Value())
+			case entities.Boolean:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetBooleanValue())
+			case entities.DateTimeSeconds:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned32Value())
+			case entities.DateTimeMilliseconds:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned64Value())
+			case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
+				err := fmt.Errorf("API does not support micro and nano seconds types yet")
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), err)
+			case entities.MacAddress:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetMacAddressValue())
+			case entities.Ipv4Address, entities.Ipv6Address:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetIPAddressValue())
+			case entities.String:
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetStringValue())
+			default:
+				err := fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
+				recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), err)
+			}
+		}
+		records = append(records, recordString)
+	}
+	return records
+}
+
 func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMapCallBack) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
