@@ -472,6 +472,24 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			existingIeWithValue, index, _ := existingRecord.GetInfoElementWithValue(element)
 			switch ieWithValue.Element.Name {
 			case "flowEndSeconds":
+				srcPodName, _, _ := existingRecord.GetInfoElementWithValue("sourcePodName")
+				dstPodName, _, _ := existingRecord.GetInfoElementWithValue("destinationPodName")
+				octetDeltaCount, _, _ := incomingRecord.GetInfoElementWithValue("octetDeltaCount")
+				octetTotalCount, _, _ := incomingRecord.GetInfoElementWithValue("octetTotalCount")
+				if srcPodName.Value.(string) == "perftest-a" {
+					klog.Info(srcPodName.Value.(string))
+					klog.Info("FLOWENDSECONDS: ", ieWithValue.Value)
+					klog.Info("OCTETDELTACOUNT: ", octetDeltaCount.Value.(uint64))
+					klog.Info("OCTETTOTALCOUNT: ", octetTotalCount.Value.(uint64))
+					klog.Info("\n\n")
+				}
+				if dstPodName.Value.(string) == "perftest-c" {
+					klog.Info(dstPodName.Value.(string))
+					klog.Info("FLOWENDSECONDS: ", ieWithValue.Value)
+					klog.Info("OCTETDELTACOUNT: ", octetDeltaCount.Value.(uint64))
+					klog.Info("OCTETTOTALCOUNT: ", octetTotalCount.Value.(uint64))
+					klog.Info("\n\n")
+				}
 				// Update flow end timestamp if it is latest.
 				if isLatest {
 					existingIeWithValue.Value = ieWithValue.Value
