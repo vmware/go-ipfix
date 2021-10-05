@@ -15,6 +15,7 @@
 package entities
 
 import (
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -164,4 +165,98 @@ func TestGetInfoElementWithValue(t *testing.T) {
 	assert.Equal(t, net.ParseIP("10.0.0.1"), infoElementWithValue.GetIPAddressValue())
 	infoElementWithValue, _, _ = dataRec.GetInfoElementWithValue("destinationIPv4Address")
 	assert.Empty(t, infoElementWithValue)
+}
+
+func TestGetString(t *testing.T) {
+	ieList := []*InfoElement{
+		// Test element of each type
+		NewInfoElement("protocolIdentifier", 4, 1, 0, 1),  // unsigned8
+		NewInfoElement("sourceTransportPort", 7, 2, 0, 2), // unsigned16
+		NewInfoElement("ingressInterface", 10, 3, 0, 4),   // unsigned32
+		NewInfoElement("packetDeltaCount", 2, 4, 0, 8),    // unsigned64
+		// No elements of signed8, signed16 and signed64 in IANA registry
+		NewInfoElement("mibObjectValueInteger", 434, 7, 0, 4), // signed32
+		// No elements of float32 in IANA registry
+		NewInfoElement("samplingProbability", 311, 10, 0, 8),     // float64
+		NewInfoElement("dataRecordsReliability", 276, 11, 0, 1),  // boolean
+		NewInfoElement("sourceMacAddress", 56, 12, 0, 6),         // mac address
+		NewInfoElement("sourceIPv4Address", 8, 18, 0, 4),         // IP Address
+		NewInfoElement("interfaceDescription", 83, 13, 0, 65535), // String
+		NewInfoElement("flowStartSeconds", 150, 14, 0, 4),        // dateTimeSeconds
+		NewInfoElement("flowStartMilliseconds", 152, 15, 0, 8),   // dateTimeMilliseconds
+	}
+	macAddress, _ := net.ParseMAC("aa:bb:cc:dd:ee:ff")
+	type valData struct {
+		proto              uint8
+		srcPort            uint16
+		ingressInt         uint32
+		pktCount           uint64
+		minObjVal          int32
+		samplingProb       float64
+		dataReliable       bool
+		macAddr            net.HardwareAddr
+		ipAddr             net.IP
+		stringVal          string
+		flowStartSecs      uint32
+		flowStartMillisecs uint64
+	}
+	valList := valData{
+		uint8(0x1),                  // ICMP proto
+		uint16(443),                 // https port
+		uint32(1000),                // ingress interface ID
+		uint64(100000),              // packet count
+		int32(-12345),               // mibObjectValueInteger
+		0.856,                       // samplingProbability
+		true,                        // dataRecordsReliability
+		macAddress,                  // mac address
+		net.ParseIP("1.2.3.4"),      // IP Address
+		"My Interface in IPFIX lib", // String
+		uint32(time.Now().Unix()),   // dateTimeSeconds
+		uint64(time.Now().Unix()),   // dateTimeMilliseconds
+	}
+	record := NewDataRecord(uniqueTemplateID, len(ieList), 0, false)
+
+	for _, testIE := range ieList {
+		var ie InfoElementWithValue
+		switch testIE.Name {
+		case "protocolIdentifier":
+			ie = NewUnsigned8InfoElement(testIE, valList.proto)
+		case "sourceTransportPort":
+			ie = NewUnsigned16InfoElement(testIE, valList.srcPort)
+		case "ingressInterface":
+			ie = NewUnsigned32InfoElement(testIE, valList.ingressInt)
+		case "packetDeltaCount":
+			ie = NewUnsigned64InfoElement(testIE, valList.pktCount)
+		case "mibObjectValueInteger":
+			ie = NewSigned32InfoElement(testIE, valList.minObjVal)
+		case "samplingProbability":
+			ie = NewFloat64InfoElement(testIE, valList.samplingProb)
+		case "dataRecordsReliability":
+			ie = NewBoolInfoElement(testIE, valList.dataReliable)
+		case "flowStartSeconds":
+			ie = NewDateTimeSecondsInfoElement(testIE, valList.flowStartSecs)
+		case "flowStartMilliseconds":
+			ie = NewDateTimeMillisecondsInfoElement(testIE, valList.flowStartMillisecs)
+		case "sourceMacAddress":
+			ie = NewMacAddressInfoElement(testIE, valList.macAddr)
+		case "sourceIPv4Address":
+			ie = NewIPAddressInfoElement(testIE, valList.ipAddr)
+		case "interfaceDescription":
+			ie = NewStringInfoElement(testIE, valList.stringVal)
+		}
+		record.AddInfoElement(ie)
+	}
+	recordString := record.GetString()
+	assert.Contains(t, recordString, fmt.Sprintf("    protocolIdentifier: %d \n", valList.proto))
+	assert.Contains(t, recordString, fmt.Sprintf("    sourceTransportPort: %d \n", valList.srcPort))
+	assert.Contains(t, recordString, fmt.Sprintf("    ingressInterface: %d \n", valList.ingressInt))
+	assert.Contains(t, recordString, fmt.Sprintf("    packetDeltaCount: %d \n", valList.pktCount))
+	assert.Contains(t, recordString, fmt.Sprintf("    mibObjectValueInteger: %d \n", valList.minObjVal))
+	assert.Contains(t, recordString, fmt.Sprintf("    samplingProbability: %v \n", valList.samplingProb))
+	assert.Contains(t, recordString, fmt.Sprintf("    dataRecordsReliability: %t \n", valList.dataReliable))
+	assert.Contains(t, recordString, fmt.Sprintf("    flowStartSeconds: %d \n", valList.flowStartSecs))
+	assert.Contains(t, recordString, fmt.Sprintf("    flowStartMilliseconds: %d \n", valList.flowStartMillisecs))
+	assert.Contains(t, recordString, fmt.Sprintf("    sourceMacAddress: %s \n", valList.macAddr))
+	assert.Contains(t, recordString, fmt.Sprintf("    sourceIPv4Address: %s \n", valList.ipAddr))
+	assert.Contains(t, recordString, fmt.Sprintf("    interfaceDescription: %s \n", valList.stringVal))
 }
