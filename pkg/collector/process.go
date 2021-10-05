@@ -137,19 +137,19 @@ func (cp *CollectingProcess) CloseMsgChan() {
 	close(cp.messageChan)
 }
 
-func (cp *CollectingProcess) GetNumOfRecordsReceived() uint64 {
+func (cp *CollectingProcess) GetNumRecordsReceived() int64 {
 	cp.mutex.RLock()
 	defer cp.mutex.RUnlock()
-	return cp.numOfRecordsReceived
+	return int64(cp.numOfRecordsReceived)
 }
 
-func (cp *CollectingProcess) GetNumOfConnToCollector() int {
+func (cp *CollectingProcess) GetNumConnToCollector() int64 {
 	cp.mutex.RLock()
 	defer cp.mutex.RUnlock()
-	return len(cp.clients)
+	return int64(len(cp.clients))
 }
 
-func (cp *CollectingProcess) incrementNumOfRecordsReceived() {
+func (cp *CollectingProcess) incrementNumRecordsReceived() {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 	cp.numOfRecordsReceived = cp.numOfRecordsReceived + 1
@@ -214,7 +214,7 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 
 	// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
 	cp.messageChan <- message
-	cp.incrementNumOfRecordsReceived()
+	cp.incrementNumRecordsReceived()
 	return message, nil
 }
 
