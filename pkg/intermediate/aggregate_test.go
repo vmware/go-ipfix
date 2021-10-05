@@ -694,6 +694,103 @@ func TestGetExpiryFromExpirePriorityQueue(t *testing.T) {
 	}
 }
 
+func assertRecordString(t *testing.T, recordString string, ipv6 bool) {
+	if ipv6 {
+		assert.Contains(t, recordString, "    sourceIPv6Address: 2001:0:3238:dfe1:63::fefb \n")
+		assert.Contains(t, recordString, "    destinationIPv6Address: 2001:0:3238:dfe1:63::fefc \n")
+		assert.Contains(t, recordString, "    destinationClusterIPv6: 2001:0:3238:bbbb:63::aaaa \n")
+	} else {
+		assert.Contains(t, recordString, "    sourceIPv4Address: 10.0.0.1 \n")
+		assert.Contains(t, recordString, "    destinationIPv4Address: 10.0.0.2 \n")
+		assert.Contains(t, recordString, "    destinationClusterIPv4: 192.168.0.1 \n")
+	}
+	assert.Contains(t, recordString, "    sourceTransportPort: 1234 \n")
+	assert.Contains(t, recordString, "    destinationTransportPort: 5678 \n")
+	assert.Contains(t, recordString, "    protocolIdentifier: 6 \n")
+	assert.Contains(t, recordString, "    sourcePodName: pod1 \n")
+	assert.Contains(t, recordString, "    destinationPodName: pod2 \n")
+	assert.Contains(t, recordString, "    destinationServicePort: 4739 \n")
+	assert.Contains(t, recordString, "    flowEndSeconds: 1 \n")
+	assert.Contains(t, recordString, "    flowType: 2 \n")
+	assert.Contains(t, recordString, "    flowEndReason: 2 \n")
+	assert.Contains(t, recordString, "    tcpState: ESTABLISHED \n")
+	assert.Contains(t, recordString, "    ingressNetworkPolicyRuleAction: 0 \n")
+	assert.Contains(t, recordString, "    egressNetworkPolicyRuleAction: 0 \n")
+	assert.Contains(t, recordString, "    ingressNetworkPolicyRulePriority: 50000 \n")
+	assert.Contains(t, recordString, "    packetTotalCount: 500 \n")
+	assert.Contains(t, recordString, "    packetDeltaCount: 0 \n")
+	assert.Contains(t, recordString, "    reversePacketTotalCount: 500 \n")
+	assert.Contains(t, recordString, "    reversePacketDeltaCount: 0 \n")
+}
+
+func TestGetRecords(t *testing.T) {
+	messageChan := make(chan *entities.Message)
+	input := AggregationInput{
+		MessageChan:           messageChan,
+		WorkerNum:             2,
+		CorrelateFields:       fields,
+		ActiveExpiryTimeout:   testActiveExpiry,
+		InactiveExpiryTimeout: testInactiveExpiry,
+	}
+	ap, _ := InitAggregationProcess(input)
+
+	// Add records with IPv4 fields.
+	recordIPv4Src := createDataMsgForSrc(t, false, false, false, false, false).GetSet().GetRecords()[0]
+	recordIPv4Dst := createDataMsgForDst(t, false, false, false, false, false).GetSet().GetRecords()[0]
+	// Add records with IPv6 fields.
+	recordIPv6Src := createDataMsgForSrc(t, true, false, false, false, false).GetSet().GetRecords()[0]
+	recordIPv6Dst := createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
+	records := []entities.Record{recordIPv4Src, recordIPv4Dst, recordIPv6Src, recordIPv6Dst}
+	for _, record := range records {
+		flowKey, isIPv4, _ := getFlowKeyFromRecord(record)
+		err := ap.addOrUpdateRecordInMap(flowKey, record, isIPv4)
+		assert.NoError(t, err)
+	}
+
+	flowKeyIPv4, _, _ := getFlowKeyFromRecord(recordIPv4Src)
+	partialFlowKeyIPv6 := &FlowKey{
+		SourceAddress: "2001:0:3238:dfe1:63::fefb",
+	}
+	testCases := []struct {
+		name        string
+		flowKey     *FlowKey
+		expectedLen int
+	}{
+		{
+			"Empty flowkey",
+			nil,
+			2,
+		},
+		{
+			"IPv4 flowkey",
+			flowKeyIPv4,
+			1,
+		},
+		{
+			"IPv6 flowkey",
+			partialFlowKeyIPv6,
+			1,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			recordStrings := ap.GetRecords(tc.flowKey)
+			assert.Equalf(t, tc.expectedLen, len(recordStrings), "%s: Number of records string is incorrect, expected %d got %d", tc.name, tc.expectedLen, len(recordStrings))
+			if tc.flowKey != nil {
+				assertRecordString(t, recordStrings[0], tc.name == "IPv6 flowkey")
+			} else {
+				if strings.Contains(recordStrings[0], "sourceIPv6Address") {
+					assertRecordString(t, recordStrings[0], true)
+					assertRecordString(t, recordStrings[1], false)
+				} else {
+					assertRecordString(t, recordStrings[0], false)
+					assertRecordString(t, recordStrings[1], true)
+				}
+			}
+		})
+	}
+}
+
 func TestForAllExpiredFlowRecordsDo(t *testing.T) {
 	messageChan := make(chan *entities.Message)
 	input := AggregationInput{

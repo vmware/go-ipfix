@@ -215,6 +215,38 @@ func (a *AggregationProcess) GetExpiryFromExpirePriorityQueue() time.Duration {
 	return a.inactiveExpiryTimeout
 }
 
+// GetRecords returns the string format flow records by FlowKey from flowKeyRecordMap.
+// Returns partial match if FlowKey is not complete.
+// Returns all the flow records if FlowKey is not provided.
+func (a *AggregationProcess) GetRecords(flowKey *FlowKey) []string {
+	a.mutex.Lock()
+	defer a.mutex.Unlock()
+
+	var records []string
+	// Complete filter
+	if flowKey != nil && flowKey.SourceAddress != "" && flowKey.DestinationAddress != "" &&
+		flowKey.Protocol != 0 && flowKey.SourcePort != 0 && flowKey.DestinationPort != 0 {
+		if record, ok := a.flowKeyRecordMap[*flowKey]; ok {
+			records = append(records, record.Record.GetString())
+		}
+		return records
+	}
+	// Partial filter
+	for currentFlowKey, record := range a.flowKeyRecordMap {
+		if flowKey != nil {
+			if (flowKey.SourceAddress != "" && flowKey.SourceAddress != currentFlowKey.SourceAddress) ||
+				(flowKey.DestinationAddress != "" && flowKey.DestinationAddress != currentFlowKey.DestinationAddress) ||
+				(flowKey.Protocol != 0 && flowKey.Protocol != currentFlowKey.Protocol) ||
+				(flowKey.SourcePort != 0 && flowKey.SourcePort != currentFlowKey.SourcePort) ||
+				(flowKey.DestinationPort != 0 && flowKey.DestinationPort != currentFlowKey.DestinationPort) {
+				continue
+			}
+		}
+		records = append(records, record.Record.GetString())
+	}
+	return records
+}
+
 func (a *AggregationProcess) ForAllExpiredFlowRecordsDo(callback FlowKeyRecordMapCallBack) error {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
