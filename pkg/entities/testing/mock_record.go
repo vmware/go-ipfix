@@ -147,6 +147,20 @@ func (mr *MockRecordMockRecorder) GetRecordLength() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordLength", reflect.TypeOf((*MockRecord)(nil).GetRecordLength))
 }
 
+// GetString mocks base method
+func (m *MockRecord) GetString() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetString")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetString indicates an expected call of GetString
+func (mr *MockRecordMockRecorder) GetString() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetString", reflect.TypeOf((*MockRecord)(nil).GetString))
+}
+
 // GetTemplateID mocks base method
 func (m *MockRecord) GetTemplateID() uint16 {
 	m.ctrl.T.Helper()
