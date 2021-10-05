@@ -404,7 +404,7 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	message = createDataMsgForSrc(t, false, false, false, false, false)
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
-	assert.NotZero(t, uint64(1), aggregationProcess.GetNumberOfFlows())
+	assert.NotZero(t, uint64(1), aggregationProcess.GetNumFlows())
 	assert.NotZero(t, aggregationProcess.expirePriorityQueue.Len())
 	flowKey := FlowKey{"10.0.0.1", "10.0.0.2", 6, 1234, 5678}
 	aggRecord := aggregationProcess.flowKeyRecordMap[flowKey]
@@ -421,13 +421,13 @@ func TestAggregateMsgByFlowKey(t *testing.T) {
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
 	// It should have only data record with IPv4 fields that is added before.
-	assert.Equal(t, uint64(1), aggregationProcess.GetNumberOfFlows())
+	assert.Equal(t, int64(1), aggregationProcess.GetNumFlows())
 	assert.Equal(t, 1, aggregationProcess.expirePriorityQueue.Len())
 	// Data record with IPv6 addresses should be processed and stored correctly
 	message = createDataMsgForSrc(t, true, false, false, false, false)
 	err = aggregationProcess.AggregateMsgByFlowKey(message)
 	assert.NoError(t, err)
-	assert.Equal(t, uint64(2), aggregationProcess.GetNumberOfFlows())
+	assert.Equal(t, int64(2), aggregationProcess.GetNumFlows())
 	assert.Equal(t, 2, aggregationProcess.expirePriorityQueue.Len())
 	flowKey = FlowKey{"2001:0:3238:dfe1:63::fefb", "2001:0:3238:dfe1:63::fefc", 6, 1234, 5678}
 	assert.NotNil(t, aggregationProcess.flowKeyRecordMap[flowKey])
@@ -638,10 +638,10 @@ func TestDeleteFlowKeyFromMapWithLock(t *testing.T) {
 		areExternalFieldsFilled:   false,
 	}
 	aggregationProcess.flowKeyRecordMap[flowKey1] = aggFlowRecord
-	assert.Equal(t, uint64(1), aggregationProcess.GetNumberOfFlows())
+	assert.Equal(t, int64(1), aggregationProcess.GetNumFlows())
 	err := aggregationProcess.deleteFlowKeyFromMap(flowKey2)
 	assert.Error(t, err)
-	assert.Equal(t, uint64(1), aggregationProcess.GetNumberOfFlows())
+	assert.Equal(t, int64(1), aggregationProcess.GetNumFlows())
 	err = aggregationProcess.deleteFlowKeyFromMap(flowKey1)
 	assert.NoError(t, err)
 	assert.Empty(t, aggregationProcess.flowKeyRecordMap)
@@ -909,7 +909,7 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 		err = ap.addOrUpdateRecordInMap(flowKey2, record2, isIPv4)
 		assert.NoError(t, err)
 	}
-	assert.Equal(t, uint64(1), ap.GetNumberOfFlows())
+	assert.Equal(t, int64(1), ap.GetNumFlows())
 	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
 	aggRecord, _ := ap.flowKeyRecordMap[*flowKey1]
 	item = ap.expirePriorityQueue.Peek()
@@ -966,7 +966,7 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 		err = ap.addOrUpdateRecordInMap(flowKey, dstRecordLatest, isIPv4)
 		assert.NoError(t, err)
 	}
-	assert.Equal(t, uint64(1), ap.GetNumberOfFlows())
+	assert.Equal(t, int64(1), ap.GetNumFlows())
 	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
 	aggRecord, _ := ap.flowKeyRecordMap[*flowKey]
 	item = ap.expirePriorityQueue.Peek()
