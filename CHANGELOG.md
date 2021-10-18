@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.9 10-18-2021
+### Added
+- Add GetName and GetDataType method to infoElementWithValue. (#259, @zyiou)
+- Add GetRecords method to AggregationProcess. (#261, @yanjunz97)
+### Changed
+- Remove UDP message checks. (#241, @srikartati)
+- Modify flow visibility methods and return type. (#262, @zyiou)
 ## 0.5.8 09-17-2021
 ### Added
 - Add visibility of collector ingest rate and aggregator connection count. (#253, @zyiou)
