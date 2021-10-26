@@ -55,6 +55,10 @@ type AggregationElements struct {
 	StatsElements                      []string
 	AggregatedSourceStatsElements      []string
 	AggregatedDestinationStatsElements []string
+	AntreaFlowEndSecondsElements       []string
+	ThroughputElements                 []string
+	SourceThroughputElements           []string
+	DestinationThroughputElements      []string
 }
 
 type FlowKeyRecordMapCallBack func(key FlowKey, record *AggregationFlowRecord) error
