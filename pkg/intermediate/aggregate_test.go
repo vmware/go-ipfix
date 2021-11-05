@@ -694,33 +694,33 @@ func TestGetExpiryFromExpirePriorityQueue(t *testing.T) {
 	}
 }
 
-func assertRecordString(t *testing.T, recordString string, ipv6 bool) {
+func assertElementMap(t *testing.T, record map[string]interface{}, ipv6 bool) {
 	if ipv6 {
-		assert.Contains(t, recordString, "    sourceIPv6Address: 2001:0:3238:dfe1:63::fefb \n")
-		assert.Contains(t, recordString, "    destinationIPv6Address: 2001:0:3238:dfe1:63::fefc \n")
-		assert.Contains(t, recordString, "    destinationClusterIPv6: 2001:0:3238:bbbb:63::aaaa \n")
+		assert.Equal(t, net.ParseIP("2001:0:3238:dfe1:63::fefb"), record["sourceIPv6Address"])
+		assert.Equal(t, net.ParseIP("2001:0:3238:dfe1:63::fefc"), record["destinationIPv6Address"])
+		assert.Equal(t, net.ParseIP("2001:0:3238:bbbb:63::aaaa"), record["destinationClusterIPv6"])
 	} else {
-		assert.Contains(t, recordString, "    sourceIPv4Address: 10.0.0.1 \n")
-		assert.Contains(t, recordString, "    destinationIPv4Address: 10.0.0.2 \n")
-		assert.Contains(t, recordString, "    destinationClusterIPv4: 192.168.0.1 \n")
+		assert.Equal(t, net.ParseIP("10.0.0.1").To4(), record["sourceIPv4Address"])
+		assert.Equal(t, net.ParseIP("10.0.0.2").To4(), record["destinationIPv4Address"])
+		assert.Equal(t, net.ParseIP("192.168.0.1").To4(), record["destinationClusterIPv4"])
 	}
-	assert.Contains(t, recordString, "    sourceTransportPort: 1234 \n")
-	assert.Contains(t, recordString, "    destinationTransportPort: 5678 \n")
-	assert.Contains(t, recordString, "    protocolIdentifier: 6 \n")
-	assert.Contains(t, recordString, "    sourcePodName: pod1 \n")
-	assert.Contains(t, recordString, "    destinationPodName: pod2 \n")
-	assert.Contains(t, recordString, "    destinationServicePort: 4739 \n")
-	assert.Contains(t, recordString, "    flowEndSeconds: 1 \n")
-	assert.Contains(t, recordString, "    flowType: 2 \n")
-	assert.Contains(t, recordString, "    flowEndReason: 2 \n")
-	assert.Contains(t, recordString, "    tcpState: ESTABLISHED \n")
-	assert.Contains(t, recordString, "    ingressNetworkPolicyRuleAction: 0 \n")
-	assert.Contains(t, recordString, "    egressNetworkPolicyRuleAction: 0 \n")
-	assert.Contains(t, recordString, "    ingressNetworkPolicyRulePriority: 50000 \n")
-	assert.Contains(t, recordString, "    packetTotalCount: 500 \n")
-	assert.Contains(t, recordString, "    packetDeltaCount: 0 \n")
-	assert.Contains(t, recordString, "    reversePacketTotalCount: 500 \n")
-	assert.Contains(t, recordString, "    reversePacketDeltaCount: 0 \n")
+	assert.Equal(t, uint16(1234), record["sourceTransportPort"])
+	assert.Equal(t, uint16(5678), record["destinationTransportPort"])
+	assert.Equal(t, uint8(6), record["protocolIdentifier"])
+	assert.Equal(t, "pod1", record["sourcePodName"])
+	assert.Equal(t, "pod2", record["destinationPodName"])
+	assert.Equal(t, uint16(4739), record["destinationServicePort"])
+	assert.Equal(t, uint32(1), record["flowEndSeconds"])
+	assert.Equal(t, uint8(2), record["flowType"])
+	assert.Equal(t, uint8(2), record["flowEndReason"])
+	assert.Equal(t, "ESTABLISHED", record["tcpState"])
+	assert.Equal(t, uint8(0), record["ingressNetworkPolicyRuleAction"])
+	assert.Equal(t, uint8(0), record["egressNetworkPolicyRuleAction"])
+	assert.Equal(t, int32(50000), record["ingressNetworkPolicyRulePriority"])
+	assert.Equal(t, uint64(500), record["packetTotalCount"])
+	assert.Equal(t, uint64(0), record["packetDeltaCount"])
+	assert.Equal(t, uint64(500), record["reversePacketTotalCount"])
+	assert.Equal(t, uint64(0), record["reversePacketDeltaCount"])
 }
 
 func TestGetRecords(t *testing.T) {
@@ -740,6 +740,7 @@ func TestGetRecords(t *testing.T) {
 	// Add records with IPv6 fields.
 	recordIPv6Src := createDataMsgForSrc(t, true, false, false, false, false).GetSet().GetRecords()[0]
 	recordIPv6Dst := createDataMsgForDst(t, true, false, false, false, false).GetSet().GetRecords()[0]
+
 	records := []entities.Record{recordIPv4Src, recordIPv4Dst, recordIPv6Src, recordIPv6Dst}
 	for _, record := range records {
 		flowKey, isIPv4, _ := getFlowKeyFromRecord(record)
@@ -774,17 +775,17 @@ func TestGetRecords(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			recordStrings := ap.GetRecords(tc.flowKey)
-			assert.Equalf(t, tc.expectedLen, len(recordStrings), "%s: Number of records string is incorrect, expected %d got %d", tc.name, tc.expectedLen, len(recordStrings))
+			records := ap.GetRecords(tc.flowKey)
+			assert.Equalf(t, tc.expectedLen, len(records), "%s: Number of records string is incorrect, expected %d got %d", tc.name, tc.expectedLen, len(records))
 			if tc.flowKey != nil {
-				assertRecordString(t, recordStrings[0], tc.name == "IPv6 flowkey")
+				assertElementMap(t, records[0], tc.name == "IPv6 flowkey")
 			} else {
-				if strings.Contains(recordStrings[0], "sourceIPv6Address") {
-					assertRecordString(t, recordStrings[0], true)
-					assertRecordString(t, recordStrings[1], false)
+				if _, ok := records[0]["sourceIPv6Address"]; ok {
+					assertElementMap(t, records[0], true)
+					assertElementMap(t, records[1], false)
 				} else {
-					assertRecordString(t, recordStrings[0], false)
-					assertRecordString(t, recordStrings[1], true)
+					assertElementMap(t, records[0], false)
+					assertElementMap(t, records[1], true)
 				}
 			}
 		})

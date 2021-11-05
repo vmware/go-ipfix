@@ -15,7 +15,6 @@
 package entities
 
 import (
-	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -167,7 +166,7 @@ func TestGetInfoElementWithValue(t *testing.T) {
 	assert.Empty(t, infoElementWithValue)
 }
 
-func TestGetString(t *testing.T) {
+func TestGetElementMap(t *testing.T) {
 	ieList := []*InfoElement{
 		// Test element of each type
 		NewInfoElement("protocolIdentifier", 4, 1, 0, 1),  // unsigned8
@@ -246,17 +245,17 @@ func TestGetString(t *testing.T) {
 		}
 		record.AddInfoElement(ie)
 	}
-	recordString := record.GetString()
-	assert.Contains(t, recordString, fmt.Sprintf("    protocolIdentifier: %d \n", valList.proto))
-	assert.Contains(t, recordString, fmt.Sprintf("    sourceTransportPort: %d \n", valList.srcPort))
-	assert.Contains(t, recordString, fmt.Sprintf("    ingressInterface: %d \n", valList.ingressInt))
-	assert.Contains(t, recordString, fmt.Sprintf("    packetDeltaCount: %d \n", valList.pktCount))
-	assert.Contains(t, recordString, fmt.Sprintf("    mibObjectValueInteger: %d \n", valList.minObjVal))
-	assert.Contains(t, recordString, fmt.Sprintf("    samplingProbability: %v \n", valList.samplingProb))
-	assert.Contains(t, recordString, fmt.Sprintf("    dataRecordsReliability: %t \n", valList.dataReliable))
-	assert.Contains(t, recordString, fmt.Sprintf("    flowStartSeconds: %d \n", valList.flowStartSecs))
-	assert.Contains(t, recordString, fmt.Sprintf("    flowStartMilliseconds: %d \n", valList.flowStartMillisecs))
-	assert.Contains(t, recordString, fmt.Sprintf("    sourceMacAddress: %s \n", valList.macAddr))
-	assert.Contains(t, recordString, fmt.Sprintf("    sourceIPv4Address: %s \n", valList.ipAddr))
-	assert.Contains(t, recordString, fmt.Sprintf("    interfaceDescription: %s \n", valList.stringVal))
+	elements := record.GetElementMap()
+	assert.Equal(t, valList.proto, elements["protocolIdentifier"])
+	assert.Equal(t, valList.srcPort, elements["sourceTransportPort"])
+	assert.Equal(t, valList.ingressInt, elements["ingressInterface"])
+	assert.Equal(t, valList.pktCount, elements["packetDeltaCount"])
+	assert.Equal(t, valList.minObjVal, elements["mibObjectValueInteger"])
+	assert.Equal(t, valList.samplingProb, elements["samplingProbability"])
+	assert.Equal(t, valList.dataReliable, elements["dataRecordsReliability"])
+	assert.Equal(t, valList.flowStartSecs, elements["flowStartSeconds"])
+	assert.Equal(t, valList.flowStartMillisecs, elements["flowStartMilliseconds"])
+	assert.Equal(t, valList.macAddr, elements["sourceMacAddress"])
+	assert.Equal(t, valList.ipAddr, elements["sourceIPv4Address"])
+	assert.Equal(t, valList.stringVal, elements["interfaceDescription"])
 }
