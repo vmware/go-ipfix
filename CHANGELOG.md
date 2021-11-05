@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.10 11-05-2021
+### Changed
+- Update GetRecords in AggregationProcess to return map format records. (#271, @yanjunz97)
 ## 0.5.9 10-18-2021
 ### Added
 - Add GetName and GetDataType method to infoElementWithValue. (#259, @zyiou)
