@@ -75,6 +75,20 @@ func (mr *MockRecordMockRecorder) GetBuffer() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBuffer", reflect.TypeOf((*MockRecord)(nil).GetBuffer))
 }
 
+// GetElementMap mocks base method
+func (m *MockRecord) GetElementMap() map[string]interface{} {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetElementMap")
+	ret0, _ := ret[0].(map[string]interface{})
+	return ret0
+}
+
+// GetElementMap indicates an expected call of GetElementMap
+func (mr *MockRecordMockRecorder) GetElementMap() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetElementMap", reflect.TypeOf((*MockRecord)(nil).GetElementMap))
+}
+
 // GetFieldCount mocks base method
 func (m *MockRecord) GetFieldCount() uint16 {
 	m.ctrl.T.Helper()
@@ -145,20 +159,6 @@ func (m *MockRecord) GetRecordLength() int {
 func (mr *MockRecordMockRecorder) GetRecordLength() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecordLength", reflect.TypeOf((*MockRecord)(nil).GetRecordLength))
-}
-
-// GetString mocks base method
-func (m *MockRecord) GetString() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetString")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetString indicates an expected call of GetString
-func (mr *MockRecordMockRecorder) GetString() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetString", reflect.TypeOf((*MockRecord)(nil).GetString))
 }
 
 // GetTemplateID mocks base method

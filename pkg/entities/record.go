@@ -40,7 +40,7 @@ type Record interface {
 	GetInfoElementWithValue(name string) (InfoElementWithValue, int, bool)
 	GetRecordLength() int
 	GetMinDataRecordLen() uint16
-	GetString() string
+	GetElementMap() map[string]interface{}
 }
 
 type baseRecord struct {
@@ -112,51 +112,52 @@ func (b *baseRecord) GetInfoElementWithValue(name string) (InfoElementWithValue,
 	return nil, 0, false
 }
 
-func (b *baseRecord) GetString() string {
-	var recordString string
-	for _, ie := range b.GetOrderedElementList() {
-		switch ie.GetDataType() {
+func (b *baseRecord) GetElementMap() map[string]interface{} {
+	elements := make(map[string]interface{})
+	orderedElements := b.GetOrderedElementList()
+	for _, element := range orderedElements {
+		switch element.GetDataType() {
 		case Unsigned8:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned8Value())
+			elements[element.GetName()] = element.GetUnsigned8Value()
 		case Unsigned16:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned16Value())
+			elements[element.GetName()] = element.GetUnsigned16Value()
 		case Unsigned32:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned32Value())
+			elements[element.GetName()] = element.GetUnsigned32Value()
 		case Unsigned64:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned64Value())
+			elements[element.GetName()] = element.GetUnsigned64Value()
 		case Signed8:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned8Value())
+			elements[element.GetName()] = element.GetSigned8Value()
 		case Signed16:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned16Value())
+			elements[element.GetName()] = element.GetSigned16Value()
 		case Signed32:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned32Value())
+			elements[element.GetName()] = element.GetSigned32Value()
 		case Signed64:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetSigned64Value())
+			elements[element.GetName()] = element.GetSigned64Value()
 		case Float32:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetFloat32Value())
+			elements[element.GetName()] = element.GetFloat32Value()
 		case Float64:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetFloat64Value())
+			elements[element.GetName()] = element.GetFloat64Value()
 		case Boolean:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetBooleanValue())
+			elements[element.GetName()] = element.GetBooleanValue()
 		case DateTimeSeconds:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned32Value())
+			elements[element.GetName()] = element.GetUnsigned32Value()
 		case DateTimeMilliseconds:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetUnsigned64Value())
+			elements[element.GetName()] = element.GetUnsigned64Value()
 		case DateTimeMicroseconds, DateTimeNanoseconds:
 			err := fmt.Errorf("API does not support micro and nano seconds types yet")
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), err)
+			elements[element.GetName()] = err
 		case MacAddress:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetMacAddressValue())
+			elements[element.GetName()] = element.GetMacAddressValue()
 		case Ipv4Address, Ipv6Address:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetIPAddressValue())
+			elements[element.GetName()] = element.GetIPAddressValue()
 		case String:
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), ie.GetStringValue())
+			elements[element.GetName()] = element.GetStringValue()
 		default:
 			err := fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
-			recordString += fmt.Sprintf("    %s: %v \n", ie.GetName(), err)
+			elements[element.GetName()] = err
 		}
 	}
-	return recordString
+	return elements
 }
 
 func (d *dataRecord) PrepareRecord() error {
