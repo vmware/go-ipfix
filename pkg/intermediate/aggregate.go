@@ -215,19 +215,20 @@ func (a *AggregationProcess) GetExpiryFromExpirePriorityQueue() time.Duration {
 	return a.inactiveExpiryTimeout
 }
 
-// GetRecords returns the string format flow records by FlowKey from flowKeyRecordMap.
-// Returns partial match if FlowKey is not complete.
-// Returns all the flow records if FlowKey is not provided.
-func (a *AggregationProcess) GetRecords(flowKey *FlowKey) []string {
+// GetRecords returns map format flow records given a flow key.
+// The key of the map is the element name and the value is the IE object.
+// Returns partially matched flow records if the flow key is not complete.
+// Returns all the flow records if the flow key is not provided.
+func (a *AggregationProcess) GetRecords(flowKey *FlowKey) []map[string]interface{} {
 	a.mutex.Lock()
 	defer a.mutex.Unlock()
 
-	var records []string
+	var records []map[string]interface{}
 	// Complete filter
 	if flowKey != nil && flowKey.SourceAddress != "" && flowKey.DestinationAddress != "" &&
 		flowKey.Protocol != 0 && flowKey.SourcePort != 0 && flowKey.DestinationPort != 0 {
 		if record, ok := a.flowKeyRecordMap[*flowKey]; ok {
-			records = append(records, record.Record.GetString())
+			records = append(records, record.Record.GetElementMap())
 		}
 		return records
 	}
@@ -242,7 +243,7 @@ func (a *AggregationProcess) GetRecords(flowKey *FlowKey) []string {
 				continue
 			}
 		}
-		records = append(records, record.Record.GetString())
+		records = append(records, record.Record.GetElementMap())
 	}
 	return records
 }
