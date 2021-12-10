@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.11 12-10-2021
+### Added
+- Add throughput calculation into aggregation process. (#270, @heanlan)
 ## 0.5.10 11-05-2021
 ### Changed
 - Update GetRecords in AggregationProcess to return map format records. (#271, @yanjunz97)
