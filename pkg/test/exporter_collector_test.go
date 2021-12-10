@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//go:build integration
 // +build integration
 
 package test
@@ -231,7 +232,7 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 	ianaFields = append(ianaFields, commonFields...)
 	for _, name := range ianaFields {
 		element, _, exist := record.GetInfoElementWithValue(name)
-		assert.True(t, exist)
+		assert.Truef(t, exist, "element with name %s should exist in the record", name)
 		switch name {
 		case "sourceIPv4Address", "sourceIPv6Address":
 			assert.Equal(t, testRec.srcIP, element.GetIPAddressValue())
@@ -247,6 +248,8 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 			assert.Equal(t, testRec.pktCount, element.GetUnsigned64Value())
 		case "packetDeltaCount":
 			assert.Equal(t, testRec.pktDelta, element.GetUnsigned64Value())
+		case "flowStartSeconds":
+			assert.Equal(t, testRec.flowStart, element.GetUnsigned32Value())
 		case "flowEndSeconds":
 			assert.Equal(t, testRec.flowEnd, element.GetUnsigned32Value())
 		case "flowEndReason":
@@ -279,6 +282,8 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 			assert.Equal(t, testRec.revPktCount, element.GetUnsigned64Value())
 		case "reversePacketDeltaCount":
 			assert.Equal(t, testRec.revPktDelta, element.GetUnsigned64Value())
+		case "reverseOctetTotalCount":
+			assert.Equal(t, testRec.revBytCount, element.GetUnsigned64Value())
 		}
 	}
 }

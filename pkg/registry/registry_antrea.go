@@ -66,4 +66,12 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyRuleName", 142, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("sourcePodLabels", 143, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("destinationPodLabels", 144, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("throughput", 145, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("reverseThroughput", 146, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("throughputFromSourceNode", 147, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("throughputFromDestinationNode", 148, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("reverseThroughputFromSourceNode", 149, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("reverseThroughputFromDestinationNode", 150, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("flowEndSecondsFromSourceNode", 151, 14, 56506, 4), 56506)
+	registerInfoElement(*entities.NewInfoElement("flowEndSecondsFromDestinationNode", 152, 14, 56506, 4), 56506)
 }
