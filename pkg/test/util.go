@@ -26,10 +26,12 @@ var (
 		"sourceTransportPort",
 		"destinationTransportPort",
 		"protocolIdentifier",
+		"flowStartSeconds",
 		"flowEndSeconds",
 		"flowEndReason",
 		"packetTotalCount",
 		"packetDeltaCount",
+		"octetTotalCount",
 	}
 	ianaIPv4Fields = []string{
 		"sourceIPv4Address",
@@ -55,6 +57,7 @@ var (
 	reverseFields = []string{
 		"reversePacketTotalCount",
 		"reversePacketDeltaCount",
+		"reverseOctetTotalCount",
 	}
 )
 
@@ -64,6 +67,7 @@ type testRecord struct {
 	srcPort       uint16
 	dstPort       uint16
 	proto         uint8
+	flowStart     uint32
 	flowEnd       uint32
 	pktCount      uint64
 	pktDelta      uint64
@@ -73,6 +77,8 @@ type testRecord struct {
 	dstSvcPort    uint16
 	revPktCount   uint64
 	revPktDelta   uint64
+	bytCount      uint64
+	revBytCount   uint64
 	flowType      uint8
 	flowEndReason uint8
 	tcpState      string
@@ -95,10 +101,13 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 		record.srcIP = net.ParseIP("2001:0:3238:DFE1:63::FEFB")
 		record.dstIP = net.ParseIP("2001:0:3238:DFE1:63::FEFC")
 	}
+	record.flowStart = uint32(1257893000)
 	if !isSrcNode {
-		record.flowEnd = uint32(1257894000)
+		record.flowEnd = uint32(1257896000)
 		record.pktCount = uint64(1000)
 		record.pktDelta = uint64(500)
+		record.bytCount = uint64(1000000)
+		record.revBytCount = uint64(1000000)
 		record.dstSvcPort = uint16(0)
 		record.srcPod = ""
 		record.dstPod = "pod2"
@@ -110,9 +119,11 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 			record.dstClusterIP = net.ParseIP("::")
 		}
 	} else {
-		record.flowEnd = uint32(1257896000)
+		record.flowEnd = uint32(1257894000)
 		record.pktCount = uint64(800)
 		record.pktDelta = uint64(500)
+		record.bytCount = uint64(800000)
+		record.revBytCount = uint64(800000)
 		record.dstSvcPort = uint16(4739)
 		record.srcPod = "pod1"
 		record.dstPod = ""
@@ -200,6 +211,10 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 			ie = entities.NewUnsigned64InfoElement(element, testRec.pktCount)
 		case "packetDeltaCount":
 			ie = entities.NewUnsigned64InfoElement(element, testRec.pktDelta)
+		case "octetTotalCount":
+			ie = entities.NewUnsigned64InfoElement(element, testRec.bytCount)
+		case "flowStartSeconds":
+			ie = entities.NewDateTimeSecondsInfoElement(element, testRec.flowStart)
 		case "flowEndSeconds":
 			ie = entities.NewDateTimeSecondsInfoElement(element, testRec.flowEnd)
 		case "flowEndReason":
@@ -240,6 +255,8 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 			ie = entities.NewUnsigned64InfoElement(element, testRec.revPktCount)
 		case "reversePacketDeltaCount":
 			ie = entities.NewUnsigned64InfoElement(element, testRec.revPktDelta)
+		case "reverseOctetTotalCount":
+			ie = entities.NewUnsigned64InfoElement(element, testRec.revBytCount)
 		}
 		elements = append(elements, ie)
 	}

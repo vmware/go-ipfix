@@ -50,20 +50,42 @@ var (
 	statsElementList = []string{
 		"packetTotalCount",
 		"packetDeltaCount",
+		"octetTotalCount",
 		"reversePacketTotalCount",
 		"reversePacketDeltaCount",
+		"reverseOctetTotalCount",
 	}
 	antreaSourceStatsElementList = []string{
 		"packetTotalCountFromSourceNode",
 		"packetDeltaCountFromSourceNode",
+		"octetTotalCountFromSourceNode",
 		"reversePacketTotalCountFromSourceNode",
 		"reversePacketDeltaCountFromSourceNode",
+		"reverseOctetTotalCountFromSourceNode",
 	}
 	antreaDestinationStatsElementList = []string{
 		"packetTotalCountFromDestinationNode",
 		"packetDeltaCountFromDestinationNode",
+		"octetTotalCountFromDestinationNode",
 		"reversePacketTotalCountFromDestinationNode",
 		"reversePacketDeltaCountFromDestinationNode",
+		"reverseOctetTotalCountFromDestinationNode",
+	}
+	antreaFlowEndSecondsElementList = []string{
+		"flowEndSecondsFromSourceNode",
+		"flowEndSecondsFromDestinationNode",
+	}
+	antreaThroughputElementList = []string{
+		"throughput",
+		"reverseThroughput",
+	}
+	antreaSourceThroughputElementList = []string{
+		"throughputFromSourceNode",
+		"reverseThroughputFromSourceNode",
+	}
+	antreaDestinationThroughputElementList = []string{
+		"throughputFromDestinationNode",
+		"reverseThroughputFromDestinationNode",
 	}
 )
 
@@ -152,6 +174,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
 	}
+	tmpFlowStartSecs, _ := registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
 	tmpFlowEndSecs, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	tmpFlowEndReason, _ := registry.GetInfoElement("flowEndReason", registry.IANAEnterpriseID)
 	tmpTCPState, _ := registry.GetInfoElement("tcpState", registry.AntreaEnterpriseID)
@@ -183,8 +206,9 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	} else {
 		ie15 = entities.NewUnsigned8InfoElement(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), registry.NetworkPolicyRuleActionNoAction)
 	}
+	ie17 := entities.NewDateTimeSecondsInfoElement(tmpFlowStartSecs, uint32(0))
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -207,6 +231,12 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(0))
 			} else {
 				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(500))
+			}
+		case "octetTotalCount", "reverseOctetTotalCount":
+			if !isUpdatedRecord {
+				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(1000))
+			} else {
+				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(2000))
 			}
 		}
 		elements = append(elements, ieWithValue)
@@ -236,7 +266,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]entities.InfoElementWithValue, 0)
 	var srcAddr, dstAddr, svcAddr []byte
-	var flowEndTime uint32
+	var flowStartTime, flowEndTime uint32
 	var flowEndReason, ingressNetworkPolicyRuleAction, antreaFlowType uint8
 	var srcPod, dstPod, tcpState string
 	var svcPort uint16
@@ -287,6 +317,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
 	}
+	flowStartTime = uint32(0)
 	if !isUpdatedRecord {
 		flowEndTime = uint32(1)
 		flowEndReason = registry.ActiveTimeoutReason
@@ -296,7 +327,9 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		flowEndReason = registry.EndOfFlowReason
 		tcpState = "TIME_WAIT"
 	}
-	tmpElement, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
+	tmpElement, _ := registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
+	ie17 := entities.NewDateTimeSecondsInfoElement(tmpElement, flowStartTime)
+	tmpElement, _ = registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
 	ie10 := entities.NewDateTimeSecondsInfoElement(tmpElement, flowEndTime)
 	if !isIntraNode {
 		antreaFlowType = registry.FlowTypeInterNode
@@ -312,7 +345,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie15 := entities.NewUnsigned8InfoElement(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), egressNetworkPolicyRuleAction)
 	ie16 := entities.NewSigned32InfoElement(entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, registry.AntreaEnterpriseID, 4), ingressNetworkPolicyRulePriority)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -334,6 +367,12 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(0))
 			} else {
 				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(503))
+			}
+		case "octetTotalCount", "reverseOctetTotalCount":
+			if !isUpdatedRecord {
+				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(1020))
+			} else {
+				ieWithValue = entities.NewUnsigned64InfoElement(e, uint64(2050))
 			}
 		}
 		elements = append(elements, ieWithValue)
@@ -599,6 +638,10 @@ func TestAggregateRecordsForInterNodeFlow(t *testing.T) {
 		StatsElements:                      statsElementList,
 		AggregatedSourceStatsElements:      antreaSourceStatsElementList,
 		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
+		AntreaFlowEndSecondsElements:       antreaFlowEndSecondsElementList,
+		ThroughputElements:                 antreaThroughputElementList,
+		SourceThroughputElements:           antreaSourceThroughputElementList,
+		DestinationThroughputElements:      antreaDestinationThroughputElementList,
 	}
 	input := AggregationInput{
 		MessageChan:           messageChan,
@@ -710,25 +753,48 @@ func assertElementMap(t *testing.T, record map[string]interface{}, ipv6 bool) {
 	assert.Equal(t, "pod1", record["sourcePodName"])
 	assert.Equal(t, "pod2", record["destinationPodName"])
 	assert.Equal(t, uint16(4739), record["destinationServicePort"])
+	assert.Equal(t, uint32(0), record["flowStartSeconds"])
 	assert.Equal(t, uint32(1), record["flowEndSeconds"])
+	assert.Equal(t, uint32(1), record["flowEndSecondsFromSourceNode"])
+	assert.Equal(t, uint32(1), record["flowEndSecondsFromDestinationNode"])
 	assert.Equal(t, uint8(2), record["flowType"])
 	assert.Equal(t, uint8(2), record["flowEndReason"])
 	assert.Equal(t, "ESTABLISHED", record["tcpState"])
 	assert.Equal(t, uint8(0), record["ingressNetworkPolicyRuleAction"])
 	assert.Equal(t, uint8(0), record["egressNetworkPolicyRuleAction"])
 	assert.Equal(t, int32(50000), record["ingressNetworkPolicyRulePriority"])
-	assert.Equal(t, uint64(500), record["packetTotalCount"])
+	assert.Equal(t, uint64(502), record["packetTotalCount"])
+	assert.Equal(t, uint64(502), record["reversePacketTotalCount"])
+	assert.Equal(t, uint64(1020), record["octetTotalCount"])
+	assert.Equal(t, uint64(1020), record["reverseOctetTotalCount"])
+	assert.Equal(t, uint64(1020*8), record["throughput"])
+	assert.Equal(t, uint64(1020*8), record["reverseThroughput"])
+	assert.Equal(t, uint64(1000*8), record["throughputFromSourceNode"])
+	assert.Equal(t, uint64(1000*8), record["reverseThroughputFromSourceNode"])
+	assert.Equal(t, uint64(1020*8), record["throughputFromDestinationNode"])
+	assert.Equal(t, uint64(1020*8), record["reverseThroughputFromDestinationNode"])
 	assert.Equal(t, uint64(0), record["packetDeltaCount"])
-	assert.Equal(t, uint64(500), record["reversePacketTotalCount"])
+	assert.Equal(t, uint64(502), record["reversePacketTotalCount"])
 	assert.Equal(t, uint64(0), record["reversePacketDeltaCount"])
 }
 
 func TestGetRecords(t *testing.T) {
 	messageChan := make(chan *entities.Message)
+	aggElements := &AggregationElements{
+		NonStatsElements:                   nonStatsElementList,
+		StatsElements:                      statsElementList,
+		AggregatedSourceStatsElements:      antreaSourceStatsElementList,
+		AggregatedDestinationStatsElements: antreaDestinationStatsElementList,
+		AntreaFlowEndSecondsElements:       antreaFlowEndSecondsElementList,
+		ThroughputElements:                 antreaThroughputElementList,
+		SourceThroughputElements:           antreaSourceThroughputElementList,
+		DestinationThroughputElements:      antreaDestinationThroughputElementList,
+	}
 	input := AggregationInput{
 		MessageChan:           messageChan,
 		WorkerNum:             2,
 		CorrelateFields:       fields,
+		AggregateElements:     aggElements,
 		ActiveExpiryTimeout:   testActiveExpiry,
 		InactiveExpiryTimeout: testInactiveExpiry,
 	}
@@ -1006,9 +1072,7 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 		if !strings.Contains(e, "Delta") {
 			assert.Equalf(t, latestVal, aggVal, "values should be equal for element %v", e)
 		} else {
-			prevRecord, _, _ := srcRecordLatest.GetInfoElementWithValue(e)
-			prevVal := prevRecord.GetUnsigned64Value()
-			assert.Equalf(t, prevVal+latestVal, aggVal, "values should be equal for element %v", e)
+			assert.Equalf(t, latestVal, aggVal, "values should be equal for element %v", e)
 		}
 	}
 	for i, e := range antreaSourceStatsElementList {
@@ -1020,5 +1084,20 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
 		latestRecord, _, _ := dstRecordLatest.GetInfoElementWithValue(statsElementList[i])
 		assert.Equalf(t, latestRecord.GetUnsigned64Value(), ieWithValue.GetUnsigned64Value(), "values should be equal for element %v", e)
+	}
+	for _, e := range antreaThroughputElementList {
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
+		expectedVal := 915
+		assert.Equalf(t, uint64(expectedVal), ieWithValue.GetUnsigned64Value(), "values should be equal for element %v", e)
+	}
+	for _, e := range antreaSourceThroughputElementList {
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
+		expectedVal := 888
+		assert.Equalf(t, uint64(expectedVal), ieWithValue.GetUnsigned64Value(), "values should be equal for element %v", e)
+	}
+	for _, e := range antreaDestinationThroughputElementList {
+		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue(e)
+		expectedVal := 915
+		assert.Equalf(t, uint64(expectedVal), ieWithValue.GetUnsigned64Value(), "values should be equal for element %v", e)
 	}
 }
