@@ -379,13 +379,22 @@ func (a *AggregationProcess) addOrUpdateRecordInMap(flowKey *FlowKey, record ent
 				if err := a.addFieldsForStatsAggregation(record, true, false); err != nil {
 					return err
 				}
+				if err := a.addFieldsForThroughputCalculation(record, true, false); err != nil {
+					return err
+				}
 			} else {
 				if err := a.addFieldsForStatsAggregation(record, false, true); err != nil {
+					return err
+				}
+				if err := a.addFieldsForThroughputCalculation(record, false, true); err != nil {
 					return err
 				}
 			}
 		} else {
 			if err := a.addFieldsForStatsAggregation(record, true, true); err != nil {
+				return err
+			}
+			if err := a.addFieldsForThroughputCalculation(record, true, true); err != nil {
 				return err
 			}
 		}
@@ -482,14 +491,31 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		return nil
 	}
 	isLatest := false
+	var prevFlowEndSeconds, flowEndSecondsDiff uint32
 	if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue("flowEndSeconds"); exist {
 		if existingIeWithValue, _, exist2 := existingRecord.GetInfoElementWithValue("flowEndSeconds"); exist2 {
 			incomingVal := ieWithValue.GetUnsigned32Value()
 			existingVal := existingIeWithValue.GetUnsigned32Value()
-			if incomingVal > existingVal {
+			if incomingVal >= existingVal {
 				isLatest = true
 				existingIeWithValue.SetUnsigned32Value(incomingVal)
 			}
+			// Update the flowEndSecondsFromSource/DestinationNode fields, and compute
+			// the time difference between the incoming record and the last record.
+			if fillSrcStats {
+				prevFlowEndSeconds = a.updateFlowEndSecondsFromNodes(incomingRecord, existingRecord, true, incomingVal)
+			}
+			if fillDstStats {
+				prevFlowEndSeconds = a.updateFlowEndSecondsFromNodes(incomingRecord, existingRecord, false, incomingVal)
+			}
+			// Skip the aggregation process if the incoming record is not the latest
+			// from its coming node; for intra-node flows. Also to avoid to assign
+			// zero value to flowEndSecondsDiff.
+			if incomingVal <= prevFlowEndSeconds {
+				klog.Warningf("The incoming record doesn't have the latest flowEndSeconds. Previous value: %d. Incoming value: %d. From source node: %v. From destination node: %v", prevFlowEndSeconds, incomingVal, fillSrcStats, fillDstStats)
+				return nil
+			}
+			flowEndSecondsDiff = incomingVal - prevFlowEndSeconds
 		}
 	}
 	for _, element := range a.aggregateElements.NonStatsElements {
@@ -524,58 +550,92 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	statsElementList := a.aggregateElements.StatsElements
 	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
 	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
-	isDelta := false
+	var totalCountDiff, reverseTotalCountDiff uint64
 	for i, element := range statsElementList {
-		isDelta = false
-		if strings.Contains(element, "Delta") {
-			isDelta = true
-		}
+		isDelta := strings.Contains(element, "Delta")
 		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(element); exist {
-			existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(element)
 			incomingVal := ieWithValue.GetUnsigned64Value()
-			existingVal := existingIeWithValue.GetUnsigned64Value()
-			// Update the corresponding element in existing record.
-			if !isDelta {
-				if existingVal < incomingVal {
-					existingIeWithValue.SetUnsigned64Value(incomingVal)
-				}
-			} else {
-				// We are simply adding the delta stats now. We expect delta stats to be
-				// reset after sending the record from flowKeyMap in aggregation process.
-				// Delta stats from source and destination nodes are added, so we will have
-				// two times the stats approximately.
-				// For delta stats, it is better to use source and destination specific
-				// stats.
-				existingIeWithValue.SetUnsigned64Value(existingVal + incomingVal)
-			}
-
-			// Update the corresponding source element in antreaStatsElement list.
+			// Update the source fields in antreaSourceStatsElements list
 			if fillSrcStats {
-				if existingIeWithValue, _, exist = existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
+				if srcExistingIeWithValue, _, exist := existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
+					existingVal := srcExistingIeWithValue.GetUnsigned64Value()
 					if !isDelta {
-						existingIeWithValue.SetUnsigned64Value(incomingVal)
+						srcExistingIeWithValue.SetUnsigned64Value(incomingVal)
+						switch antreaSourceStatsElements[i] {
+						case "octetTotalCountFromSourceNode":
+							totalCountDiff = incomingVal - existingVal
+						case "reverseOctetTotalCountFromSourceNode":
+							reverseTotalCountDiff = incomingVal - existingVal
+						}
 					} else {
-						existingIeWithValue.SetUnsigned64Value(incomingVal + existingIeWithValue.GetUnsigned64Value())
+						srcExistingIeWithValue.SetUnsigned64Value(incomingVal + existingVal)
 					}
 				} else {
 					return fmt.Errorf("element does not exist in the record: %v", antreaSourceStatsElements[i])
 				}
 			}
-			// Update the corresponding destination element in antreaStatsElement list.
+			// Update the destination fields in antreaDestinationStatsElements list
 			if fillDstStats {
-				if existingIeWithValue, _, exist = existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
+				if dstExistingIeWithValue, _, exist := existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
+					existingVal := dstExistingIeWithValue.GetUnsigned64Value()
 					if !isDelta {
-						existingIeWithValue.SetUnsigned64Value(incomingVal)
+						dstExistingIeWithValue.SetUnsigned64Value(incomingVal)
+						switch antreaDestinationStatsElements[i] {
+						case "octetTotalCountFromDestinationNode":
+							totalCountDiff = incomingVal - existingVal
+						case "reverseOctetTotalCountFromDestinationNode":
+							reverseTotalCountDiff = incomingVal - existingVal
+						}
 					} else {
-						existingIeWithValue.SetUnsigned64Value(incomingVal + existingIeWithValue.GetUnsigned64Value())
+						dstExistingIeWithValue.SetUnsigned64Value(incomingVal + existingVal)
 					}
 				} else {
 					return fmt.Errorf("element does not exist in the record: %v", antreaDestinationStatsElements[i])
 				}
 			}
+			// Update the corresponding common element in statsElement list.
+			commonExistingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(element)
+			if isLatest {
+				if !isDelta {
+					if commonExistingIeWithValue.GetUnsigned64Value() < incomingVal {
+						commonExistingIeWithValue.SetUnsigned64Value(incomingVal)
+					}
+				} else {
+					if fillSrcStats {
+						srcIe, _, _ := existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i])
+						commonExistingIeWithValue.SetUnsigned64Value(srcIe.GetUnsigned64Value())
+					}
+					if fillDstStats {
+						dstIe, _, _ := existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i])
+						commonExistingIeWithValue.SetUnsigned64Value(dstIe.GetUnsigned64Value())
+					}
+				}
+			}
 		} else {
 			return fmt.Errorf("element with name %v in statsElements not present in the incoming record", element)
 		}
+	}
+
+	// Update the throughput & reverseThroughput fields:
+	// throughput = (octetTotalCount - prevOctetTotalCount) / (flowEndSeconds - prevFlowEndSeconds)
+	// reverseThroughput = (reverseOctetTotalCount - prevReverseOctetTotalCount) / (flowEndSeconds - prevFlowEndSeconds)
+	antreaThroughputElements := a.aggregateElements.ThroughputElements
+	antreaSourceThroughputElements := a.aggregateElements.SourceThroughputElements
+	antreaDestinationThroughputElements := a.aggregateElements.DestinationThroughputElements
+	throughput := totalCountDiff * 8 / uint64(flowEndSecondsDiff)
+	reverseThroughput := reverseTotalCountDiff * 8 / uint64(flowEndSecondsDiff)
+	throughputVals := []uint64{throughput, reverseThroughput}
+	for i, element := range antreaThroughputElements {
+		if fillSrcStats {
+			ie, _, _ := existingRecord.GetInfoElementWithValue(antreaSourceThroughputElements[i])
+			ie.SetUnsigned64Value(throughputVals[i])
+		}
+		if fillDstStats {
+			ie, _, _ := existingRecord.GetInfoElementWithValue(antreaDestinationThroughputElements[i])
+			ie.SetUnsigned64Value(throughputVals[i])
+		}
+		ie, _, _ := existingRecord.GetInfoElementWithValue(element)
+		ie.SetUnsigned64Value(throughputVals[i])
 	}
 	return nil
 }
@@ -646,6 +706,132 @@ func (a *AggregationProcess) addFieldsForStatsAggregation(record entities.Record
 		}
 	}
 	return nil
+}
+
+func (a *AggregationProcess) addFieldsForThroughputCalculation(record entities.Record, fillSrcStats, fillDstStats bool) error {
+	if a.aggregateElements == nil {
+		return nil
+	}
+	antreaFlowEndSecondsElements := a.aggregateElements.AntreaFlowEndSecondsElements
+	antreaThroughputElements := a.aggregateElements.ThroughputElements
+	antreaSourceThroughputElements := a.aggregateElements.SourceThroughputElements
+	antreaDestinationThroughputElements := a.aggregateElements.DestinationThroughputElements
+
+	var timeStart, timeEnd uint32
+	var byteCount, reverseByteCount uint64
+	timeStart, err := getUnsigned32ValueByIeName(record, "flowStartSeconds")
+	if err != nil {
+		return err
+	}
+	timeEnd, err = getUnsigned32ValueByIeName(record, "flowEndSeconds")
+	if err != nil {
+		return err
+	}
+	byteCount, err = getUnsigned64ValueByIeName(record, "octetTotalCount")
+	if err != nil {
+		return err
+	}
+	reverseByteCount, err = getUnsigned64ValueByIeName(record, "reverseOctetTotalCount")
+	if err != nil {
+		return err
+	}
+
+	// Initialize flowEndSecondsFromSourceNode and flowEndSecondsFromDestinationNode.
+	for _, ieName := range antreaFlowEndSecondsElements {
+		ie, err := registry.GetInfoElement(ieName, registry.AntreaEnterpriseID)
+		if err != nil {
+			return err
+		}
+		value := uint32(0)
+		if fillSrcStats && strings.Contains(ieName, "Source") || fillDstStats && strings.Contains(ieName, "Destination") {
+			value = timeEnd
+		}
+		if err = record.AddInfoElement(entities.NewUnsigned32InfoElement(ie, value)); err != nil {
+			return err
+		}
+	}
+
+	// Initialize the throughput elements.
+	var incomingVal, reverseIncomingVal uint64
+	// For the edge case when the record has the same timeEnd and timeStart values,
+	// we will initialize the throughput fields with zero values.
+	if timeEnd > timeStart {
+		incomingVal = byteCount * 8 / (uint64(timeEnd - timeStart))
+		reverseIncomingVal = reverseByteCount * 8 / (uint64(timeEnd - timeStart))
+	}
+	throughputVals := []uint64{incomingVal, reverseIncomingVal}
+	for i, element := range antreaThroughputElements {
+		// add common throughput elements
+		value := throughputVals[i]
+		ie, err := registry.GetInfoElement(element, registry.AntreaEnterpriseID)
+		if err != nil {
+			return err
+		}
+		if err = record.AddInfoElement(entities.NewUnsigned64InfoElement(ie, value)); err != nil {
+			return err
+		}
+		// add source throughput elements
+		value = uint64(0)
+		ie, err = registry.GetInfoElement(antreaSourceThroughputElements[i], registry.AntreaEnterpriseID)
+		if err != nil {
+			return err
+		}
+		if fillSrcStats {
+			value = throughputVals[i]
+		}
+		if err = record.AddInfoElement(entities.NewUnsigned64InfoElement(ie, value)); err != nil {
+			return err
+		}
+		// add destination throughput elements
+		value = uint64(0)
+		ie, err = registry.GetInfoElement(antreaDestinationThroughputElements[i], registry.AntreaEnterpriseID)
+		if err != nil {
+			return err
+		}
+		if fillDstStats {
+			value = throughputVals[i]
+		}
+		if err = record.AddInfoElement(entities.NewUnsigned64InfoElement(ie, value)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// updateFlowEndSecondsFromNodes updates the value of flowEndSecondsFromSourceNode
+// or flowEndSecondsFromDestinationNode, returning the previous value before update.
+func (a *AggregationProcess) updateFlowEndSecondsFromNodes(incomingRecord, existingRecord entities.Record, isSrc bool, incomingVal uint32) uint32 {
+	ieName := "flowEndSecondsFromSourceNode"
+	if !isSrc {
+		ieName = "flowEndSecondsFromDestinationNode"
+	}
+	existingIe, _, _ := existingRecord.GetInfoElementWithValue(ieName)
+	existingVal := existingIe.GetUnsigned32Value()
+	// When the incoming record is the first record from its node, the existingVal of the field
+	// is zero, we set it by flowStartSeconds. time_diff = flowEndSeconds - flowStartSeconds
+	if existingVal == 0 {
+		incomingIe, _, _ := incomingRecord.GetInfoElementWithValue("flowStartSeconds")
+		existingVal = incomingIe.GetUnsigned32Value()
+	}
+	existingIe.SetUnsigned32Value(incomingVal)
+	return existingVal
+}
+
+// TODO: We can consider to add similar methods into record interface.
+func getUnsigned64ValueByIeName(record entities.Record, ieName string) (uint64, error) {
+	if ieWithValue, _, exist := record.GetInfoElementWithValue(ieName); exist {
+		return ieWithValue.GetUnsigned64Value(), nil
+	} else {
+		return uint64(0), fmt.Errorf("element with name %s not present in the incoming record", ieName)
+	}
+}
+
+func getUnsigned32ValueByIeName(record entities.Record, ieName string) (uint32, error) {
+	if ieWithValue, _, exist := record.GetInfoElementWithValue(ieName); exist {
+		return ieWithValue.GetUnsigned32Value(), nil
+	} else {
+		return uint32(0), fmt.Errorf("element with name %s not present in the incoming record", ieName)
+	}
 }
 
 // isRecordFromSrc returns true if record belongs to inter-node flow and from source node.
