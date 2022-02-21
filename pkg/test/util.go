@@ -16,6 +16,7 @@ package test
 
 import (
 	"net"
+	"time"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
@@ -67,8 +68,8 @@ type testRecord struct {
 	srcPort       uint16
 	dstPort       uint16
 	proto         uint8
-	flowStart     uint32
-	flowEnd       uint32
+	flowStart     time.Time
+	flowEnd       time.Time
 	pktCount      uint64
 	pktDelta      uint64
 	srcPod        string
@@ -101,9 +102,9 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 		record.srcIP = net.ParseIP("2001:0:3238:DFE1:63::FEFB")
 		record.dstIP = net.ParseIP("2001:0:3238:DFE1:63::FEFC")
 	}
-	record.flowStart = uint32(1257893000)
+	record.flowStart = time.Unix(1257893000, 0)
 	if !isSrcNode {
-		record.flowEnd = uint32(1257896000)
+		record.flowEnd = time.Unix(1257896000, 0)
 		record.pktCount = uint64(1000)
 		record.pktDelta = uint64(500)
 		record.bytCount = uint64(1000000)
@@ -119,7 +120,7 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 			record.dstClusterIP = net.ParseIP("::")
 		}
 	} else {
-		record.flowEnd = uint32(1257894000)
+		record.flowEnd = time.Unix(1257894000, 0)
 		record.pktCount = uint64(800)
 		record.pktDelta = uint64(500)
 		record.bytCount = uint64(800000)
@@ -214,9 +215,9 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 		case "octetTotalCount":
 			ie = entities.NewUnsigned64InfoElement(element, testRec.bytCount)
 		case "flowStartSeconds":
-			ie = entities.NewDateTimeSecondsInfoElement(element, testRec.flowStart)
+			ie = entities.NewDateTimeInfoElement(element, testRec.flowStart)
 		case "flowEndSeconds":
-			ie = entities.NewDateTimeSecondsInfoElement(element, testRec.flowEnd)
+			ie = entities.NewDateTimeInfoElement(element, testRec.flowEnd)
 		case "flowEndReason":
 			ie = entities.NewUnsigned8InfoElement(element, testRec.flowEndReason)
 		}

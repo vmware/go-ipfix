@@ -2,6 +2,7 @@ package entities
 
 import (
 	"net"
+	"time"
 )
 
 type InfoElementWithValue interface {
@@ -25,6 +26,7 @@ type InfoElementWithValue interface {
 	GetMacAddressValue() net.HardwareAddr
 	GetStringValue() string
 	GetIPAddressValue() net.IP
+	GetDateTimeValue() time.Time
 	SetUnsigned8Value(val uint8)
 	SetUnsigned16Value(val uint16)
 	SetUnsigned32Value(val uint32)
@@ -39,6 +41,7 @@ type InfoElementWithValue interface {
 	SetMacAddressValue(val net.HardwareAddr)
 	SetStringValue(val string)
 	SetIPAddressValue(val net.IP)
+	SetDateTimeValue(val time.Time)
 	IsValueEmpty() bool
 	GetLength() int
 	ResetValue()
@@ -120,6 +123,10 @@ func (b *baseInfoElement) GetIPAddressValue() net.IP {
 	panic("accessing value of wrong data type")
 }
 
+func (b *baseInfoElement) GetDateTimeValue() time.Time {
+	panic("accessing value of wrong data type")
+}
+
 func (b *baseInfoElement) SetUnsigned8Value(val uint8) {
 	panic("setting value with wrong data type")
 }
@@ -173,6 +180,10 @@ func (b *baseInfoElement) SetStringValue(val string) {
 }
 
 func (b *baseInfoElement) SetIPAddressValue(val net.IP) {
+	panic("setting value with wrong data type")
+}
+
+func (b *baseInfoElement) SetDateTimeValue(val time.Time) {
 	panic("setting value with wrong data type")
 }
 
@@ -566,62 +577,33 @@ func (s *StringInfoElement) ResetValue() {
 	s.value = ""
 }
 
-type DateTimeSecondsInfoElement struct {
-	value uint32
+type DateTimeInfoElement struct {
+	value time.Time
 	baseInfoElement
 }
 
-func NewDateTimeSecondsInfoElement(element *InfoElement, val uint32) *DateTimeSecondsInfoElement {
-	infoElem := &DateTimeSecondsInfoElement{
+func NewDateTimeInfoElement(element *InfoElement, val time.Time) *DateTimeInfoElement {
+	infoElem := &DateTimeInfoElement{
 		value: val,
 	}
 	infoElem.element = element
 	return infoElem
 }
 
-func (dsec *DateTimeSecondsInfoElement) GetUnsigned32Value() uint32 {
-	return dsec.value
-}
-
-func (dsec *DateTimeSecondsInfoElement) SetUnsigned32Value(val uint32) {
-	dsec.value = val
-}
-
-func (dsec *DateTimeSecondsInfoElement) IsValueEmpty() bool {
-	return dsec.value == 0
-}
-
-func (dsec *DateTimeSecondsInfoElement) ResetValue() {
-	dsec.value = 0
-}
-
-type DateTimeMillisecondsInfoElement struct {
-	value uint64
-	baseInfoElement
-}
-
-func NewDateTimeMillisecondsInfoElement(element *InfoElement, val uint64) *DateTimeMillisecondsInfoElement {
-	infoElem := &DateTimeMillisecondsInfoElement{
-		value: val,
-	}
-	infoElem.element = element
-	return infoElem
-}
-
-func (dmsec *DateTimeMillisecondsInfoElement) GetUnsigned64Value() uint64 {
+func (dmsec *DateTimeInfoElement) GetDateTimeValue() time.Time {
 	return dmsec.value
 }
 
-func (dmsec *DateTimeMillisecondsInfoElement) SetUnsigned64Value(val uint64) {
+func (dmsec *DateTimeInfoElement) SetDateTimeValue(val time.Time) {
 	dmsec.value = val
 }
 
-func (dmsec *DateTimeMillisecondsInfoElement) IsValueEmpty() bool {
-	return dmsec.value == 0
+func (dmsec *DateTimeInfoElement) IsValueEmpty() bool {
+	return dmsec.value == time.Time{}
 }
 
-func (dmsec *DateTimeMillisecondsInfoElement) ResetValue() {
-	dmsec.value = 0
+func (dmsec *DateTimeInfoElement) ResetValue() {
+	dmsec.value = time.Time{}
 }
 
 type IPAddressInfoElement struct {

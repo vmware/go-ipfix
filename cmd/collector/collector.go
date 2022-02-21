@@ -87,7 +87,6 @@ func printIPFIXMessage(msg *entities.Message) {
 				case entities.Unsigned8:
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned8Value())
 				case entities.Unsigned16:
-
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned16Value())
 				case entities.Unsigned32:
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
@@ -107,13 +106,8 @@ func printIPFIXMessage(msg *entities.Message) {
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetFloat64Value())
 				case entities.Boolean:
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetBooleanValue())
-				case entities.DateTimeSeconds:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
-				case entities.DateTimeMilliseconds:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned64Value())
-				case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
-					err := fmt.Errorf("API does not support micro and nano seconds types yet")
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
+				case entities.DateTimeSeconds, entities.DateTimeMilliseconds, entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
+					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetDateTimeValue())
 				case entities.MacAddress:
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetMacAddressValue())
 				case entities.Ipv4Address, entities.Ipv6Address:

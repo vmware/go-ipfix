@@ -3,6 +3,7 @@ package entities
 import (
 	"net"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -28,7 +29,10 @@ var valData = []struct {
 	{true, 1, Boolean, true, []byte{0x1}},
 	{false, 1, Boolean, false, []byte{0x2}},
 	{macAddress, 6, MacAddress, net.HardwareAddr([]byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}), []byte{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}},
-	{uint32(1257894000), 4, DateTimeSeconds, uint32(1257894000), []byte{0x4a, 0xf9, 0xf0, 0x70}},
+	{time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC).In(time.Local), 4, DateTimeSeconds, time.Date(2009, time.November, 10, 23, 0, 0, 0, time.UTC).In(time.Local), []byte{0x4a, 0xf9, 0xf0, 0x70}},
+	{time.Date(2009, time.November, 10, 23, 0, 0, 42000000, time.UTC).In(time.Local), 8, DateTimeMilliseconds, time.Date(2009, time.November, 10, 23, 0, 0, 42000000, time.UTC).In(time.Local), []byte{0x00, 0x00, 0x01, 0x24, 0xe0, 0x53, 0x35, 0xaa}},
+	{time.Date(2022, time.February, 21, 16, 59, 56, 141509000, time.UTC).In(time.Local), 8, DateTimeMicroseconds, time.Date(2022, time.February, 21, 16, 59, 56, 141509000, time.UTC).In(time.Local), []byte{0xe5, 0xbe, 0x43, 0x8c, 0x24, 0x39, 0xef, 0x0f}},
+	{time.Date(2022, time.February, 21, 16, 59, 56, 141509436, time.UTC).In(time.Local), 8, DateTimeNanoseconds, time.Date(2022, time.February, 21, 16, 59, 56, 141509436, time.UTC).In(time.Local), []byte{0xe5, 0xbe, 0x43, 0x8c, 0x24, 0x39, 0xf6, 0x60}},
 	{net.ParseIP("1.2.3.4"), 4, Ipv4Address, net.IP([]byte{0x1, 0x2, 0x3, 0x4}), []byte{0x1, 0x2, 0x3, 0x4}},
 	{net.ParseIP("2001:0:3238:DFE1:63::FEFB"), 16, Ipv6Address, net.IP([]byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}), []byte{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xdf, 0xe1, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xfe, 0xfb}},
 }
@@ -37,6 +41,7 @@ func TestDecodeToIEDataType(t *testing.T) {
 	for _, data := range valData {
 		buff, err := EncodeToIEDataType(data.dataType, data.value)
 		assert.Nil(t, err)
+		assert.Equal(t, data.length, len(buff))
 		v, err := decodeToIEDataType(data.dataType, buff)
 		assert.Nil(t, err)
 		assert.Equal(t, data.expectedDecode, v)

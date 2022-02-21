@@ -122,7 +122,7 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), nil)
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), nil)
 	}
-	ie10 := entities.NewDateTimeSecondsInfoElement(entities.NewInfoElement("flowEndSeconds", 151, 14, 0, 4), 0)
+	ie10 := entities.NewDateTimeInfoElement(entities.NewInfoElement("flowEndSeconds", 151, 14, 0, 4), time.Time{})
 	ie11 := entities.NewUnsigned8InfoElement(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), 0)
 	ie12 := entities.NewUnsigned8InfoElement(entities.NewInfoElement("ingressNetworkPolicyRuleAction", 139, 1, registry.AntreaEnterpriseID, 1), 0)
 	ie13 := entities.NewUnsigned8InfoElement(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), 0)
@@ -180,11 +180,11 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	tmpTCPState, _ := registry.GetInfoElement("tcpState", registry.AntreaEnterpriseID)
 
 	if !isUpdatedRecord {
-		ie10 = entities.NewDateTimeSecondsInfoElement(tmpFlowEndSecs, uint32(1))
+		ie10 = entities.NewDateTimeInfoElement(tmpFlowEndSecs, time.Unix(1, 0))
 		ie12 = entities.NewUnsigned8InfoElement(tmpFlowEndReason, registry.ActiveTimeoutReason)
 		ie13 = entities.NewStringInfoElement(tmpTCPState, "ESTABLISHED")
 	} else {
-		ie10 = entities.NewDateTimeSecondsInfoElement(tmpFlowEndSecs, uint32(10))
+		ie10 = entities.NewDateTimeInfoElement(tmpFlowEndSecs, time.Unix(10, 0))
 		ie12 = entities.NewUnsigned8InfoElement(tmpFlowEndReason, registry.EndOfFlowReason)
 		ie13 = entities.NewStringInfoElement(tmpTCPState, "TIME_WAIT")
 	}
@@ -206,7 +206,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	} else {
 		ie15 = entities.NewUnsigned8InfoElement(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), registry.NetworkPolicyRuleActionNoAction)
 	}
-	ie17 := entities.NewDateTimeSecondsInfoElement(tmpFlowStartSecs, uint32(0))
+	ie17 := entities.NewDateTimeInfoElement(tmpFlowStartSecs, time.Time{})
 
 	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17)
 	// Add all elements in statsElements.
@@ -266,7 +266,7 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]entities.InfoElementWithValue, 0)
 	var srcAddr, dstAddr, svcAddr []byte
-	var flowStartTime, flowEndTime uint32
+	var flowStartTime, flowEndTime time.Time
 	var flowEndReason, ingressNetworkPolicyRuleAction, antreaFlowType uint8
 	var srcPod, dstPod, tcpState string
 	var svcPort uint16
@@ -317,20 +317,20 @@ func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
 	}
-	flowStartTime = uint32(0)
+	flowStartTime = time.Unix(0, 0)
 	if !isUpdatedRecord {
-		flowEndTime = uint32(1)
+		flowEndTime = time.Unix(1, 0)
 		flowEndReason = registry.ActiveTimeoutReason
 		tcpState = "ESTABLISHED"
 	} else {
-		flowEndTime = uint32(10)
+		flowEndTime = time.Unix(10, 0)
 		flowEndReason = registry.EndOfFlowReason
 		tcpState = "TIME_WAIT"
 	}
 	tmpElement, _ := registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
-	ie17 := entities.NewDateTimeSecondsInfoElement(tmpElement, flowStartTime)
+	ie17 := entities.NewDateTimeInfoElement(tmpElement, flowStartTime)
 	tmpElement, _ = registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
-	ie10 := entities.NewDateTimeSecondsInfoElement(tmpElement, flowEndTime)
+	ie10 := entities.NewDateTimeInfoElement(tmpElement, flowEndTime)
 	if !isIntraNode {
 		antreaFlowType = registry.FlowTypeInterNode
 	} else {

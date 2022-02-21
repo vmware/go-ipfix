@@ -59,6 +59,8 @@ func TestAddInfoElements(t *testing.T) {
 		NewInfoElement("interfaceDescription", 83, 13, 0, 65535), // String
 		NewInfoElement("flowStartSeconds", 150, 14, 0, 4),        // dateTimeSeconds
 		NewInfoElement("flowStartMilliseconds", 152, 15, 0, 8),   // dateTimeMilliseconds
+		NewInfoElement("flowStartMicroseconds", 154, 16, 0, 8),   // dateTimeMicroseconds
+		NewInfoElement("flowStartNanoseconds", 156, 17, 0, 8),    // dateTimeNanoseconds
 	}
 	macAddress, _ := net.ParseMAC("aa:bb:cc:dd:ee:ff")
 	type valData struct {
@@ -72,8 +74,10 @@ func TestAddInfoElements(t *testing.T) {
 		macAddr            net.HardwareAddr
 		ipAddr             net.IP
 		stringVal          string
-		flowStartSecs      uint32
-		flowStartMillisecs uint64
+		flowStartSecs      time.Time
+		flowStartMillisecs time.Time
+		flowStartMicrosecs time.Time
+		flowStartNanosecs  time.Time
 	}
 	values := valData{
 		uint8(0x1),                  // ICMP proto
@@ -86,15 +90,17 @@ func TestAddInfoElements(t *testing.T) {
 		macAddress,                  // mac address
 		net.ParseIP("1.2.3.4"),      // IP Address
 		"My Interface in IPFIX lib", // String
-		uint32(time.Now().Unix()),   // dateTimeSeconds
-		uint64(time.Now().Unix()),   // dateTimeMilliseconds
+		time.Now(),                  // dateTimeSeconds
+		time.Now(),                  // dateTimeMilliseconds
+		time.Now(),                  // dateTimeMicroseconds
+		time.Now(),                  // dateTimeNanoseconds
 	}
 	addIETests := []struct {
 		record  Record
 		ieList  []*InfoElement
 		valList valData
 	}{
-		{NewTemplateRecord(uniqueTemplateID, 12, false), testIEs, valData{}},
+		{NewTemplateRecord(uniqueTemplateID, 14, false), testIEs, valData{}},
 		{NewDataRecord(uniqueTemplateID, len(testIEs), 0, false), testIEs, values},
 	}
 
@@ -124,9 +130,13 @@ func TestAddInfoElements(t *testing.T) {
 				case "dataRecordsReliability":
 					ie = NewBoolInfoElement(testIE, test.valList.dataReliable)
 				case "flowStartSeconds":
-					ie = NewDateTimeSecondsInfoElement(testIE, test.valList.flowStartSecs)
+					ie = NewDateTimeInfoElement(testIE, test.valList.flowStartSecs)
 				case "flowStartMilliseconds":
-					ie = NewDateTimeMillisecondsInfoElement(testIE, test.valList.flowStartMillisecs)
+					ie = NewDateTimeInfoElement(testIE, test.valList.flowStartMillisecs)
+				case "flowStartMicroseconds":
+					ie = NewDateTimeInfoElement(testIE, test.valList.flowStartMicrosecs)
+				case "flowStartNanoseconds":
+					ie = NewDateTimeInfoElement(testIE, test.valList.flowStartNanosecs)
 				case "sourceMacAddress":
 					ie = NewMacAddressInfoElement(testIE, test.valList.macAddr)
 				case "sourceIPv4Address":
@@ -196,8 +206,8 @@ func TestGetElementMap(t *testing.T) {
 		macAddr            net.HardwareAddr
 		ipAddr             net.IP
 		stringVal          string
-		flowStartSecs      uint32
-		flowStartMillisecs uint64
+		flowStartSecs      time.Time
+		flowStartMillisecs time.Time
 	}
 	valList := valData{
 		uint8(0x1),                  // ICMP proto
@@ -210,8 +220,8 @@ func TestGetElementMap(t *testing.T) {
 		macAddress,                  // mac address
 		net.ParseIP("1.2.3.4"),      // IP Address
 		"My Interface in IPFIX lib", // String
-		uint32(time.Now().Unix()),   // dateTimeSeconds
-		uint64(time.Now().Unix()),   // dateTimeMilliseconds
+		time.Now(),                  // dateTimeSeconds
+		time.Now(),                  // dateTimeMilliseconds
 	}
 	record := NewDataRecord(uniqueTemplateID, len(ieList), 0, false)
 
@@ -233,9 +243,9 @@ func TestGetElementMap(t *testing.T) {
 		case "dataRecordsReliability":
 			ie = NewBoolInfoElement(testIE, valList.dataReliable)
 		case "flowStartSeconds":
-			ie = NewDateTimeSecondsInfoElement(testIE, valList.flowStartSecs)
+			ie = NewDateTimeInfoElement(testIE, valList.flowStartSecs)
 		case "flowStartMilliseconds":
-			ie = NewDateTimeMillisecondsInfoElement(testIE, valList.flowStartMillisecs)
+			ie = NewDateTimeInfoElement(testIE, valList.flowStartMillisecs)
 		case "sourceMacAddress":
 			ie = NewMacAddressInfoElement(testIE, valList.macAddr)
 		case "sourceIPv4Address":
