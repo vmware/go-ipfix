@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.12 02-23-2022
+### Changed
+- Fix the throughput burst issue. (#278, @yanjunz97)
 ## 0.5.11 12-10-2021
 ### Added
 - Add throughput calculation into aggregation process. (#270, @heanlan)
