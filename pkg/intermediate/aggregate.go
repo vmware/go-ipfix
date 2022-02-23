@@ -91,6 +91,9 @@ func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error)
 		if (len(input.AggregateElements.StatsElements) != len(input.AggregateElements.AggregatedSourceStatsElements)) || (len(input.AggregateElements.StatsElements) != len(input.AggregateElements.AggregatedDestinationStatsElements)) {
 			return nil, fmt.Errorf("stats elements, source stats elements and destination stats elemenst length should be equal")
 		}
+		if (len(input.AggregateElements.ThroughputElements) != len(input.AggregateElements.SourceThroughputElements)) || (len(input.AggregateElements.ThroughputElements) != len(input.AggregateElements.DestinationThroughputElements)) {
+			return nil, fmt.Errorf("throughput elements, source throughput elements and destination throughput elemenst length should be equal")
+		}
 	}
 	return &AggregationProcess{
 		make(map[FlowKey]*AggregationFlowRecord),
@@ -640,28 +643,38 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	return nil
 }
 
-// ResetStatElementsInRecord is called by the user after the aggregation record
-// is sent after its expiry either by active or inactive expiry interval. This should
-// be called by user after acquiring the mutex in the Aggregation process.
-func (a *AggregationProcess) ResetStatElementsInRecord(record entities.Record) error {
+// ResetStatAndThroughputElementsInRecord is called by the user after the aggregation
+// record is sent after its expiry either by active or inactive expiry interval. This
+// should be called by user after acquiring the mutex in the Aggregation process.
+func (a *AggregationProcess) ResetStatAndThroughputElementsInRecord(record entities.Record) error {
 	statsElementList := a.aggregateElements.StatsElements
 	antreaSourceStatsElements := a.aggregateElements.AggregatedSourceStatsElements
 	antreaDestinationStatsElements := a.aggregateElements.AggregatedDestinationStatsElements
 	for i, element := range statsElementList {
-		if ieWithValue, _, exist := record.GetInfoElementWithValue(element); exist {
-			ieWithValue.ResetValue()
-		} else {
-			return fmt.Errorf("element with name %v in statsElements is not present in the record", element)
+		// TotalCount statistic elements should not be reset to zeroes as they are used in the
+		// throughput calculation.
+		isDelta := strings.Contains(element, "Delta")
+		if !isDelta {
+			continue
 		}
-		if ieWithValue, _, exist := record.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
-			ieWithValue.ResetValue()
-		} else {
-			return fmt.Errorf("element with name %v in statsElements is not present in the record", antreaSourceStatsElements[i])
+		for _, array := range [][]string{statsElementList, antreaSourceStatsElements, antreaDestinationStatsElements} {
+			if ieWithValue, _, exist := record.GetInfoElementWithValue(array[i]); exist {
+				ieWithValue.ResetValue()
+			} else {
+				return fmt.Errorf("element with name %v in statsElements is not present in the record", array[i])
+			}
 		}
-		if ieWithValue, _, exist := record.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
-			ieWithValue.ResetValue()
-		} else {
-			return fmt.Errorf("element with name %v in statsElements is not present in the record", antreaDestinationStatsElements[i])
+	}
+	throughputElements := a.aggregateElements.ThroughputElements
+	sourceThroughputElements := a.aggregateElements.SourceThroughputElements
+	destinationThroughputElements := a.aggregateElements.DestinationThroughputElements
+	for i := range throughputElements {
+		for _, array := range [][]string{throughputElements, sourceThroughputElements, destinationThroughputElements} {
+			if ieWithValue, _, exist := record.GetInfoElementWithValue(array[i]); exist {
+				ieWithValue.ResetValue()
+			} else {
+				return fmt.Errorf("element with name %v in throughputElements is not present in the record", array[i])
+			}
 		}
 	}
 	return nil
