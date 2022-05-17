@@ -563,6 +563,9 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 				if srcExistingIeWithValue, _, exist := existingRecord.GetInfoElementWithValue(antreaSourceStatsElements[i]); exist {
 					existingVal := srcExistingIeWithValue.GetUnsigned64Value()
 					if !isDelta {
+						if incomingVal < existingVal {
+							klog.Warningf("The incoming record shouldn't have a smaller value compared to the previous record in field: %s. Previous value: %d. Incoming value: %d.", antreaSourceStatsElements[i], existingVal, incomingVal)
+						}
 						srcExistingIeWithValue.SetUnsigned64Value(incomingVal)
 						switch antreaSourceStatsElements[i] {
 						case "octetTotalCountFromSourceNode":
@@ -582,6 +585,9 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 				if dstExistingIeWithValue, _, exist := existingRecord.GetInfoElementWithValue(antreaDestinationStatsElements[i]); exist {
 					existingVal := dstExistingIeWithValue.GetUnsigned64Value()
 					if !isDelta {
+						if incomingVal < existingVal {
+							klog.Warningf("The incoming record shouldn't have a smaller value compared to the previous record in field: %s. Previous value: %d. Incoming value: %d.", antreaDestinationStatsElements[i], existingVal, incomingVal)
+						}
 						dstExistingIeWithValue.SetUnsigned64Value(incomingVal)
 						switch antreaDestinationStatsElements[i] {
 						case "octetTotalCountFromDestinationNode":
