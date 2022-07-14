@@ -494,38 +494,38 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		return nil
 	}
 	isLatest := false
-	var prevFlowEndSeconds, flowEndSecondsDiff uint32
-	if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue("flowEndSeconds"); exist {
-		if existingIeWithValue, _, exist2 := existingRecord.GetInfoElementWithValue("flowEndSeconds"); exist2 {
-			incomingVal := ieWithValue.GetUnsigned32Value()
-			existingVal := existingIeWithValue.GetUnsigned32Value()
+	var prevFlowEndMilliseconds, flowEndMillisecondsDiff uint64
+	if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue("flowEndMilliseconds"); exist {
+		if existingIeWithValue, _, exist2 := existingRecord.GetInfoElementWithValue("flowEndMilliseconds"); exist2 {
+			incomingVal := ieWithValue.GetUnsigned64Value()
+			existingVal := existingIeWithValue.GetUnsigned64Value()
 			if incomingVal >= existingVal {
 				isLatest = true
-				existingIeWithValue.SetUnsigned32Value(incomingVal)
+				existingIeWithValue.SetUnsigned64Value(incomingVal)
 			}
 			// Update the flowEndSecondsFromSource/DestinationNode fields, and compute
 			// the time difference between the incoming record and the last record.
 			if fillSrcStats {
-				prevFlowEndSeconds = a.updateFlowEndSecondsFromNodes(incomingRecord, existingRecord, true, incomingVal)
+				prevFlowEndMilliseconds = a.updateFlowEndSecondsFromNodes(incomingRecord, existingRecord, true, incomingVal)
 			}
 			if fillDstStats {
-				prevFlowEndSeconds = a.updateFlowEndSecondsFromNodes(incomingRecord, existingRecord, false, incomingVal)
+				prevFlowEndMilliseconds = a.updateFlowEndSecondsFromNodes(incomingRecord, existingRecord, false, incomingVal)
 			}
 			// Skip the aggregation process if the incoming record is not the latest
 			// from its coming node; for intra-node flows. Also to avoid to assign
-			// zero value to flowEndSecondsDiff.
-			if incomingVal <= prevFlowEndSeconds {
-				klog.Warningf("The incoming record doesn't have the latest flowEndSeconds. Previous value: %d. Incoming value: %d. From source node: %v. From destination node: %v", prevFlowEndSeconds, incomingVal, fillSrcStats, fillDstStats)
+			// zero value to flowEndMillisecondsDiff.
+			if incomingVal < prevFlowEndMilliseconds {
+				klog.Warningf("The incoming record doesn't have the latest flowEndMilliseconds. Previous value: %d. Incoming value: %d. From source node: %v. From destination node: %v", prevFlowEndMilliseconds, incomingVal, fillSrcStats, fillDstStats)
 				return nil
 			}
-			flowEndSecondsDiff = incomingVal - prevFlowEndSeconds
+			flowEndMillisecondsDiff = incomingVal - prevFlowEndMilliseconds
 		}
 	}
 	for _, element := range a.aggregateElements.NonStatsElements {
 		if ieWithValue, _, exist := incomingRecord.GetInfoElementWithValue(element); exist {
 			existingIeWithValue, _, _ := existingRecord.GetInfoElementWithValue(element)
 			switch ieWithValue.GetName() {
-			case "flowEndSeconds":
+			case "flowEndMilliseconds":
 				// Flow end timestamp is already updated.
 				break
 			case "flowEndReason":
@@ -548,6 +548,10 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 		} else {
 			return fmt.Errorf("element with name %v in nonStatsElements not present in the incoming record", element)
 		}
+	}
+	// if flowEndMillisecondsDiff is zero, no need to update statsElements and throughputElements
+	if flowEndMillisecondsDiff == 0 {
+		return nil
 	}
 
 	statsElementList := a.aggregateElements.StatsElements
@@ -620,13 +624,16 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 	}
 
 	// Update the throughput & reverseThroughput fields:
-	// throughput = (octetTotalCount - prevOctetTotalCount) / (flowEndSeconds - prevFlowEndSeconds)
-	// reverseThroughput = (reverseOctetTotalCount - prevReverseOctetTotalCount) / (flowEndSeconds - prevFlowEndSeconds)
+	// throughput = (octetTotalCount - prevOctetTotalCount) * 8000 / (flowEndMillisecondsDiff - prevFlowEndMilliseconds)
+	// reverseThroughput = (reverseOctetTotalCount - prevReverseOctetTotalCount) * 8000 / (flowEndMillisecondsDiff - prevFlowEndMilliseconds)
 	antreaThroughputElements := a.aggregateElements.ThroughputElements
 	antreaSourceThroughputElements := a.aggregateElements.SourceThroughputElements
 	antreaDestinationThroughputElements := a.aggregateElements.DestinationThroughputElements
-	throughput := totalCountDiff * 8 / uint64(flowEndSecondsDiff)
-	reverseThroughput := reverseTotalCountDiff * 8 / uint64(flowEndSecondsDiff)
+
+	var throughput, reverseThroughput uint64
+	throughput = totalCountDiff * 8000 / flowEndMillisecondsDiff
+	reverseThroughput = reverseTotalCountDiff * 8000 / flowEndMillisecondsDiff
+
 	throughputVals := []uint64{throughput, reverseThroughput}
 	for i, element := range antreaThroughputElements {
 		if fillSrcStats {
@@ -725,18 +732,18 @@ func (a *AggregationProcess) addFieldsForThroughputCalculation(record entities.R
 	if a.aggregateElements == nil {
 		return nil
 	}
-	antreaFlowEndSecondsElements := a.aggregateElements.AntreaFlowEndSecondsElements
+	antreaFlowEndMillisecondsElements := a.aggregateElements.AntreaFlowEndMillisecondsElements
 	antreaThroughputElements := a.aggregateElements.ThroughputElements
 	antreaSourceThroughputElements := a.aggregateElements.SourceThroughputElements
 	antreaDestinationThroughputElements := a.aggregateElements.DestinationThroughputElements
 
-	var timeStart, timeEnd uint32
+	var timeStart, timeEnd uint64
 	var byteCount, reverseByteCount uint64
-	timeStart, err := getUnsigned32ValueByIeName(record, "flowStartSeconds")
+	timeStart, err := getUnsigned64ValueByIeName(record, "flowStartMilliseconds")
 	if err != nil {
 		return err
 	}
-	timeEnd, err = getUnsigned32ValueByIeName(record, "flowEndSeconds")
+	timeEnd, err = getUnsigned64ValueByIeName(record, "flowEndMilliseconds")
 	if err != nil {
 		return err
 	}
@@ -749,17 +756,17 @@ func (a *AggregationProcess) addFieldsForThroughputCalculation(record entities.R
 		return err
 	}
 
-	// Initialize flowEndSecondsFromSourceNode and flowEndSecondsFromDestinationNode.
-	for _, ieName := range antreaFlowEndSecondsElements {
+	// Initialize flowEndMillisecondsFromSourceNode and flowEndMillisecondsFromDestinationNode.
+	for _, ieName := range antreaFlowEndMillisecondsElements {
 		ie, err := registry.GetInfoElement(ieName, registry.AntreaEnterpriseID)
 		if err != nil {
 			return err
 		}
-		value := uint32(0)
+		value := uint64(0)
 		if fillSrcStats && strings.Contains(ieName, "Source") || fillDstStats && strings.Contains(ieName, "Destination") {
 			value = timeEnd
 		}
-		if err = record.AddInfoElement(entities.NewUnsigned32InfoElement(ie, value)); err != nil {
+		if err = record.AddInfoElement(entities.NewUnsigned64InfoElement(ie, value)); err != nil {
 			return err
 		}
 	}
@@ -769,8 +776,8 @@ func (a *AggregationProcess) addFieldsForThroughputCalculation(record entities.R
 	// For the edge case when the record has the same timeEnd and timeStart values,
 	// we will initialize the throughput fields with zero values.
 	if timeEnd > timeStart {
-		incomingVal = byteCount * 8 / (uint64(timeEnd - timeStart))
-		reverseIncomingVal = reverseByteCount * 8 / (uint64(timeEnd - timeStart))
+		incomingVal = byteCount * 8000 / (timeEnd - timeStart)
+		reverseIncomingVal = reverseByteCount * 8000 / (timeEnd - timeStart)
 	}
 	throughputVals := []uint64{incomingVal, reverseIncomingVal}
 	for i, element := range antreaThroughputElements {
@@ -811,22 +818,22 @@ func (a *AggregationProcess) addFieldsForThroughputCalculation(record entities.R
 	return nil
 }
 
-// updateFlowEndSecondsFromNodes updates the value of flowEndSecondsFromSourceNode
-// or flowEndSecondsFromDestinationNode, returning the previous value before update.
-func (a *AggregationProcess) updateFlowEndSecondsFromNodes(incomingRecord, existingRecord entities.Record, isSrc bool, incomingVal uint32) uint32 {
-	ieName := "flowEndSecondsFromSourceNode"
+// updateFlowEndMillisecondsFromNodes updates the value of flowEndMillisecondsFromSourceNode
+// or flowEndMillisecondsFromDestinationNode, returning the previous value before update.
+func (a *AggregationProcess) updateFlowEndSecondsFromNodes(incomingRecord, existingRecord entities.Record, isSrc bool, incomingVal uint64) uint64 {
+	ieName := "flowEndMillisecondsFromSourceNode"
 	if !isSrc {
-		ieName = "flowEndSecondsFromDestinationNode"
+		ieName = "flowEndMillisecondsFromDestinationNode"
 	}
 	existingIe, _, _ := existingRecord.GetInfoElementWithValue(ieName)
-	existingVal := existingIe.GetUnsigned32Value()
+	existingVal := existingIe.GetUnsigned64Value()
 	// When the incoming record is the first record from its node, the existingVal of the field
-	// is zero, we set it by flowStartSeconds. time_diff = flowEndSeconds - flowStartSeconds
+	// is zero, we set it by flowStartMilliseconds. time_diff = flowEndMilliseconds - flowStartMilliseconds
 	if existingVal == 0 {
-		incomingIe, _, _ := incomingRecord.GetInfoElementWithValue("flowStartSeconds")
-		existingVal = incomingIe.GetUnsigned32Value()
+		incomingIe, _, _ := incomingRecord.GetInfoElementWithValue("flowStartMilliseconds")
+		existingVal = incomingIe.GetUnsigned64Value()
 	}
-	existingIe.SetUnsigned32Value(incomingVal)
+	existingIe.SetUnsigned64Value(incomingVal)
 	return existingVal
 }
 
@@ -839,11 +846,11 @@ func getUnsigned64ValueByIeName(record entities.Record, ieName string) (uint64, 
 	}
 }
 
-func getUnsigned32ValueByIeName(record entities.Record, ieName string) (uint32, error) {
+func getUnsigned8ValueByIeName(record entities.Record, ieName string) (uint8, error) {
 	if ieWithValue, _, exist := record.GetInfoElementWithValue(ieName); exist {
-		return ieWithValue.GetUnsigned32Value(), nil
+		return ieWithValue.GetUnsigned8Value(), nil
 	} else {
-		return uint32(0), fmt.Errorf("element with name %s not present in the incoming record", ieName)
+		return uint8(0), fmt.Errorf("element with name %s not present in the incoming record", ieName)
 	}
 }
 

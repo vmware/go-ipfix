@@ -55,7 +55,7 @@ type AggregationElements struct {
 	StatsElements                      []string
 	AggregatedSourceStatsElements      []string
 	AggregatedDestinationStatsElements []string
-	AntreaFlowEndSecondsElements       []string
+	AntreaFlowEndMillisecondsElements  []string
 	ThroughputElements                 []string
 	SourceThroughputElements           []string
 	DestinationThroughputElements      []string
