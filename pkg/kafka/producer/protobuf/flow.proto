@@ -32,7 +32,7 @@ message FlowType1 {
   uint32 TimeFlowStartInSecs = 4;
   uint32 TimeFlowEndInSecs = 5;
   uint64 TimeFlowStartInMilliSecs = 27;
-  uint32 TimeFlowEndInMilliSecs = 28;
+  uint64 TimeFlowEndInMilliSecs = 28;
 
   // 5-tuple of flows
   string SrcIP = 6;
@@ -78,7 +78,7 @@ message FlowType2 {
   uint32 TimeFlowStartInSecs = 4;
   uint32 TimeFlowEndInSecs = 5;
   uint64 TimeFlowStartInMilliSecs = 27;
-  uint32 TimeFlowEndInMilliSecs = 28;
+  uint64 TimeFlowEndInMilliSecs = 28;
   uint32 FlowEndReason = 35;
   string TcpState = 36;
 

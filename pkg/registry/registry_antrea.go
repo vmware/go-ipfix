@@ -72,6 +72,8 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("throughputFromDestinationNode", 148, 4, 56506, 8), 56506)
 	registerInfoElement(*entities.NewInfoElement("reverseThroughputFromSourceNode", 149, 4, 56506, 8), 56506)
 	registerInfoElement(*entities.NewInfoElement("reverseThroughputFromDestinationNode", 150, 4, 56506, 8), 56506)
-	registerInfoElement(*entities.NewInfoElement("flowEndSecondsFromSourceNode", 151, 14, 56506, 4), 56506)
-	registerInfoElement(*entities.NewInfoElement("flowEndSecondsFromDestinationNode", 152, 14, 56506, 4), 56506)
+	registerInfoElement(*entities.NewInfoElement("flowEndSecondsFromSourceNode", 151, 3, 56506, 4), 56506)
+	registerInfoElement(*entities.NewInfoElement("flowEndSecondsFromDestinationNode", 152, 3, 56506, 4), 56506)
+	registerInfoElement(*entities.NewInfoElement("flowEndMillisecondsFromSourceNode", 153, 4, 56506, 8), 56506)
+	registerInfoElement(*entities.NewInfoElement("flowEndMillisecondsFromDestinationNode", 154, 4, 56506, 8), 56506)
 }

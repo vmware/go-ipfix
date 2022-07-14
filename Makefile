@@ -3,7 +3,7 @@ GOPATH			?= $$($(GO) env GOPATH)
 BINDIR          ?= $(CURDIR)/bin
 
 codegen:
-	GO111MODULE=on $(GO) get github.com/golang/mock/mockgen@v1.4.3 google.golang.org/protobuf/cmd/protoc-gen-go
+	GO111MODULE=on $(GO) get github.com/golang/mock/mockgen@v1.6.0 google.golang.org/protobuf/cmd/protoc-gen-go@v1.28.1
 	PATH=$$PATH:$(GOPATH)/bin $(GO) generate ./...
 
 	# Make sure the IPFIX registries are up-to-date.

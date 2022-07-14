@@ -26,8 +26,8 @@ var (
 		"sourceTransportPort",
 		"destinationTransportPort",
 		"protocolIdentifier",
-		"flowStartSeconds",
-		"flowEndSeconds",
+		"flowStartMilliseconds",
+		"flowEndMilliseconds",
 		"flowEndReason",
 		"packetTotalCount",
 		"packetDeltaCount",
@@ -67,8 +67,8 @@ type testRecord struct {
 	srcPort       uint16
 	dstPort       uint16
 	proto         uint8
-	flowStart     uint32
-	flowEnd       uint32
+	flowStart     uint64
+	flowEnd       uint64
 	pktCount      uint64
 	pktDelta      uint64
 	srcPod        string
@@ -101,9 +101,9 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 		record.srcIP = net.ParseIP("2001:0:3238:DFE1:63::FEFB")
 		record.dstIP = net.ParseIP("2001:0:3238:DFE1:63::FEFC")
 	}
-	record.flowStart = uint32(1257893000)
+	record.flowStart = uint64(1257893000)
 	if !isSrcNode {
-		record.flowEnd = uint32(1257896000)
+		record.flowEnd = uint64(1257896000)
 		record.pktCount = uint64(1000)
 		record.pktDelta = uint64(500)
 		record.bytCount = uint64(1000000)
@@ -119,7 +119,7 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 			record.dstClusterIP = net.ParseIP("::")
 		}
 	} else {
-		record.flowEnd = uint32(1257894000)
+		record.flowEnd = uint64(1257894000)
 		record.pktCount = uint64(800)
 		record.pktDelta = uint64(500)
 		record.bytCount = uint64(800000)
@@ -187,6 +187,7 @@ func createDataSet(templateID uint16, isSrcNode, isIPv6 bool, isMultipleRecord b
 
 func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithValue {
 	testRec := getTestRecord(isSrcNode, isIPv6)
+
 	elements := make([]entities.InfoElementWithValue, 0)
 	ianaFields := ianaIPv4Fields
 	if isIPv6 {
@@ -213,10 +214,10 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 			ie = entities.NewUnsigned64InfoElement(element, testRec.pktDelta)
 		case "octetTotalCount":
 			ie = entities.NewUnsigned64InfoElement(element, testRec.bytCount)
-		case "flowStartSeconds":
-			ie = entities.NewDateTimeSecondsInfoElement(element, testRec.flowStart)
-		case "flowEndSeconds":
-			ie = entities.NewDateTimeSecondsInfoElement(element, testRec.flowEnd)
+		case "flowStartMilliseconds":
+			ie = entities.NewDateTimeMillisecondsInfoElement(element, testRec.flowStart)
+		case "flowEndMilliseconds":
+			ie = entities.NewDateTimeMillisecondsInfoElement(element, testRec.flowEnd)
 		case "flowEndReason":
 			ie = entities.NewUnsigned8InfoElement(element, testRec.flowEndReason)
 		}

@@ -13,13 +13,13 @@ jobs:
 
   test-unit:
     name: Unit test
-    runs-on: [ubuntu-18.04]
+    runs-on: [ubuntu-20.04]
     steps:
 
-    - name: Set up Go 1.15
+    - name: Set up Go 1.17
       uses: actions/setup-go@v1
       with:
-        go-version: 1.15
+        go-version: 1.17
 
     - name: Check-out code
       uses: actions/checkout@v2
@@ -36,13 +36,13 @@ jobs:
 
   test-integration:
     name: Integration test
-    runs-on: [ubuntu-18.04]
+    runs-on: [ubuntu-20.04]
     steps:
 
-    - name: Set up Go 1.15
+    - name: Set up Go 1.17
       uses: actions/setup-go@v1
       with:
-        go-version: 1.15
+        go-version: 1.17
 
     - name: Check-out code
       uses: actions/checkout@v2
@@ -59,18 +59,18 @@ jobs:
 
   codegen:
     name: Check code generation
-    runs-on: [ubuntu-18.04]
+    runs-on: [ubuntu-20.04]
     steps:
 
-    - name: Set up Go 1.15
+    - name: Set up Go 1.17
       uses: actions/setup-go@v1
       with:
-        go-version: 1.15
+        go-version: 1.17
 
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
       with:
-        version: '3.15.0'
+        version: '3.20.1'
 
     - name: Check-out code
       uses: actions/checkout@v2
@@ -84,10 +84,10 @@ jobs:
     runs-on: [ubuntu-latest]
     steps:
 
-    - name: Set up Go 1.15
+    - name: Set up Go 1.17
       uses: actions/setup-go@v1
       with:
-        go-version: 1.15
+        go-version: 1.17
 
     - name: Check-out code
       uses: actions/checkout@v2
@@ -98,12 +98,12 @@ jobs:
 
   golangci-lint:
     name: Golangci-lint
-    runs-on: [ubuntu-18.04]
+    runs-on: [ubuntu-20.04]
     steps:
-      - name: Set up Go 1.15
+      - name: Set up Go 1.17
         uses: actions/setup-go@v1
         with:
-          go-version: 1.15
+          go-version: 1.17
 
       - name: Check-out code
         uses: actions/checkout@v2

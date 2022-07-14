@@ -248,10 +248,10 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 			assert.Equal(t, testRec.pktCount, element.GetUnsigned64Value())
 		case "packetDeltaCount":
 			assert.Equal(t, testRec.pktDelta, element.GetUnsigned64Value())
-		case "flowStartSeconds":
-			assert.Equal(t, testRec.flowStart, element.GetUnsigned32Value())
-		case "flowEndSeconds":
-			assert.Equal(t, testRec.flowEnd, element.GetUnsigned32Value())
+		case "flowStartSMilliseconds":
+			assert.Equal(t, testRec.flowStart, element.GetUnsigned64Value())
+		case "flowEndMilliseconds":
+			assert.Equal(t, testRec.flowEnd, element.GetUnsigned64Value())
 		case "flowEndReason":
 			assert.Equal(t, testRec.flowEndReason, element.GetUnsigned8Value())
 		}

@@ -70,10 +70,10 @@ func addAllFieldsToFlowType1(flowMsg *protobuf.FlowType1, record entities.Record
 		var portVal uint16
 		var protoVal uint8
 		switch ie.GetName() {
-		case "flowStartSeconds":
-			flowMsg.TimeFlowStartInSecs = ie.GetUnsigned32Value()
-		case "flowEndSeconds":
-			flowMsg.TimeFlowEndInSecs = ie.GetUnsigned32Value()
+		case "flowStartMilliseconds":
+			flowMsg.TimeFlowStartInMilliSecs = ie.GetUnsigned64Value()
+		case "flowEndMilliseconds":
+			flowMsg.TimeFlowEndInMilliSecs = ie.GetUnsigned64Value()
 		case "sourceIPv4Address", "sourceIPv6Address":
 			if flowMsg.SrcIP != "" {
 				klog.Warningf("Do not expect source IP: %v to be filled already", flowMsg.SrcIP)

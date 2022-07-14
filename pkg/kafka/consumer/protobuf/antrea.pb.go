@@ -49,7 +49,7 @@ type AntreaFlowMsg struct {
 	TimeFlowStartInSecs      uint32 `protobuf:"varint,4,opt,name=TimeFlowStartInSecs,json=timeFlowStartInSecs,proto3" json:"TimeFlowStartInSecs,omitempty"`
 	TimeFlowEndInSecs        uint32 `protobuf:"varint,5,opt,name=TimeFlowEndInSecs,json=timeFlowEndInSecs,proto3" json:"TimeFlowEndInSecs,omitempty"`
 	TimeFlowStartInMilliSecs uint64 `protobuf:"varint,27,opt,name=TimeFlowStartInMilliSecs,json=timeFlowStartInMilliSecs,proto3" json:"TimeFlowStartInMilliSecs,omitempty"`
-	TimeFlowEndInMilliSecs   uint32 `protobuf:"varint,28,opt,name=TimeFlowEndInMilliSecs,json=timeFlowEndInMilliSecs,proto3" json:"TimeFlowEndInMilliSecs,omitempty"`
+	TimeFlowEndInMilliSecs   uint64 `protobuf:"varint,28,opt,name=TimeFlowEndInMilliSecs,json=timeFlowEndInMilliSecs,proto3" json:"TimeFlowEndInMilliSecs,omitempty"`
 	// 5-tuple of flows
 	SrcIP   string `protobuf:"bytes,6,opt,name=SrcIP,json=srcIP,proto3" json:"SrcIP,omitempty"`
 	DstIP   string `protobuf:"bytes,7,opt,name=DstIP,json=dstIP,proto3" json:"DstIP,omitempty"`
@@ -162,7 +162,7 @@ func (x *AntreaFlowMsg) GetTimeFlowStartInMilliSecs() uint64 {
 	return 0
 }
 
-func (x *AntreaFlowMsg) GetTimeFlowEndInMilliSecs() uint32 {
+func (x *AntreaFlowMsg) GetTimeFlowEndInMilliSecs() uint64 {
 	if x != nil {
 		return x.TimeFlowEndInMilliSecs
 	}

@@ -30,7 +30,7 @@ message AntreaFlowMsg {
   uint32 TimeFlowStartInSecs = 4;
   uint32 TimeFlowEndInSecs = 5;
   uint64 TimeFlowStartInMilliSecs = 27;
-  uint32 TimeFlowEndInMilliSecs = 28;
+  uint64 TimeFlowEndInMilliSecs = 28;
 
   // 5-tuple of flows
   string SrcIP = 6;

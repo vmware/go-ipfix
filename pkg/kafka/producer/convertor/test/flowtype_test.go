@@ -39,8 +39,8 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 	elements := make([]entities.InfoElementWithValue, 0)
 
 	ieNamesIANA := []string{
-		"flowStartSeconds",
-		"flowEndSeconds",
+		"flowStartMilliseconds",
+		"flowEndMilliseconds",
 		"sourceTransportPort",
 		"destinationTransportPort",
 		"protocolIdentifier",
@@ -98,9 +98,9 @@ func createMsgwithDataSet(t *testing.T, isV6 bool) *entities.Message {
 
 		var value []byte
 		switch ieName {
-		case "flowStartSeconds", "flowEndSeconds":
+		case "flowStartMilliseconds", "flowEndMilliseconds":
 			// hardcoding it to initial epoch to make the test simple.
-			value, _ = entities.EncodeToIEDataType(entities.DateTimeSeconds, uint32(0))
+			value, _ = entities.EncodeToIEDataType(entities.DateTimeMilliseconds, uint64(0))
 		case "sourceIPv4Address":
 			value, _ = entities.EncodeToIEDataType(entities.Ipv4Address, net.IP{10, 0, 0, 1})
 		case "sourceIPv6Address":
