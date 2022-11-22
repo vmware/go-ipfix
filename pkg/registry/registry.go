@@ -73,9 +73,13 @@ var (
 	globalRegistryByName map[uint32]map[string]*entities.InfoElement
 )
 
-func InitNewRegistry(customEnterpriseID uint32) {
+func InitNewRegistry(customEnterpriseID uint32) error {
+	if globalRegistryByID == nil {
+		return fmt.Errorf("Please use LoadRegistry before registering custom registry")
+	}
 	globalRegistryByID[customEnterpriseID] = make(map[uint16]*entities.InfoElement)
 	globalRegistryByName[customEnterpriseID] = make(map[string]*entities.InfoElement)
+	return nil
 }
 
 func RegisterIE(ie entities.InfoElement, enterpriseID uint32) error {
