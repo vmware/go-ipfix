@@ -73,6 +73,30 @@ var (
 	globalRegistryByName map[uint32]map[string]*entities.InfoElement
 )
 
+func InitNewRegistry(customEnterpriseID uint32) {
+	globalRegistryByID[customEnterpriseID] = make(map[uint16]*entities.InfoElement)
+	globalRegistryByName[customEnterpriseID] = make(map[string]*entities.InfoElement)
+}
+
+func RegisterIE(ie entities.InfoElement, enterpriseID uint32) error {
+	if _, exist := globalRegistryByName[enterpriseID]; !exist {
+		return fmt.Errorf("Registry with EnterpriseID %d is not Initialized, Please use InitNewRegistry", ie.EnterpriseId)
+	} else if _, exist = globalRegistryByName[enterpriseID][ie.Name]; exist {
+		return fmt.Errorf("Information element %s in registry with EnterpriseID %d has already been registered", ie.Name, ie.EnterpriseId)
+	}
+	globalRegistryByID[ie.EnterpriseId][ie.ElementId] = &ie
+	globalRegistryByName[ie.EnterpriseId][ie.Name] = &ie
+
+	if ie.EnterpriseId == IANAEnterpriseID { // handle reverse information element for IANA registry
+		reverseIE, err := getIANAReverseInfoElement(ie.Name)
+		if err == nil { // the information element has reverse information element
+			globalRegistryByID[IANAReversedEnterpriseID][reverseIE.ElementId] = reverseIE
+			globalRegistryByName[IANAReversedEnterpriseID][reverseIE.Name] = reverseIE
+		}
+	}
+	return nil
+}
+
 func LoadRegistry() {
 	globalRegistryByID = make(map[uint32]map[uint16]*entities.InfoElement)
 	globalRegistryByID[AntreaEnterpriseID] = make(map[uint16]*entities.InfoElement)
