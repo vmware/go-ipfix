@@ -90,14 +90,6 @@ func RegisterIE(ie entities.InfoElement, enterpriseID uint32) error {
 	}
 	globalRegistryByID[ie.EnterpriseId][ie.ElementId] = &ie
 	globalRegistryByName[ie.EnterpriseId][ie.Name] = &ie
-
-	if ie.EnterpriseId == IANAEnterpriseID { // handle reverse information element for IANA registry
-		reverseIE, err := getIANAReverseInfoElement(ie.Name)
-		if err == nil { // the information element has reverse information element
-			globalRegistryByID[IANAReversedEnterpriseID][reverseIE.ElementId] = reverseIE
-			globalRegistryByName[IANAReversedEnterpriseID][reverseIE.Name] = reverseIE
-		}
-	}
 	return nil
 }
 
