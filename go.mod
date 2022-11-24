@@ -1,4 +1,4 @@
-module github.com/vmware/go-ipfix
+module github.com/praveingk/go-ipfix
 
 go 1.15
 
