@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.5.13 12-05-2022
+### Added
+- Add APIs for custom registries. (#299, @praveingk)
+### Changed
+- Renew fake cert for tests. (#290, @yanjunz97)
 ## 0.5.12 02-23-2022
 ### Changed
 - Fix the throughput burst issue. (#278, @yanjunz97)
