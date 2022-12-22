@@ -19,35 +19,36 @@
 package testing
 
 import (
+	reflect "reflect"
+
 	gomock "github.com/golang/mock/gomock"
 	entities "github.com/vmware/go-ipfix/pkg/entities"
-	reflect "reflect"
 )
 
-// MockSet is a mock of Set interface
+// MockSet is a mock of Set interface.
 type MockSet struct {
 	ctrl     *gomock.Controller
 	recorder *MockSetMockRecorder
 }
 
-// MockSetMockRecorder is the mock recorder for MockSet
+// MockSetMockRecorder is the mock recorder for MockSet.
 type MockSetMockRecorder struct {
 	mock *MockSet
 }
 
-// NewMockSet creates a new mock instance
+// NewMockSet creates a new mock instance.
 func NewMockSet(ctrl *gomock.Controller) *MockSet {
 	mock := &MockSet{ctrl: ctrl}
 	mock.recorder = &MockSetMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use
+// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockSet) EXPECT() *MockSetMockRecorder {
 	return m.recorder
 }
 
-// AddRecord mocks base method
+// AddRecord mocks base method.
 func (m *MockSet) AddRecord(arg0 []entities.InfoElementWithValue, arg1 uint16) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddRecord", arg0, arg1)
@@ -55,13 +56,13 @@ func (m *MockSet) AddRecord(arg0 []entities.InfoElementWithValue, arg1 uint16) e
 	return ret0
 }
 
-// AddRecord indicates an expected call of AddRecord
+// AddRecord indicates an expected call of AddRecord.
 func (mr *MockSetMockRecorder) AddRecord(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), arg0, arg1)
 }
 
-// AddRecordWithExtraElements mocks base method
+// AddRecordWithExtraElements mocks base method.
 func (m *MockSet) AddRecordWithExtraElements(arg0 []entities.InfoElementWithValue, arg1 int, arg2 uint16) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "AddRecordWithExtraElements", arg0, arg1, arg2)
@@ -69,13 +70,13 @@ func (m *MockSet) AddRecordWithExtraElements(arg0 []entities.InfoElementWithValu
 	return ret0
 }
 
-// AddRecordWithExtraElements indicates an expected call of AddRecordWithExtraElements
+// AddRecordWithExtraElements indicates an expected call of AddRecordWithExtraElements.
 func (mr *MockSetMockRecorder) AddRecordWithExtraElements(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordWithExtraElements", reflect.TypeOf((*MockSet)(nil).AddRecordWithExtraElements), arg0, arg1, arg2)
 }
 
-// GetHeaderBuffer mocks base method
+// GetHeaderBuffer mocks base method.
 func (m *MockSet) GetHeaderBuffer() []byte {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetHeaderBuffer")
@@ -83,13 +84,13 @@ func (m *MockSet) GetHeaderBuffer() []byte {
 	return ret0
 }
 
-// GetHeaderBuffer indicates an expected call of GetHeaderBuffer
+// GetHeaderBuffer indicates an expected call of GetHeaderBuffer.
 func (mr *MockSetMockRecorder) GetHeaderBuffer() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetHeaderBuffer", reflect.TypeOf((*MockSet)(nil).GetHeaderBuffer))
 }
 
-// GetNumberOfRecords mocks base method
+// GetNumberOfRecords mocks base method.
 func (m *MockSet) GetNumberOfRecords() uint32 {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetNumberOfRecords")
@@ -97,13 +98,13 @@ func (m *MockSet) GetNumberOfRecords() uint32 {
 	return ret0
 }
 
-// GetNumberOfRecords indicates an expected call of GetNumberOfRecords
+// GetNumberOfRecords indicates an expected call of GetNumberOfRecords.
 func (mr *MockSetMockRecorder) GetNumberOfRecords() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNumberOfRecords", reflect.TypeOf((*MockSet)(nil).GetNumberOfRecords))
 }
 
-// GetRecords mocks base method
+// GetRecords mocks base method.
 func (m *MockSet) GetRecords() []entities.Record {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRecords")
@@ -111,13 +112,13 @@ func (m *MockSet) GetRecords() []entities.Record {
 	return ret0
 }
 
-// GetRecords indicates an expected call of GetRecords
+// GetRecords indicates an expected call of GetRecords.
 func (mr *MockSetMockRecorder) GetRecords() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecords", reflect.TypeOf((*MockSet)(nil).GetRecords))
 }
 
-// GetSetLength mocks base method
+// GetSetLength mocks base method.
 func (m *MockSet) GetSetLength() int {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSetLength")
@@ -125,13 +126,13 @@ func (m *MockSet) GetSetLength() int {
 	return ret0
 }
 
-// GetSetLength indicates an expected call of GetSetLength
+// GetSetLength indicates an expected call of GetSetLength.
 func (mr *MockSetMockRecorder) GetSetLength() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSetLength", reflect.TypeOf((*MockSet)(nil).GetSetLength))
 }
 
-// GetSetType mocks base method
+// GetSetType mocks base method.
 func (m *MockSet) GetSetType() entities.ContentType {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetSetType")
@@ -139,13 +140,13 @@ func (m *MockSet) GetSetType() entities.ContentType {
 	return ret0
 }
 
-// GetSetType indicates an expected call of GetSetType
+// GetSetType indicates an expected call of GetSetType.
 func (mr *MockSetMockRecorder) GetSetType() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetSetType", reflect.TypeOf((*MockSet)(nil).GetSetType))
 }
 
-// PrepareSet mocks base method
+// PrepareSet mocks base method.
 func (m *MockSet) PrepareSet(arg0 entities.ContentType, arg1 uint16) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PrepareSet", arg0, arg1)
@@ -153,31 +154,31 @@ func (m *MockSet) PrepareSet(arg0 entities.ContentType, arg1 uint16) error {
 	return ret0
 }
 
-// PrepareSet indicates an expected call of PrepareSet
+// PrepareSet indicates an expected call of PrepareSet.
 func (mr *MockSetMockRecorder) PrepareSet(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareSet", reflect.TypeOf((*MockSet)(nil).PrepareSet), arg0, arg1)
 }
 
-// ResetSet mocks base method
+// ResetSet mocks base method.
 func (m *MockSet) ResetSet() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "ResetSet")
 }
 
-// ResetSet indicates an expected call of ResetSet
+// ResetSet indicates an expected call of ResetSet.
 func (mr *MockSetMockRecorder) ResetSet() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetSet", reflect.TypeOf((*MockSet)(nil).ResetSet))
 }
 
-// UpdateLenInHeader mocks base method
+// UpdateLenInHeader mocks base method.
 func (m *MockSet) UpdateLenInHeader() {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "UpdateLenInHeader")
 }
 
-// UpdateLenInHeader indicates an expected call of UpdateLenInHeader
+// UpdateLenInHeader indicates an expected call of UpdateLenInHeader.
 func (mr *MockSetMockRecorder) UpdateLenInHeader() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateLenInHeader", reflect.TypeOf((*MockSet)(nil).UpdateLenInHeader))
