@@ -16,7 +16,6 @@ package producer
 
 import (
 	"crypto/tls"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -79,7 +78,7 @@ func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, client
 }
 
 func createTmpFileAndWrite(t *testing.T, content, pattern string) *os.File {
-	tmpFile, err := ioutil.TempFile(os.TempDir(), pattern)
+	tmpFile, err := os.CreateTemp("", pattern)
 	if err != nil {
 		t.Fatal("Cannot create temporary file", err)
 	}
