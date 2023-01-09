@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.6.0 01-09-2023
+### Changed
+- Upgrade Go to v1.19. Upgrade Go modules to their latest version.
+  Upgrade Antrea base image to ubuntu 22.04. (#293, @antoninbas)
+- Refactor TLS client config for exporter. (#294, @antoninbas)
 ## 0.5.13 12-05-2022
 ### Added
 - Add APIs for custom registries. (#288, @praveingk)
