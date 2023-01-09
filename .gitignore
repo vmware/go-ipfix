@@ -2,7 +2,6 @@ bin
 pkg/registry/build_registry/build_registry
 .coverage/
 .golangci-bin/
-.mockgen-bin/
 
 .DS_Store
 

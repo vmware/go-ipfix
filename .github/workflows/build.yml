@@ -13,9 +13,9 @@ on:
 jobs:
   build-ipfix-collector:
     if: ${{ github.event_name == 'push' }}
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Build ipfix-collector Docker image
         run: make docker-collector
       - name: Push ipfix-collector Docker image to Antrea Docker registry
@@ -28,9 +28,9 @@ jobs:
           docker push antrea/ipfix-collector:latest
   build-kafka-consumer:
     if: ${{ github.event_name == 'push' }}
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Build kafka-consumer Docker image
         run: make docker-consumer
       - name: Push kafka-consumer Docker image to Antrea Docker registry

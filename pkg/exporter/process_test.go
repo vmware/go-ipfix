@@ -16,15 +16,12 @@ package exporter
 
 import (
 	"crypto/tls"
-	"crypto/x509"
-	"io"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/pion/dtls/v2"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
@@ -395,156 +392,6 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	exporter.CloseConnToCollector()
 }
 
-func TestInitExportingProcessWithTLS(t *testing.T) {
-	caCert, caKey, caData, err := test.GenerateCACert()
-	require.NoError(t, err, "Error when generating CA cert")
-	clientCertData, clientKeyData, err := test.GenerateClientCert(caCert, caKey)
-	require.NoError(t, err, "Error when generating client cert")
-
-	testCases := []struct {
-		name              string
-		serverCertOptions []test.CertificateOption
-		withClientAuth    bool
-		tlsClientConfig   *ExporterTLSClientConfig
-		expectedErr       string
-		expectedServerErr string
-	}{
-		{
-			name: "no SANs",
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData: caData,
-			},
-			expectedErr:       "x509: cannot validate certificate for 127.0.0.1 because it doesn't contain any IP SANs",
-			expectedServerErr: "tls: bad certificate",
-		},
-		{
-			name:              "IP SAN",
-			serverCertOptions: []test.CertificateOption{test.AddIPAddress(net.ParseIP("127.0.0.1"))},
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData: caData,
-			},
-		},
-		{
-			name:              "name SAN with matching ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData:     caData,
-				ServerName: "foobar",
-			},
-		},
-		{
-			name:              "name SAN with mismatching ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData:     caData,
-				ServerName: "badname",
-			},
-			expectedErr:       "x509: certificate is valid for foobar, not badname",
-			expectedServerErr: "tls: bad certificate",
-		},
-		{
-			name:              "name SAN without ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData: caData,
-			},
-			expectedErr:       "x509: cannot validate certificate for 127.0.0.1 because it doesn't contain any IP SANs",
-			expectedServerErr: "tls: bad certificate",
-		},
-		{
-			name:              "client auth with no cert",
-			serverCertOptions: []test.CertificateOption{test.AddIPAddress(net.ParseIP("127.0.0.1"))},
-			withClientAuth:    true,
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData: caData,
-			},
-			expectedServerErr: "tls: client didn't provide a certificate",
-		},
-		{
-			name:              "client auth with cert",
-			serverCertOptions: []test.CertificateOption{test.AddIPAddress(net.ParseIP("127.0.0.1"))},
-			withClientAuth:    true,
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData:   caData,
-				CertData: clientCertData,
-				KeyData:  clientKeyData,
-			},
-		},
-		{
-			name:              "client auth and ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
-			withClientAuth:    true,
-			tlsClientConfig: &ExporterTLSClientConfig{
-				CAData:     caData,
-				CertData:   clientCertData,
-				KeyData:    clientKeyData,
-				ServerName: "foobar",
-			},
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			// Create local server for testing
-			address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
-			require.NoError(t, err)
-			serverCertData, serverKeyData, err := test.GenerateServerCert(caCert, caKey, tc.serverCertOptions...)
-			require.NoError(t, err, "Error when generating server cert")
-			serverCert, err := tls.X509KeyPair(serverCertData, serverKeyData)
-			require.NoError(t, err)
-			config := &tls.Config{
-				Certificates: []tls.Certificate{serverCert},
-				MinVersion:   tls.VersionTLS12,
-			}
-			if tc.withClientAuth {
-				certPool := x509.NewCertPool()
-				certPool.AppendCertsFromPEM(caData)
-				config.ClientAuth = tls.RequireAndVerifyClientCert
-				config.ClientCAs = certPool
-			}
-			listener, err := tls.Listen("tcp", address.String(), config)
-			require.NoError(t, err, "Error when starting server")
-			serverErrCh := make(chan error)
-
-			go func() {
-				defer listener.Close()
-				conn, err := listener.Accept()
-				if err != nil {
-					return
-				}
-				defer conn.Close()
-				t.Log("Accept the connection from exporter")
-				_, err = io.ReadAll(conn)
-				serverErrCh <- err
-			}()
-
-			input := ExporterInput{
-				CollectorAddress:    listener.Addr().String(),
-				CollectorProtocol:   listener.Addr().Network(),
-				ObservationDomainID: 1,
-				TempRefTimeout:      0,
-				TLSClientConfig:     tc.tlsClientConfig,
-			}
-			exporter, err := InitExportingProcess(input)
-			if tc.expectedErr != "" {
-				assert.ErrorContains(t, err, tc.expectedErr)
-			} else {
-				assert.NoError(t, err)
-			}
-			if err == nil {
-				exporter.CloseConnToCollector()
-			}
-			serverErr := <-serverErrCh
-			if tc.expectedServerErr != "" {
-				assert.ErrorContains(t, serverErr, tc.expectedServerErr)
-			} else {
-				assert.NoError(t, serverErr)
-			}
-		})
-	}
-}
-
 func TestExportingProcessWithTLS(t *testing.T) {
 	// Create local server for testing
 	address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
@@ -556,10 +403,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	config := &tls.Config{
-		Certificates: []tls.Certificate{cer},
-		MinVersion:   tls.VersionTLS12,
-	}
+	config := &tls.Config{Certificates: []tls.Certificate{cer}}
 	listener, err := tls.Listen("tcp", address.String(), config)
 	if err != nil {
 		t.Errorf("Cannot start tls collecting process on %s: %v", listener.Addr().String(), err)
@@ -591,10 +435,8 @@ func TestExportingProcessWithTLS(t *testing.T) {
 		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
-		TLSClientConfig: &ExporterTLSClientConfig{
-			CAData:     []byte(test.FakeCACert),
-			ServerName: "127.0.0.1",
-		},
+		IsEncrypted:         true,
+		CACert:              []byte(test.FakeCACert),
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -678,9 +520,8 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 		CollectorProtocol:   listener.Addr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
-		TLSClientConfig: &ExporterTLSClientConfig{
-			CAData: []byte(test.FakeCert2),
-		},
+		IsEncrypted:         true,
+		CACert:              []byte(test.FakeCert2),
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {

@@ -136,18 +136,18 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 		CollectorProtocol:   cp.GetAddress().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
+		IsEncrypted:         isEncrypted,
+		CACert:              nil,
 		CheckConnInterval:   time.Millisecond,
 	}
 	if isEncrypted {
-		tlsClientConfig := &exporter.ExporterTLSClientConfig{}
 		if address.Network() == "tcp" { // use TLS
-			tlsClientConfig.CAData = []byte(FakeCACert)
-			tlsClientConfig.CertData = []byte(FakeClientCert)
-			tlsClientConfig.KeyData = []byte(FakeClientKey)
+			epInput.CACert = []byte(FakeCACert)
+			epInput.ClientCert = []byte(FakeClientCert)
+			epInput.ClientKey = []byte(FakeClientKey)
 		} else if address.Network() == "udp" { // use DTLS
-			tlsClientConfig.CAData = []byte(FakeCert2)
+			epInput.CACert = []byte(FakeCert2)
 		}
-		epInput.TLSClientConfig = tlsClientConfig
 	}
 	export, err := exporter.InitExportingProcess(epInput)
 	if err != nil {

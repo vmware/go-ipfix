@@ -36,6 +36,7 @@ type ConsumerInput struct {
 }
 
 type KafkaConsumer struct {
+	consumer    sarama.Consumer
 	input       ConsumerInput
 	stopChan    chan struct{}
 	messageChan chan *sarama.ConsumerMessage

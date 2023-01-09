@@ -13,16 +13,16 @@ jobs:
 
   test-unit:
     name: Unit test
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
 
-    - name: Check-out code
-      uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v3
+    - name: Set up Go 1.15
+      uses: actions/setup-go@v1
       with:
-        go-version-file: 'go.mod'
+        go-version: 1.15
+
+    - name: Check-out code
+      uses: actions/checkout@v2
 
     - name: Run unit tests
       run: make test-unit
@@ -36,16 +36,16 @@ jobs:
 
   test-integration:
     name: Integration test
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
 
-    - name: Check-out code
-      uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v3
+    - name: Set up Go 1.15
+      uses: actions/setup-go@v1
       with:
-        go-version-file: 'go.mod'
+        go-version: 1.15
+
+    - name: Check-out code
+      uses: actions/checkout@v2
 
     - name: Run integration tests
       run: make test-integration
@@ -59,21 +59,21 @@ jobs:
 
   codegen:
     name: Check code generation
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
 
-    - name: Check-out code
-      uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v3
+    - name: Set up Go 1.15
+      uses: actions/setup-go@v1
       with:
-        go-version-file: 'go.mod'
+        go-version: 1.15
 
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
       with:
         version: '3.15.0'
+
+    - name: Check-out code
+      uses: actions/checkout@v2
 
     - name: Check code generation
       run: ./ci/check_codegen.sh
@@ -84,13 +84,13 @@ jobs:
     runs-on: [ubuntu-latest]
     steps:
 
-    - name: Check-out code
-      uses: actions/checkout@v3
-
-    - name: Set up Go
-      uses: actions/setup-go@v3
+    - name: Set up Go 1.15
+      uses: actions/setup-go@v1
       with:
-        go-version-file: 'go.mod'
+        go-version: 1.15
+
+    - name: Check-out code
+      uses: actions/checkout@v2
 
     - name: Check manifest
       run: ./ci/check_manifest.sh
@@ -98,16 +98,15 @@ jobs:
 
   golangci-lint:
     name: Golangci-lint
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
+      - name: Set up Go 1.15
+        uses: actions/setup-go@v1
+        with:
+          go-version: 1.15
 
       - name: Check-out code
-        uses: actions/checkout@v3
-
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version-file: 'go.mod'
+        uses: actions/checkout@v2
 
       - name: Run golangci-lint
         run: make golangci
