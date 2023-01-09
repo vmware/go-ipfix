@@ -403,10 +403,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	config := &tls.Config{
-		Certificates: []tls.Certificate{cer},
-		MinVersion:   tls.VersionTLS12,
-	}
+	config := &tls.Config{Certificates: []tls.Certificate{cer}}
 	listener, err := tls.Listen("tcp", address.String(), config)
 	if err != nil {
 		t.Errorf("Cannot start tls collecting process on %s: %v", listener.Addr().String(), err)

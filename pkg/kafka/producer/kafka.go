@@ -19,6 +19,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"sync"
@@ -131,7 +132,7 @@ func setupTLSConfig(caFile, tlsCertFile, tlsKeyFile string, kafkaTLSSkipVerify b
 			return nil, fmt.Errorf("kafka TLS load X509 key pair error: %v", err)
 		}
 
-		caCert, err := os.ReadFile(caFile)
+		caCert, err := ioutil.ReadFile(caFile)
 		if err != nil {
 			return nil, fmt.Errorf("kafka TLS CA file error: %v", err)
 		}

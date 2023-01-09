@@ -7,9 +7,9 @@ on:
 
 jobs:
   build-ipfix-collector:
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Build go-ipfix Docker images and push to Antrea Docker registry
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -21,9 +21,9 @@ jobs:
           docker tag antrea/ipfix-collector antrea/ipfix-collector:"${TAG:10}"
           docker push antrea/ipfix-collector:"${TAG:10}"
   build-kafka-collector:
-    runs-on: [ubuntu-latest]
+    runs-on: [ubuntu-18.04]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v2
       - name: Build kafka-consumer Docker images and push to Antrea Docker registry
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

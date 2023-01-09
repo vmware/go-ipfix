@@ -160,10 +160,7 @@ func getIANAReverseInfoElement(name string) (*entities.InfoElement, error) {
 		err := fmt.Errorf("IANA Registry: The information element %s is not reverse element", name)
 		return ie, err
 	}
-	reverseName := "reverse"
-	if ie.Name != "" {
-		reverseName += strings.ToUpper(ie.Name[:1]) + ie.Name[1:]
-	}
+	reverseName := "reverse" + strings.Title(ie.Name)
 	return entities.NewInfoElement(reverseName, ie.ElementId, ie.DataType, IANAReversedEnterpriseID, ie.Len), nil
 }
 

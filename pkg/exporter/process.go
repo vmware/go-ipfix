@@ -40,15 +40,15 @@ type templateValue struct {
 	minDataRecLen uint16
 }
 
-//  1. Tested one exportingProcess process per exporter. Can support multiple collector scenario by
-//     creating different instances of exporting process. Need to be tested
-//  2. Only one observation point per observation domain is supported,
-//     so observation point ID not defined.
-//  3. Supports only TCP and UDP; one session at a time. SCTP is not supported.
-//  4. UDP needs to send MTU size packets as per RFC7011. We are not honoring that,
-//     and relying on IP fragmentation and assuming data loss in the network is minimal.
-//     We will revisit this if there are any issues, and get PathMTU from the user
-//     as part of exporter input.
+// 1. Tested one exportingProcess process per exporter. Can support multiple collector scenario by
+//    creating different instances of exporting process. Need to be tested
+// 2. Only one observation point per observation domain is supported,
+//    so observation point ID not defined.
+// 3. Supports only TCP and UDP; one session at a time. SCTP is not supported.
+// 4. UDP needs to send MTU size packets as per RFC7011. We are not honoring that,
+//    and relying on IP fragmentation and assuming data loss in the network is minimal.
+//    We will revisit this if there are any issues, and get PathMTU from the user
+//    as part of exporter input.
 type ExportingProcess struct {
 	connToCollector net.Conn
 	obsDomainID     uint32
@@ -393,7 +393,6 @@ func (ep *ExportingProcess) updateTemplate(id uint16, elements []entities.InfoEl
 	return
 }
 
-//nolint:unused // Keeping this function for reference.
 func (ep *ExportingProcess) deleteTemplate(id uint16) error {
 	ep.templateMutex.Lock()
 	defer ep.templateMutex.Unlock()

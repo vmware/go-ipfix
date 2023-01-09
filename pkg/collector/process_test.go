@@ -387,7 +387,6 @@ func TestTLSCollectingProcess(t *testing.T) {
 		config = &tls.Config{
 			RootCAs:      roots,
 			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
 		}
 
 		conn, err = tls.Dial("tcp", collectorAddr.String(), config)

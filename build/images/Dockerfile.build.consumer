@@ -1,4 +1,4 @@
-FROM golang:1.19 as go-ipfix-build
+FROM golang:1.15 as go-ipfix-build
 
 WORKDIR /go-ipfix
 
@@ -10,7 +10,7 @@ COPY . /go-ipfix
 
 RUN make consumer
 
-FROM ubuntu:22.04
+FROM ubuntu:18.04
 
 LABEL maintainer="go-ipfix"
 LABEL description="A Docker image based on Ubuntu 18.04 which contains a Kafka consumer"
