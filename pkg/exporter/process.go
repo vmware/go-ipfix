@@ -61,19 +61,6 @@ type ExportingProcess struct {
 	jsonBufferLen   int
 }
 
-type ExporterTLSClientConfig struct {
-	// ServerName is passed to the server for SNI and is used in the client to check server
-	// certificates against. If ServerName is empty, the hostname used to contact the
-	// server is used.
-	ServerName string
-	// CAData holds PEM-encoded bytes for trusted root certificates for server.
-	CAData []byte
-	// CertData holds PEM-encoded bytes.
-	CertData []byte
-	// KeyData holds PEM-encoded bytes.
-	KeyData []byte
-}
-
 type ExporterInput struct {
 	// CollectorAddress needs to be provided in hostIP:port format.
 	CollectorAddress string
@@ -82,12 +69,14 @@ type ExporterInput struct {
 	CollectorProtocol   string
 	ObservationDomainID uint32
 	TempRefTimeout      uint32
-	// TLSClientConfig is set to use an encrypted connection to the collector.
-	TLSClientConfig   *ExporterTLSClientConfig
-	IsIPv6            bool
-	SendJSONRecord    bool
-	JSONBufferLen     int
-	CheckConnInterval time.Duration
+	IsEncrypted         bool
+	CACert              []byte
+	ClientCert          []byte
+	ClientKey           []byte
+	IsIPv6              bool
+	SendJSONRecord      bool
+	JSONBufferLen       int
+	CheckConnInterval   time.Duration
 }
 
 // InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID)
@@ -104,10 +93,9 @@ type ExporterInput struct {
 func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	var conn net.Conn
 	var err error
-	if input.TLSClientConfig != nil {
-		tlsConfig := input.TLSClientConfig
+	if input.IsEncrypted {
 		if input.CollectorProtocol == "tcp" { // use TLS
-			config, configErr := createClientConfig(tlsConfig)
+			config, configErr := createClientConfig(input.CACert, input.ClientCert, input.ClientKey)
 			if configErr != nil {
 				return nil, configErr
 			}
@@ -117,20 +105,13 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 				return nil, err
 			}
 		} else if input.CollectorProtocol == "udp" { // use DTLS
-			// TODO: support client authentication
-			if len(tlsConfig.CertData) > 0 || len(tlsConfig.KeyData) > 0 {
-				klog.Error("Client-authentication is not supported yet for DTLS, cert and key data will be ignored")
-			}
 			roots := x509.NewCertPool()
-			ok := roots.AppendCertsFromPEM(tlsConfig.CAData)
+			ok := roots.AppendCertsFromPEM(input.CACert)
 			if !ok {
 				return nil, fmt.Errorf("failed to parse root certificate")
 			}
-			config := &dtls.Config{
-				RootCAs:              roots,
-				ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
-				ServerName:           tlsConfig.ServerName,
-			}
+			config := &dtls.Config{RootCAs: roots,
+				ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
 			udpAddr, err := net.ResolveUDPAddr(input.CollectorProtocol, input.CollectorAddress)
 			if err != nil {
 				return nil, err
@@ -484,20 +465,19 @@ func isChanClosed(ch <-chan struct{}) bool {
 	return false
 }
 
-func createClientConfig(config *ExporterTLSClientConfig) (*tls.Config, error) {
+func createClientConfig(caCert, clientCert, clientKey []byte) (*tls.Config, error) {
 	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM(config.CAData)
+	ok := roots.AppendCertsFromPEM(caCert)
 	if !ok {
 		return nil, fmt.Errorf("failed to parse root certificate")
 	}
-	if config.CertData == nil {
+	if clientCert == nil {
 		return &tls.Config{
 			RootCAs:    roots,
 			MinVersion: tls.VersionTLS12,
-			ServerName: config.ServerName,
 		}, nil
 	}
-	cert, err := tls.X509KeyPair(config.CertData, config.KeyData)
+	cert, err := tls.X509KeyPair(clientCert, clientKey)
 	if err != nil {
 		return nil, err
 	}
@@ -505,6 +485,5 @@ func createClientConfig(config *ExporterTLSClientConfig) (*tls.Config, error) {
 		Certificates: []tls.Certificate{cert},
 		RootCAs:      roots,
 		MinVersion:   tls.VersionTLS12,
-		ServerName:   config.ServerName,
 	}, nil
 }
