@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.6.1 05-17-2023
+### Changed
+- Increase log verbosity when skipping aggregation. (#303, @heanlan)
 ## 0.6.0 01-09-2023
 ### Changed
 - Upgrade Go to v1.19. Upgrade Go modules to their latest version.
