@@ -515,7 +515,7 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			// from its coming node; for intra-node flows. Also to avoid to assign
 			// zero value to flowEndSecondsDiff.
 			if incomingVal <= prevFlowEndSeconds {
-				klog.Warningf("The incoming record doesn't have the latest flowEndSeconds. Previous value: %d. Incoming value: %d. From source node: %v. From destination node: %v", prevFlowEndSeconds, incomingVal, fillSrcStats, fillDstStats)
+				klog.V(4).InfoS("The incoming record doesn't have the latest flowEndSeconds", "previous value", prevFlowEndSeconds, "incoming value", incomingVal, "from source node", fillSrcStats, "from destination node", fillDstStats)
 				return nil
 			}
 			flowEndSecondsDiff = incomingVal - prevFlowEndSeconds
