@@ -87,7 +87,6 @@ func printIPFIXMessage(msg *entities.Message) {
 				case entities.Unsigned8:
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned8Value())
 				case entities.Unsigned16:
-
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned16Value())
 				case entities.Unsigned32:
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
