@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.6.2 06-07-2023
+### Added
+- Add fields for Egress information support. (#308, @dreamtalen)
 ## 0.6.1 05-17-2023
 ### Changed
 - Increase log verbosity when skipping aggregation. (#303, @heanlan)
