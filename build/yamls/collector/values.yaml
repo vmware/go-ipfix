@@ -1,3 +1,5 @@
 protocol: tcp
 port: 4739
 image_tag: latest
+# -- Log verbosity switch for IPFIX collector.
+logVerbosity: 0

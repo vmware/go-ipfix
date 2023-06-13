@@ -44,7 +44,9 @@ spec:
     spec:
       containers:
       - args:
-        - --v=0
+        {{- if .Values.logVerbosity }}
+        - --v={{ .Values.logVerbosity }}
+        {{- end }}
         - --ipfix.port={{ .Values.port }}
         - --ipfix.transport={{ .Values.protocol }}
         image: projects.registry.vmware.com/antrea/ipfix-collector:{{ .Values.image_tag }}
