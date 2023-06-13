@@ -48,7 +48,6 @@ spec:
     spec:
       containers:
       - args:
-        - --v=0
         - --ipfix.port=4739
         - --ipfix.transport=tcp
         image: projects.registry.vmware.com/antrea/ipfix-collector:latest

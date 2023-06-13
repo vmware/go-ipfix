@@ -198,6 +198,7 @@ func newCollectorCommand() *cobra.Command {
 	addIPFIXFlags(flags)
 	// Install command line flags
 	flags.AddGoFlagSet(flag.CommandLine)
+	logs.AddFlags(flags)
 	return cmd
 }
 
