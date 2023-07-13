@@ -1,4 +1,4 @@
-// Copyright 2020 VMware, Inc.
+// Copyright 2021 VMware, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -486,5 +486,16 @@ func loadIANARegistry() {
 	registerInfoElement(*entities.NewInfoElement("bgpLargeCommunity", 489, 0, 0, 65535), 0)
 	registerInfoElement(*entities.NewInfoElement("bgpSourceLargeCommunityList", 490, 20, 0, 65535), 0)
 	registerInfoElement(*entities.NewInfoElement("bgpDestinationLargeCommunityList", 491, 20, 0, 65535), 0)
+	registerInfoElement(*entities.NewInfoElement("srhFlagsIPv6", 492, 1, 0, 1), 0)
+	registerInfoElement(*entities.NewInfoElement("srhTagIPv6", 493, 2, 0, 2), 0)
+	registerInfoElement(*entities.NewInfoElement("srhSegmentIPv6", 494, 19, 0, 16), 0)
+	registerInfoElement(*entities.NewInfoElement("srhActiveSegmentIPv6", 495, 19, 0, 16), 0)
+	registerInfoElement(*entities.NewInfoElement("srhSegmentIPv6BasicList", 496, 20, 0, 65535), 0)
+	registerInfoElement(*entities.NewInfoElement("srhSegmentIPv6ListSection", 497, 0, 0, 65535), 0)
+	registerInfoElement(*entities.NewInfoElement("srhSegmentsIPv6Left", 498, 1, 0, 1), 0)
+	registerInfoElement(*entities.NewInfoElement("srhIPv6Section", 499, 0, 0, 65535), 0)
+	registerInfoElement(*entities.NewInfoElement("srhIPv6ActiveSegmentType", 500, 1, 0, 1), 0)
+	registerInfoElement(*entities.NewInfoElement("srhSegmentIPv6LocatorLength", 501, 1, 0, 1), 0)
+	registerInfoElement(*entities.NewInfoElement("srhSegmentIPv6EndpointBehavior", 502, 2, 0, 2), 0)
 	registerInfoElement(*entities.NewInfoElement("Unassigned", 0, 255, 0, 0), 0)
 }
