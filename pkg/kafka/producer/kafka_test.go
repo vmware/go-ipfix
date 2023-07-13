@@ -22,7 +22,7 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/vmware/go-ipfix/pkg/test"
+	"github.com/tushartathgur/go-ipfix/pkg/test"
 )
 
 func TestInitKafkaProducerWithTLS(t *testing.T) {

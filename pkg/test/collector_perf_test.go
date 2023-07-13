@@ -27,9 +27,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/klog/v2"
 
-	"github.com/vmware/go-ipfix/pkg/collector"
-	"github.com/vmware/go-ipfix/pkg/exporter"
-	"github.com/vmware/go-ipfix/pkg/registry"
+	"github.com/tushartathgur/go-ipfix/pkg/collector"
+	"github.com/tushartathgur/go-ipfix/pkg/exporter"
+	"github.com/tushartathgur/go-ipfix/pkg/registry"
 )
 
 func init() {
@@ -48,12 +48,12 @@ const (
 
 	goos: darwin
 	goarch: amd64
-	pkg: github.com/vmware/go-ipfix/pkg/test
+	pkg: github.com/tushartathgur/go-ipfix/pkg/test
 	cpu: Intel(R) Core(TM) i7-8750H CPU @ 2.20GHz
 	BenchmarkMultipleExportersToCollector
 	BenchmarkMultipleExportersToCollector-12               1        1512748429 ns/op        252000840 B/op   7821837 allocs/op
 	PASS
-	ok      github.com/vmware/go-ipfix/pkg/test     1.847s
+	ok      github.com/tushartathgur/go-ipfix/pkg/test     1.847s
 */
 // TODO: This should not be benchmark test if it is not run multiple times. Test should use "b.N".
 func BenchmarkMultipleExportersToCollector(b *testing.B) {

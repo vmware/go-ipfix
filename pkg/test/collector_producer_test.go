@@ -24,10 +24,10 @@ import (
 	saramamock "github.com/Shopify/sarama/mocks"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/vmware/go-ipfix/pkg/collector"
-	"github.com/vmware/go-ipfix/pkg/kafka/producer"
-	convertortest "github.com/vmware/go-ipfix/pkg/kafka/producer/convertor/test"
-	"github.com/vmware/go-ipfix/pkg/registry"
+	"github.com/tushartathgur/go-ipfix/pkg/collector"
+	"github.com/tushartathgur/go-ipfix/pkg/kafka/producer"
+	convertortest "github.com/tushartathgur/go-ipfix/pkg/kafka/producer/convertor/test"
+	"github.com/tushartathgur/go-ipfix/pkg/registry"
 )
 
 var (

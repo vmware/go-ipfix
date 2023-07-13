@@ -27,10 +27,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/util/wait"
 
-	"github.com/vmware/go-ipfix/pkg/collector"
-	"github.com/vmware/go-ipfix/pkg/entities"
-	"github.com/vmware/go-ipfix/pkg/intermediate"
-	"github.com/vmware/go-ipfix/pkg/registry"
+	"github.com/tushartathgur/go-ipfix/pkg/collector"
+	"github.com/tushartathgur/go-ipfix/pkg/entities"
+	"github.com/tushartathgur/go-ipfix/pkg/intermediate"
+	"github.com/tushartathgur/go-ipfix/pkg/registry"
 )
 
 // Run TestSingleRecordTCPTransport and TestSingleRecordTCPTransportIPv6 along with
