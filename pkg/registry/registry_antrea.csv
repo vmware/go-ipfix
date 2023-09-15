@@ -54,3 +54,5 @@ ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,R
 152,flowEndSecondsFromDestinationNode,dateTimeSeconds,,current,,,,,,,,56506,
 153,egressName,string,,current,,,,,,,,56506,
 154,egressIP,string,,current,,,,,,,,56506,
+155,isL7,boolean,,current,,,,,,,,56506,
+156,httpVals,string,,current,,,,,,,,56506,
