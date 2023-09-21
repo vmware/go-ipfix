@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.7.0 09-21-2023
+### Changed
+- Upgrade Go to v1.21, as Go v1.19 is no longer maintained. (#317, @antoninbas)
+- Replace github.com/golang/mock with go.uber.org/mock, as
+  github.com/golang/mock is no longer maintained. (#316, @antoninbas)
+### Fixed
+- Fix collector klog flag not supported error by adding registration of the
+  flag. (#311, @heanlan)
 ## 0.6.2 06-07-2023
 ### Added
 - Add fields for Egress information support. (#308, @dreamtalen)
