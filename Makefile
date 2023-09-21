@@ -1,14 +1,14 @@
 GO              ?= go
 GOPATH          ?= $$($(GO) env GOPATH)
 BINDIR          ?= $(CURDIR)/bin
-GOMOCK_VERSION         := v1.6.0
+GOMOCK_VERSION         := v0.3.0
 PROTOC_GEN_GO_VERSION  := v1.28.1
 
 .PHONY: all
 all: collector consumer
 
 .mockgen-bin:
-	GOBIN=$(CURDIR)/$@ $(GO) install github.com/golang/mock/mockgen@$(GOMOCK_VERSION)
+	GOBIN=$(CURDIR)/$@ $(GO) install go.uber.org/mock/mockgen@$(GOMOCK_VERSION)
 
 .protoc-bin:
 	GOBIN=$(CURDIR)/$@ $(GO) install google.golang.org/protobuf/cmd/protoc-gen-go@$(PROTOC_GEN_GO_VERSION)
