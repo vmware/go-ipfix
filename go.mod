@@ -1,6 +1,6 @@
 module github.com/vmware/go-ipfix
 
-go 1.19
+go 1.21
 
 require (
 	github.com/Shopify/sarama v1.37.2
