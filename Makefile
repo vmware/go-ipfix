@@ -3,6 +3,9 @@ GOPATH          ?= $$($(GO) env GOPATH)
 BINDIR          ?= $(CURDIR)/bin
 GOMOCK_VERSION         := v0.3.0
 PROTOC_GEN_GO_VERSION  := v1.28.1
+GOLANGCI_LINT_VERSION  := v1.54.2
+GOLANGCI_LINT_BINDIR   := .golangci-bin
+GOLANGCI_LINT_BIN      := $(GOLANGCI_LINT_BINDIR)/$(GOLANGCI_LINT_VERSION)/golangci-lint
 
 .PHONY: all
 all: collector consumer
@@ -36,17 +39,21 @@ test-unit: .coverage
 test-integration: .coverage
 	$(GO) test -race ./pkg/test/... -tags=integration -covermode=atomic -coverprofile=.coverage/coverage_integration.txt -coverpkg github.com/vmware/go-ipfix/pkg/collector,github.com/vmware/go-ipfix/pkg/exporter,github.com/vmware/go-ipfix/pkg/intermediate,github.com/vmware/go-ipfix/pkg/kafka/producer
 
-.golangci-bin:
+# code linting
+$(GOLANGCI_LINT_BIN):
 	@echo "===> Installing Golangci-lint <==="
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $@ v1.50.1
+	@rm -rf $(GOLANGCI_LINT_BINDIR)/* # delete old versions
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOLANGCI_LINT_BINDIR)/$(GOLANGCI_LINT_VERSION) $(GOLANGCI_LINT_VERSION)
 
 .PHONY: golangci
-golangci:.golangci-bin
-	@GOOS=linux .golangci-bin/golangci-lint run -c .golangci.yml
+golangci: $(GOLANGCI_LINT_BIN)
+	@echo "===> Running golangci <==="
+	@GOOS=linux $(GOLANGCI_LINT_BIN) run -c .golangci.yml
 
 .PHONY: golangci-fix
-golangci-fix:.golangci-bin
-	@GOOS=linux .golangci-bin/golangci-lint run -c .golangci.yml --fix
+golangci-fix: $(GOLANGCI_LINT_BIN)
+	@echo "===> Running golangci-fix <==="
+	@GOOS=linux $(GOLANGCI_LINT_BIN) run -c .golangci.yml --fix
 
 .PHONY: collector
 collector:
@@ -80,5 +87,5 @@ clean:
 	@rm -rf $(BINDIR)
 	@rm -rf .mockgen-bin
 	@rm -rf .protoc-bin
-	@rm -rf .golangci-bin
+	@rm -rf $(GOLANGCI_LINT_BINDIR)
 	@rm -rf .coverage
