@@ -2,9 +2,11 @@ package entities
 
 import (
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var macAddress, _ = net.ParseMAC("aa:bb:cc:dd:ee:ff")
@@ -71,4 +73,38 @@ func TestNewInfoElementWithValue(t *testing.T) {
 	element := NewIPAddressInfoElement(&InfoElement{"sourceIPv4Address", 8, 18, 0, 4}, ip)
 	assert.Equal(t, element.GetInfoElement().Name, "sourceIPv4Address")
 	assert.Equal(t, element.GetIPAddressValue(), ip)
+}
+
+func BenchmarkEncodeInfoElementValueToBuffShortString(b *testing.B) {
+	// a short string has a max length of 254
+	str := strings.Repeat("x", 128)
+	element := NewStringInfoElement(NewInfoElement("interfaceDescription", 83, 13, 0, 65535), str)
+	const numCopies = 1000
+	length := element.GetLength()
+	buffer := make([]byte, numCopies*length)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		index := 0
+		for j := 0; j < numCopies; j++ {
+			require.NoError(b, encodeInfoElementValueToBuff(element, buffer, index))
+			index += length
+		}
+	}
+}
+
+func BenchmarkEncodeInfoElementValueToBuffLongString(b *testing.B) {
+	// a long string has a max length of 65534
+	str := strings.Repeat("x", 10000)
+	element := NewStringInfoElement(NewInfoElement("interfaceDescription", 83, 13, 0, 65535), str)
+	const numCopies = 1000
+	length := element.GetLength()
+	buffer := make([]byte, numCopies*length)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		index := 0
+		for j := 0; j < numCopies; j++ {
+			require.NoError(b, encodeInfoElementValueToBuff(element, buffer, index))
+			index += length
+		}
+	}
 }
