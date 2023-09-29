@@ -36,7 +36,7 @@ import (
 // Run TestSingleRecordTCPTransport and TestSingleRecordTCPTransportIPv6 along with
 // debug log for the message in pkg/exporter/process.go before sending it to get following
 // raw bytes for template and data packets.
-// Following data packets are generated with getTestRecord in exporter_collector_test.go
+// Following data packets are generated with getTestRecord in util.go
 // dataPacket1IPv4: getTestRecord(true, false)
 // dataPacket2IPv4: getTestRecord(false, false)
 // dataPacket1IPv6: getTestRecord(true, true)
@@ -164,7 +164,8 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 	ap, _ := intermediate.InitAggregationProcess(apInput)
 	go cp.Start()
 	waitForCollectorReady(t, cp)
-	go func() {
+	go ap.Start()
+	func() {
 		collectorAddr, _ := net.ResolveTCPAddr("tcp", cp.GetAddress().String())
 		conn, err := net.DialTCP("tcp", nil, collectorAddr)
 		if err != nil {
@@ -181,7 +182,6 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 			conn.Write(dataPacket2IPv4)
 		}
 	}()
-	go ap.Start()
 	if isIPv6 {
 		waitForAggregationToFinish(t, ap, flowKey2)
 	} else {
@@ -276,9 +276,11 @@ func waitForCollectorReady(t *testing.T, cp *collector.CollectingProcess) {
 		if strings.Split(cp.GetAddress().String(), ":")[1] == "0" {
 			return false, fmt.Errorf("random port is not resolved")
 		}
-		if _, err := net.Dial(cp.GetAddress().Network(), cp.GetAddress().String()); err != nil {
+		conn, err := net.Dial(cp.GetAddress().Network(), cp.GetAddress().String())
+		if err != nil {
 			return false, err
 		}
+		conn.Close()
 		return true, nil
 	}
 	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
