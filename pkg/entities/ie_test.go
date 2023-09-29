@@ -93,7 +93,7 @@ func BenchmarkEncodeInfoElementValueToBuffShortString(b *testing.B) {
 }
 
 func BenchmarkEncodeInfoElementValueToBuffLongString(b *testing.B) {
-	// a long string has a max length of 65534
+	// a long string has a max length of 65535
 	str := strings.Repeat("x", 10000)
 	element := NewStringInfoElement(NewInfoElement("interfaceDescription", 83, 13, 0, 65535), str)
 	const numCopies = 1000
