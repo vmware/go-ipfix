@@ -360,12 +360,8 @@ func (ep *ExportingProcess) createAndSendJSONMsg(set entities.Set) (int, error) 
 				elements[element.GetName()] = element.GetFloat64Value()
 			case entities.Boolean:
 				elements[element.GetName()] = element.GetBooleanValue()
-			case entities.DateTimeSeconds:
-				elements[element.GetName()] = element.GetUnsigned32Value()
-			case entities.DateTimeMilliseconds:
-				elements[element.GetName()] = element.GetUnsigned64Value()
-			case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
-				return bytesSent, fmt.Errorf("API does not support micro and nano seconds types yet")
+			case entities.DateTimeSeconds, entities.DateTimeMilliseconds, entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
+				elements[element.GetName()] = element.GetDateTimeValue()
 			case entities.MacAddress:
 				elements[element.GetName()] = element.GetMacAddressValue()
 			case entities.Ipv4Address, entities.Ipv6Address:

@@ -139,13 +139,8 @@ func (b *baseRecord) GetElementMap() map[string]interface{} {
 			elements[element.GetName()] = element.GetFloat64Value()
 		case Boolean:
 			elements[element.GetName()] = element.GetBooleanValue()
-		case DateTimeSeconds:
-			elements[element.GetName()] = element.GetUnsigned32Value()
-		case DateTimeMilliseconds:
-			elements[element.GetName()] = element.GetUnsigned64Value()
-		case DateTimeMicroseconds, DateTimeNanoseconds:
-			err := fmt.Errorf("API does not support micro and nano seconds types yet")
-			elements[element.GetName()] = err
+		case DateTimeSeconds, DateTimeMilliseconds, DateTimeMicroseconds, DateTimeNanoseconds:
+			elements[element.GetName()] = element.GetDateTimeValue()
 		case MacAddress:
 			elements[element.GetName()] = element.GetMacAddressValue()
 		case Ipv4Address, Ipv6Address:

@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"time"
 )
 
 type IEDataType uint8
@@ -189,13 +190,12 @@ func decodeToIEDataType(dataType IEDataType, val interface{}) (interface{}, erro
 			return false, nil
 		}
 	case DateTimeSeconds:
-		v := binary.BigEndian.Uint32(value)
-		return v, nil
+		return time.Unix(int64(binary.BigEndian.Uint32(value)), 0), nil
 	case DateTimeMilliseconds:
 		v := binary.BigEndian.Uint64(value)
-		return v, nil
+		return time.Unix(int64(v/1000), int64(v%1000)*1000000), nil
 	case DateTimeMicroseconds, DateTimeNanoseconds:
-		return nil, fmt.Errorf("API does not support micro and nano seconds types yet")
+		return ntpTime(binary.BigEndian.Uint64(value)).Time(), nil
 	case MacAddress:
 		return net.HardwareAddr(value), nil
 	case Ipv4Address, Ipv6Address:
@@ -300,23 +300,25 @@ func DecodeAndCreateInfoElementWithValue(element *InfoElement, value []byte) (In
 			return NewBoolInfoElement(element, false), nil
 		}
 	case DateTimeSeconds:
-		var val uint32
-		if value == nil {
-			val = 0
-		} else {
-			val = binary.BigEndian.Uint32(value)
+		var val time.Time
+		if value != nil {
+			val = time.Unix(int64(binary.BigEndian.Uint32(value)), 0)
 		}
-		return NewDateTimeSecondsInfoElement(element, val), nil
+		return NewDateTimeInfoElement(element, val), nil
 	case DateTimeMilliseconds:
-		var val uint64
-		if value == nil {
-			val = 0
-		} else {
-			val = binary.BigEndian.Uint64(value)
+		var val time.Time
+		if value != nil {
+			v := binary.BigEndian.Uint64(value)
+			val = time.Unix(int64(v/1000), int64(v%1000)*1000000)
 		}
-		return NewDateTimeMillisecondsInfoElement(element, val), nil
+		return NewDateTimeInfoElement(element, val), nil
 	case DateTimeMicroseconds, DateTimeNanoseconds:
-		return nil, fmt.Errorf("API does not support micro and nano seconds types yet")
+		var val time.Time
+		if value != nil {
+			v := binary.BigEndian.Uint64(value)
+			val = ntpTime(v).Time()
+		}
+		return NewDateTimeInfoElement(element, val), nil
 	case MacAddress:
 		return NewMacAddressInfoElement(element, value), nil
 	case Ipv4Address, Ipv6Address:
@@ -428,25 +430,37 @@ func EncodeToIEDataType(dataType IEDataType, val interface{}) ([]byte, error) {
 		}
 		return b, nil
 	case DateTimeSeconds:
-		v, ok := val.(uint32)
+		v, ok := val.(time.Time)
 		if !ok {
-			return nil, fmt.Errorf("val argument %v is not of type uint32", val)
+			return nil, fmt.Errorf("val argument %v is not of type Time", val)
 		}
 		b := make([]byte, 4)
-		binary.BigEndian.PutUint32(b, v)
+		binary.BigEndian.PutUint32(b, uint32(v.Unix()))
 		return b, nil
 	case DateTimeMilliseconds:
-		v, ok := val.(uint64)
+		v, ok := val.(time.Time)
 		if !ok {
-			return nil, fmt.Errorf("val argument %v is not of type uint64", val)
+			return nil, fmt.Errorf("val argument %v is not of type Time", val)
 		}
 		b := make([]byte, 8)
-		binary.BigEndian.PutUint64(b, v)
+		binary.BigEndian.PutUint64(b, uint64(v.UnixNano()/1000000))
 		return b, nil
-		// Currently only supporting seconds and milliseconds
-	case DateTimeMicroseconds, DateTimeNanoseconds:
-		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
-		return nil, fmt.Errorf("API does not support micro and nano seconds types yet")
+	case DateTimeMicroseconds:
+		v, ok := val.(time.Time)
+		if !ok {
+			return nil, fmt.Errorf("val argument %v is not of type Time", val)
+		}
+		b := make([]byte, 8)
+		binary.BigEndian.PutUint64(b, uint64(toNtpTime(v.Truncate(time.Microsecond))))
+		return b, nil
+	case DateTimeNanoseconds:
+		v, ok := val.(time.Time)
+		if !ok {
+			return nil, fmt.Errorf("val argument %v is not of type Time", val)
+		}
+		b := make([]byte, 8)
+		binary.BigEndian.PutUint64(b, uint64(toNtpTime(v)))
+		return b, nil
 	case MacAddress:
 		// Expects net.Hardware type
 		v, ok := val.(net.HardwareAddr)
@@ -533,13 +547,13 @@ func encodeInfoElementValueToBuff(element InfoElementWithValue, buffer []byte, i
 		}
 		copy(buffer[index:index+1], []byte{indicator})
 	case DateTimeSeconds:
-		binary.BigEndian.PutUint32(buffer[index:], element.GetUnsigned32Value())
+		binary.BigEndian.PutUint32(buffer[index:], uint32(element.GetDateTimeValue().Unix()))
 	case DateTimeMilliseconds:
-		binary.BigEndian.PutUint64(buffer[index:], element.GetUnsigned64Value())
-		// Currently only supporting seconds and milliseconds
-	case DateTimeMicroseconds, DateTimeNanoseconds:
-		// TODO: RFC 7011 has extra spec for these data types. Need to follow that
-		return fmt.Errorf("API does not support micro and nano seconds types yet")
+		binary.BigEndian.PutUint64(buffer[index:], uint64(element.GetDateTimeValue().UnixNano()/1000000))
+	case DateTimeMicroseconds:
+		binary.BigEndian.PutUint64(buffer[index:], uint64(toNtpTime(element.GetDateTimeValue().Truncate(time.Microsecond))))
+	case DateTimeNanoseconds:
+		binary.BigEndian.PutUint64(buffer[index:], uint64(toNtpTime(element.GetDateTimeValue())))
 	case MacAddress:
 		copy(buffer[index:], element.GetMacAddressValue())
 	case Ipv4Address:
