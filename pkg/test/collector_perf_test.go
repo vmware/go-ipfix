@@ -71,6 +71,7 @@ func BenchmarkMultipleExportersToCollector(b *testing.B) {
 	}
 	go cp.Start()
 	waitForCollectorStatus(b, cp, true)
+	exporters := make([]*exporter.ExportingProcess, 0, numOfExporters)
 	b.ResetTimer()
 	for i := 0; i < numOfExporters; i++ {
 		b.StartTimer()
@@ -89,6 +90,7 @@ func BenchmarkMultipleExportersToCollector(b *testing.B) {
 			exporter.SendSet(createDataSet(templateID, true, false, false))
 		}
 		b.StopTimer()
+		exporters = append(exporters, exporter)
 		time.Sleep(time.Millisecond)
 	}
 	b.StartTimer()
@@ -96,10 +98,17 @@ func BenchmarkMultipleExportersToCollector(b *testing.B) {
 	for range cp.GetMsgChan() {
 		count++
 		if count == numOfRecords*numOfExporters {
-			cp.Stop()
 			break
 		}
 	}
+	b.StopTimer()
+	// Gracefully shutdown all the exporters to avoid "use of closed network connection" error
+	// logs.
+	for i := 0; i < numOfExporters; i++ {
+		exporters[i].CloseConnToCollector()
+	}
+	b.StartTimer()
+	cp.Stop()
 	waitForCollectorStatus(b, cp, false)
 }
 
