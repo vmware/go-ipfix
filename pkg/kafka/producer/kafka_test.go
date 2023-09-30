@@ -22,13 +22,13 @@ import (
 	"github.com/Shopify/sarama"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/vmware/go-ipfix/pkg/test"
+	testcerts "github.com/vmware/go-ipfix/pkg/test/certs"
 )
 
 func TestInitKafkaProducerWithTLS(t *testing.T) {
-	caCertFile := createTmpFileAndWrite(t, test.FakeCACert, "ca-")
-	certFile := createTmpFileAndWrite(t, test.FakeCert, "cert-")
-	keyFile := createTmpFileAndWrite(t, test.FakeKey, "key-")
+	caCertFile := createTmpFileAndWrite(t, testcerts.FakeCACert, "ca-")
+	certFile := createTmpFileAndWrite(t, testcerts.FakeCert, "cert-")
+	keyFile := createTmpFileAndWrite(t, testcerts.FakeKey, "key-")
 	defer closeTmpFile(t, caCertFile)
 	defer closeTmpFile(t, certFile)
 	defer closeTmpFile(t, keyFile)
@@ -36,7 +36,7 @@ func TestInitKafkaProducerWithTLS(t *testing.T) {
 	serverTLSConfig, err := setupTLSConfig(caCertFile.Name(), certFile.Name(), keyFile.Name(), false)
 	assert.NoError(t, err)
 
-	doListenerTLSTest(t, serverTLSConfig, test.FakeCACert, test.FakeClientCert, test.FakeClientKey)
+	doListenerTLSTest(t, serverTLSConfig, testcerts.FakeCACert, testcerts.FakeClientCert, testcerts.FakeClientKey)
 }
 
 func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, clientCert, clientKey string) {
@@ -49,9 +49,9 @@ func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, client
 
 	seedBroker.Returns(new(sarama.MetadataResponse))
 
-	caCertFile := createTmpFileAndWrite(t, test.FakeCACert, "ca-")
-	certFile := createTmpFileAndWrite(t, test.FakeClientCert, "clientCert-")
-	keyFile := createTmpFileAndWrite(t, test.FakeClientKey, "clientKey-")
+	caCertFile := createTmpFileAndWrite(t, testcerts.FakeCACert, "ca-")
+	certFile := createTmpFileAndWrite(t, testcerts.FakeClientCert, "clientCert-")
+	keyFile := createTmpFileAndWrite(t, testcerts.FakeClientKey, "clientKey-")
 	defer closeTmpFile(t, caCertFile)
 	defer closeTmpFile(t, certFile)
 	defer closeTmpFile(t, keyFile)

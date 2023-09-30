@@ -28,7 +28,7 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
-	"github.com/vmware/go-ipfix/pkg/test"
+	testcerts "github.com/vmware/go-ipfix/pkg/test/certs"
 )
 
 func init() {
@@ -396,14 +396,14 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 }
 
 func TestInitExportingProcessWithTLS(t *testing.T) {
-	caCert, caKey, caData, err := test.GenerateCACert()
+	caCert, caKey, caData, err := testcerts.GenerateCACert()
 	require.NoError(t, err, "Error when generating CA cert")
-	clientCertData, clientKeyData, err := test.GenerateClientCert(caCert, caKey)
+	clientCertData, clientKeyData, err := testcerts.GenerateClientCert(caCert, caKey)
 	require.NoError(t, err, "Error when generating client cert")
 
 	testCases := []struct {
 		name              string
-		serverCertOptions []test.CertificateOption
+		serverCertOptions []testcerts.CertificateOption
 		withClientAuth    bool
 		tlsClientConfig   *ExporterTLSClientConfig
 		expectedErr       string
@@ -419,14 +419,14 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 		},
 		{
 			name:              "IP SAN",
-			serverCertOptions: []test.CertificateOption{test.AddIPAddress(net.ParseIP("127.0.0.1"))},
+			serverCertOptions: []testcerts.CertificateOption{testcerts.AddIPAddress(net.ParseIP("127.0.0.1"))},
 			tlsClientConfig: &ExporterTLSClientConfig{
 				CAData: caData,
 			},
 		},
 		{
 			name:              "name SAN with matching ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
+			serverCertOptions: []testcerts.CertificateOption{testcerts.AddDNSName("foobar")},
 			tlsClientConfig: &ExporterTLSClientConfig{
 				CAData:     caData,
 				ServerName: "foobar",
@@ -434,7 +434,7 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 		},
 		{
 			name:              "name SAN with mismatching ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
+			serverCertOptions: []testcerts.CertificateOption{testcerts.AddDNSName("foobar")},
 			tlsClientConfig: &ExporterTLSClientConfig{
 				CAData:     caData,
 				ServerName: "badname",
@@ -444,7 +444,7 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 		},
 		{
 			name:              "name SAN without ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
+			serverCertOptions: []testcerts.CertificateOption{testcerts.AddDNSName("foobar")},
 			tlsClientConfig: &ExporterTLSClientConfig{
 				CAData: caData,
 			},
@@ -453,7 +453,7 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 		},
 		{
 			name:              "client auth with no cert",
-			serverCertOptions: []test.CertificateOption{test.AddIPAddress(net.ParseIP("127.0.0.1"))},
+			serverCertOptions: []testcerts.CertificateOption{testcerts.AddIPAddress(net.ParseIP("127.0.0.1"))},
 			withClientAuth:    true,
 			tlsClientConfig: &ExporterTLSClientConfig{
 				CAData: caData,
@@ -462,7 +462,7 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 		},
 		{
 			name:              "client auth with cert",
-			serverCertOptions: []test.CertificateOption{test.AddIPAddress(net.ParseIP("127.0.0.1"))},
+			serverCertOptions: []testcerts.CertificateOption{testcerts.AddIPAddress(net.ParseIP("127.0.0.1"))},
 			withClientAuth:    true,
 			tlsClientConfig: &ExporterTLSClientConfig{
 				CAData:   caData,
@@ -472,7 +472,7 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 		},
 		{
 			name:              "client auth and ServerName",
-			serverCertOptions: []test.CertificateOption{test.AddDNSName("foobar")},
+			serverCertOptions: []testcerts.CertificateOption{testcerts.AddDNSName("foobar")},
 			withClientAuth:    true,
 			tlsClientConfig: &ExporterTLSClientConfig{
 				CAData:     caData,
@@ -489,7 +489,7 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 			// Create local server for testing
 			address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 			require.NoError(t, err)
-			serverCertData, serverKeyData, err := test.GenerateServerCert(caCert, caKey, tc.serverCertOptions...)
+			serverCertData, serverKeyData, err := testcerts.GenerateServerCert(caCert, caKey, tc.serverCertOptions...)
 			require.NoError(t, err, "Error when generating server cert")
 			serverCert, err := tls.X509KeyPair(serverCertData, serverKeyData)
 			require.NoError(t, err)
@@ -551,7 +551,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error when resolving tcp address: %v", err)
 	}
-	cer, err := tls.X509KeyPair([]byte(test.FakeCert), []byte(test.FakeKey))
+	cer, err := tls.X509KeyPair([]byte(testcerts.FakeCert), []byte(testcerts.FakeKey))
 	if err != nil {
 		t.Error(err)
 		return
@@ -592,7 +592,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		TLSClientConfig: &ExporterTLSClientConfig{
-			CAData:     []byte(test.FakeCACert),
+			CAData:     []byte(testcerts.FakeCACert),
 			ServerName: "127.0.0.1",
 		},
 	}
@@ -638,7 +638,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error when resolving udp address: %v", err)
 	}
-	cert, err := tls.X509KeyPair([]byte(test.FakeCert2), []byte(test.FakeKey2))
+	cert, err := tls.X509KeyPair([]byte(testcerts.FakeCert2), []byte(testcerts.FakeKey2))
 	if err != nil {
 		t.Error(err)
 		return
@@ -679,7 +679,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		TLSClientConfig: &ExporterTLSClientConfig{
-			CAData: []byte(test.FakeCert2),
+			CAData: []byte(testcerts.FakeCert2),
 		},
 	}
 	exporter, err := InitExportingProcess(input)
