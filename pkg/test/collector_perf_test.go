@@ -29,13 +29,7 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/exporter"
-	"github.com/vmware/go-ipfix/pkg/registry"
 )
-
-func init() {
-	// Load the global registry
-	registry.LoadRegistry()
-}
 
 const (
 	numOfExporters = 100
