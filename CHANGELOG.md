@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.8.0 10-02-2023
+### Added
+- Add L7 visibility fields. (#315, @tushartathgur)
+### Changed
+- Change datatype of flowEndSecondsFromSourceNode and
+  flowEndSecondsFromDestinationNode. (#320, @tushartathgur)
+- Improve handling of string IEs. (#322, @antoninbas)
+- Avoid error logs in BenchmarkMultipleExportersToCollector. (#323,
+  @antoninbas)
+- Improve integration tests. (#325, @antoninbas)
+### Fixed
+- Fix aggregation bug for throughput common fields. (#324, @antoninbas)
 ## 0.7.0 09-21-2023
 ### Changed
 - Upgrade Go to v1.21, as Go v1.19 is no longer maintained. (#317, @antoninbas)
