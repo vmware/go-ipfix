@@ -3,6 +3,8 @@ run:
   tests: true
   timeout: 10m
   skip-dirs-use-default: true
+  build-tags:
+    - integration
 
 linters-settings:
   goimports:

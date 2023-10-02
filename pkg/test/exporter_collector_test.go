@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
@@ -102,7 +103,7 @@ func TestDTLSTransport(t *testing.T) {
 
 func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipleRecord bool, isEncrypted bool, t *testing.T) {
 	// Initialize collecting process
-	messages := make([]*entities.Message, 0)
+	messages := make([]*entities.Message, 2)
 	cpInput := collector.CollectorInput{
 		Address:       address.String(),
 		Protocol:      address.Network(),
@@ -164,13 +165,16 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	}
 	set := dataSet
 
+	messageIdx := 0
 	for message := range cp.GetMsgChan() {
-		messages = append(messages, message)
-		if len(messages) == 2 {
+		messages[messageIdx] = message
+		messageIdx++
+		if messageIdx == 2 {
 			cp.CloseMsgChan()
 		}
 	}
 	cp.Stop() // Close collecting process
+	require.Equal(t, 2, messageIdx)
 	templateMsg := messages[0]
 	assert.Equal(t, uint16(10), templateMsg.GetVersion(), "Version of flow record (template) should be 10.")
 	assert.Equal(t, uint32(1), templateMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
