@@ -16,9 +16,17 @@ package test
 
 import (
 	"net"
+	"time"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/exporter"
 	"github.com/vmware/go-ipfix/pkg/registry"
+)
+
+var (
+	// First release of Antrea (v0.1.0) at KubeCon NA 2019 (San Diego) :)
+	sanDiegoLocation, _ = time.LoadLocation("America/Los_Angeles")
+	testTime            = time.Date(2019, time.November, 18, 11, 26, 2, 0, sanDiegoLocation)
 )
 
 var (
@@ -60,6 +68,9 @@ var (
 		"reverseOctetTotalCount",
 	}
 )
+
+// will be initialized in init() after loading the registry
+var templatePacketIPv4, dataPacket1IPv4, dataPacket2IPv4, templatePacketIPv6, dataPacket1IPv6, dataPacket2IPv6 []byte
 
 type testRecord struct {
 	srcIP         net.IP
@@ -107,7 +118,7 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 		record.pktCount = uint64(1000)
 		record.pktDelta = uint64(500)
 		record.bytCount = uint64(1000000)
-		record.revBytCount = uint64(1000000)
+		record.revBytCount = uint64(400000)
 		record.dstSvcPort = uint16(0)
 		record.srcPod = ""
 		record.dstPod = "pod2"
@@ -123,7 +134,7 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 		record.pktCount = uint64(800)
 		record.pktDelta = uint64(500)
 		record.bytCount = uint64(800000)
-		record.revBytCount = uint64(800000)
+		record.revBytCount = uint64(300000)
 		record.dstSvcPort = uint16(4739)
 		record.srcPod = "pod1"
 		record.dstPod = ""
@@ -261,4 +272,34 @@ func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithVal
 		elements = append(elements, ie)
 	}
 	return elements
+}
+
+func getTestTemplatePacket(isIPv6 bool) []byte {
+	set := createTemplateSet(1 /* templateID */, isIPv6)
+	bytes, err := exporter.CreateIPFIXMsg(set, 1 /* obsDomainID */, 0 /* seqNumber */, testTime)
+	if err != nil {
+		panic("failed to create test template packet")
+	}
+	return bytes
+}
+
+func getTestDataPacket(isSrcNode bool, isIPv6 bool) []byte {
+	set := createDataSet(1 /* templateID */, isSrcNode, isIPv6, false /* isMultipleRecord */)
+	bytes, err := exporter.CreateIPFIXMsg(set, 1 /* obsDomainID */, 0 /* seqNumber */, testTime)
+	if err != nil {
+		panic("failed to create test data packet")
+	}
+	return bytes
+}
+
+func init() {
+	// Load the global registry
+	registry.LoadRegistry()
+
+	templatePacketIPv4 = getTestTemplatePacket(false)
+	dataPacket1IPv4 = getTestDataPacket(true, false)
+	dataPacket2IPv4 = getTestDataPacket(false, false)
+	templatePacketIPv6 = getTestTemplatePacket(true)
+	dataPacket1IPv6 = getTestDataPacket(true, true)
+	dataPacket2IPv6 = getTestDataPacket(false, true)
 }

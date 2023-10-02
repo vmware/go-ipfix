@@ -29,7 +29,7 @@ import (
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
-	"github.com/vmware/go-ipfix/pkg/test"
+	testcerts "github.com/vmware/go-ipfix/pkg/test/certs"
 )
 
 var validTemplatePacket = []byte{0, 10, 0, 40, 95, 154, 107, 127, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 101, 255, 255, 0, 0, 220, 186}
@@ -376,11 +376,11 @@ func TestTLSCollectingProcess(t *testing.T) {
 	var config *tls.Config
 	go func() {
 		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM([]byte(test.FakeCACert))
+		ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCACert))
 		if !ok {
 			t.Error("Failed to parse root certificate")
 		}
-		cert, err := tls.X509KeyPair([]byte(test.FakeClientCert), []byte(test.FakeClientKey))
+		cert, err := tls.X509KeyPair([]byte(testcerts.FakeClientCert), []byte(testcerts.FakeClientKey))
 		if err != nil {
 			t.Error(err)
 		}
@@ -424,7 +424,7 @@ func TestDTLSCollectingProcess(t *testing.T) {
 	collectorAddr, _ := net.ResolveUDPAddr("udp", cp.GetAddress().String())
 	go func() {
 		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM([]byte(test.FakeCert2))
+		ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCert2))
 		if !ok {
 			t.Error("Failed to parse root certificate")
 		}
@@ -517,9 +517,9 @@ func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorI
 				MaxBufferSize: 1024,
 				TemplateTTL:   0,
 				IsEncrypted:   true,
-				CACert:        []byte(test.FakeCACert),
-				ServerCert:    []byte(test.FakeCert),
-				ServerKey:     []byte(test.FakeKey),
+				CACert:        []byte(testcerts.FakeCACert),
+				ServerCert:    []byte(testcerts.FakeCert),
+				ServerKey:     []byte(testcerts.FakeKey),
 			}
 		} else {
 			return CollectorInput{
@@ -542,8 +542,8 @@ func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorI
 				MaxBufferSize: 1024,
 				TemplateTTL:   0,
 				IsEncrypted:   true,
-				ServerCert:    []byte(test.FakeCert2),
-				ServerKey:     []byte(test.FakeKey2),
+				ServerCert:    []byte(testcerts.FakeCert2),
+				ServerKey:     []byte(testcerts.FakeKey2),
 			}
 		} else {
 			return CollectorInput{
