@@ -637,8 +637,10 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 			ie, _, _ := existingRecord.GetInfoElementWithValue(antreaDestinationThroughputElements[i])
 			ie.SetUnsigned64Value(throughputVals[i])
 		}
-		ie, _, _ := existingRecord.GetInfoElementWithValue(element)
-		ie.SetUnsigned64Value(throughputVals[i])
+		if isLatest {
+			ie, _, _ := existingRecord.GetInfoElementWithValue(element)
+			ie.SetUnsigned64Value(throughputVals[i])
+		}
 	}
 	return nil
 }
@@ -756,7 +758,7 @@ func (a *AggregationProcess) addFieldsForThroughputCalculation(record entities.R
 			return err
 		}
 		value := uint32(0)
-		if fillSrcStats && strings.Contains(ieName, "Source") || fillDstStats && strings.Contains(ieName, "Destination") {
+		if (fillSrcStats && strings.Contains(ieName, "Source")) || (fillDstStats && strings.Contains(ieName, "Destination")) {
 			value = timeEnd
 		}
 		if err = record.AddInfoElement(entities.NewUnsigned32InfoElement(ie, value)); err != nil {
