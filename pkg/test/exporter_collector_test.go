@@ -23,18 +23,15 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware/go-ipfix/pkg/collector"
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/exporter"
 	"github.com/vmware/go-ipfix/pkg/registry"
+	testcerts "github.com/vmware/go-ipfix/pkg/test/certs"
 )
-
-func init() {
-	// Load the global registry
-	registry.LoadRegistry()
-}
 
 func TestSingleRecordUDPTransport(t *testing.T) {
 	address, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
@@ -106,7 +103,7 @@ func TestDTLSTransport(t *testing.T) {
 
 func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipleRecord bool, isEncrypted bool, t *testing.T) {
 	// Initialize collecting process
-	messages := make([]*entities.Message, 0)
+	messages := make([]*entities.Message, 2)
 	cpInput := collector.CollectorInput{
 		Address:       address.String(),
 		Protocol:      address.Network(),
@@ -118,12 +115,12 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	}
 	if isEncrypted {
 		if address.Network() == "tcp" {
-			cpInput.CACert = []byte(FakeCACert)
-			cpInput.ServerCert = []byte(FakeCert)
-			cpInput.ServerKey = []byte(FakeKey)
+			cpInput.CACert = []byte(testcerts.FakeCACert)
+			cpInput.ServerCert = []byte(testcerts.FakeCert)
+			cpInput.ServerKey = []byte(testcerts.FakeKey)
 		} else if address.Network() == "udp" {
-			cpInput.ServerCert = []byte(FakeCert2)
-			cpInput.ServerKey = []byte(FakeKey2)
+			cpInput.ServerCert = []byte(testcerts.FakeCert2)
+			cpInput.ServerKey = []byte(testcerts.FakeKey2)
 		}
 	}
 	cp, _ := collector.InitCollectingProcess(cpInput)
@@ -141,11 +138,11 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	if isEncrypted {
 		tlsClientConfig := &exporter.ExporterTLSClientConfig{}
 		if address.Network() == "tcp" { // use TLS
-			tlsClientConfig.CAData = []byte(FakeCACert)
-			tlsClientConfig.CertData = []byte(FakeClientCert)
-			tlsClientConfig.KeyData = []byte(FakeClientKey)
+			tlsClientConfig.CAData = []byte(testcerts.FakeCACert)
+			tlsClientConfig.CertData = []byte(testcerts.FakeClientCert)
+			tlsClientConfig.KeyData = []byte(testcerts.FakeClientKey)
 		} else if address.Network() == "udp" { // use DTLS
-			tlsClientConfig.CAData = []byte(FakeCert2)
+			tlsClientConfig.CAData = []byte(testcerts.FakeCert2)
 		}
 		epInput.TLSClientConfig = tlsClientConfig
 	}
@@ -168,13 +165,16 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	}
 	set := dataSet
 
+	messageIdx := 0
 	for message := range cp.GetMsgChan() {
-		messages = append(messages, message)
-		if len(messages) == 2 {
+		messages[messageIdx] = message
+		messageIdx++
+		if messageIdx == 2 {
 			cp.CloseMsgChan()
 		}
 	}
 	cp.Stop() // Close collecting process
+	require.Equal(t, 2, messageIdx)
 	templateMsg := messages[0]
 	assert.Equal(t, uint16(10), templateMsg.GetVersion(), "Version of flow record (template) should be 10.")
 	assert.Equal(t, uint32(1), templateMsg.GetObsDomainID(), "ObsDomainID (template) should be 1.")
@@ -219,7 +219,7 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 		}
 	}
 	if err = wait.Poll(time.Millisecond, 10*time.Millisecond, checkError); err != nil {
-		t.Errorf("Collector process does not close correctly.")
+		t.Errorf("Collector process did not close correctly.")
 	}
 }
 
