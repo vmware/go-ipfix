@@ -33,7 +33,7 @@ import (
 
 const (
 	numOfExporters = 100
-	numOfRecords   = 600
+	numOfRecords   = 1000
 )
 
 /*
@@ -104,6 +104,67 @@ func BenchmarkMultipleExportersToCollector(b *testing.B) {
 	b.StartTimer()
 	cp.Stop()
 	waitForCollectorStatus(b, cp, false)
+}
+
+func BenchmarkCollector(b *testing.B) {
+	bench := func(b *testing.B, isIPv6 bool) {
+		disableLogToStderr()
+		ctrl := gomock.NewController(b)
+		defer ctrl.Finish()
+		collectorInput := collector.CollectorInput{
+			Address:     "127.0.0.1:0",
+			Protocol:    "tcp",
+			TemplateTTL: 0,
+		}
+		cp, err := collector.InitCollectingProcess(collectorInput)
+		if err != nil {
+			b.Fatalf("cannot start collecting process on %s: %v", cp.GetAddress().String(), err)
+		}
+		go cp.Start()
+		waitForCollectorStatus(b, cp, true)
+		exporterInput := exporter.ExporterInput{
+			CollectorAddress:    cp.GetAddress().String(),
+			CollectorProtocol:   cp.GetAddress().Network(),
+			ObservationDomainID: 0,
+		}
+		exporter, err := exporter.InitExportingProcess(exporterInput)
+		if err != nil {
+			b.Errorf("cannot start exporting process: %v", err)
+		}
+		templateID := exporter.NewTemplateID()
+		exporter.SendSet(createTemplateSet(templateID, isIPv6))
+		dataSet := createDataSet(templateID, true, isIPv6, false)
+
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			ch := make(chan struct{})
+			go func() {
+				count := 0
+				for range cp.GetMsgChan() {
+					count++
+					if count == numOfRecords {
+						close(ch)
+						return
+					}
+				}
+			}()
+			b.StartTimer()
+			for j := 0; j < numOfRecords; j++ {
+				exporter.SendSet(dataSet)
+			}
+			<-ch
+		}
+
+		b.StopTimer()
+		exporter.CloseConnToCollector()
+		cp.Stop()
+		waitForCollectorStatus(b, cp, false)
+	}
+
+	b.Run("ipv4", func(b *testing.B) { bench(b, false) })
+	b.Run("ipv6", func(b *testing.B) { bench(b, true) })
 }
 
 func disableLogToStderr() {

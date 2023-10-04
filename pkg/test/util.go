@@ -67,12 +67,15 @@ var (
 		"reversePacketDeltaCount",
 		"reverseOctetTotalCount",
 	}
+	// same for IPv4 and IPv6
+	numFields = len(commonFields) + len(ianaIPv4Fields) + len(antreaCommonFields) + len(antreaIPv4) + len(reverseFields)
 )
 
 // will be initialized in init() after loading the registry
 var templatePacketIPv4, dataPacket1IPv4, dataPacket2IPv4, templatePacketIPv6, dataPacket1IPv6, dataPacket2IPv6 []byte
 
 type testRecord struct {
+	isIPv6        bool
 	srcIP         net.IP
 	dstIP         net.IP
 	srcPort       uint16
@@ -95,9 +98,12 @@ type testRecord struct {
 	tcpState      string
 }
 
+type testRecordOptions func(*testRecord)
+
 // getTestRecord outputs required testRecords with hardcoded values.
-func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
+func getTestRecord(isSrcNode, isIPv6 bool, options ...testRecordOptions) *testRecord {
 	record := testRecord{
+		isIPv6:        isIPv6,
 		srcPort:       uint16(1234),
 		dstPort:       uint16(5678),
 		proto:         uint8(6),
@@ -111,6 +117,9 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 	} else {
 		record.srcIP = net.ParseIP("2001:0:3238:DFE1:63::FEFB")
 		record.dstIP = net.ParseIP("2001:0:3238:DFE1:63::FEFC")
+	}
+	for _, option := range options {
+		option(&record)
 	}
 	record.flowStart = uint32(1257893000)
 	if !isSrcNode {
@@ -146,13 +155,13 @@ func getTestRecord(isSrcNode, isIPv6 bool) testRecord {
 			record.dstClusterIP = net.ParseIP("2001:0:3238:BBBB:63::AAAA")
 		}
 	}
-	return record
+	return &record
 }
 
 func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 	templateSet := entities.NewSet(false)
 	templateSet.PrepareSet(entities.Template, templateID)
-	elements := make([]entities.InfoElementWithValue, 0)
+	elements := make([]entities.InfoElementWithValue, 0, numFields)
 	ianaFields := ianaIPv4Fields
 	if isIPv6 {
 		ianaFields = ianaIPv6Fields
@@ -183,22 +192,28 @@ func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 	return templateSet
 }
 
-func createDataSet(templateID uint16, isSrcNode, isIPv6 bool, isMultipleRecord bool) entities.Set {
+func createDataSetForTestRecord(templateID uint16, testRec *testRecord, count int) entities.Set {
 	dataSet := entities.NewSet(false)
-	dataSet.PrepareSet(entities.Data, templateID)
-	elements := getDataRecordElements(isSrcNode, isIPv6)
-	dataSet.AddRecord(elements, templateID)
-	if isMultipleRecord {
+	for i := 0; i < count; i++ {
 		dataSet.PrepareSet(entities.Data, templateID)
-		elements = getDataRecordElements(isSrcNode, isIPv6)
+		elements := getDataRecordElements(testRec)
 		dataSet.AddRecord(elements, templateID)
 	}
 	return dataSet
 }
 
-func getDataRecordElements(isSrcNode, isIPv6 bool) []entities.InfoElementWithValue {
+func createDataSet(templateID uint16, isSrcNode, isIPv6 bool, isMultipleRecord bool) entities.Set {
 	testRec := getTestRecord(isSrcNode, isIPv6)
-	elements := make([]entities.InfoElementWithValue, 0)
+	count := 1
+	if isMultipleRecord {
+		count = 2
+	}
+	return createDataSetForTestRecord(templateID, testRec, count)
+}
+
+func getDataRecordElements(testRec *testRecord) []entities.InfoElementWithValue {
+	isIPv6 := testRec.isIPv6
+	elements := make([]entities.InfoElementWithValue, 0, numFields)
 	ianaFields := ianaIPv4Fields
 	if isIPv6 {
 		ianaFields = ianaIPv6Fields
