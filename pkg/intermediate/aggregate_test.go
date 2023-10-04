@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
@@ -147,7 +148,7 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 }
 
 // TODO:Cleanup this function using a loop, to make it easy to add elements for testing.
-func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool, isToExternal bool, isEgressDeny bool) *entities.Message {
+func createDataMsgForSrc(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool, isToExternal bool, isEgressDeny bool) *entities.Message {
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]entities.InfoElementWithValue, 0)
@@ -261,7 +262,7 @@ func createDataMsgForSrc(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedR
 	return message
 }
 
-func createDataMsgForDst(t *testing.T, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool, isIngressReject bool, isIngressDrop bool) *entities.Message {
+func createDataMsgForDst(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedRecord bool, isIngressReject bool, isIngressDrop bool) *entities.Message {
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]entities.InfoElementWithValue, 0)
@@ -509,6 +510,31 @@ func TestAggregationProcess(t *testing.T) {
 	}
 	aggRecord := aggregationProcess.flowKeyRecordMap[flowKey]
 	assert.Equalf(t, aggRecord.Record, dataMsg.GetSet().GetRecords()[0], "records should be equal")
+}
+
+func BenchmarkAggregateMsgByFlowKey(b *testing.B) {
+	bench := func(b *testing.B, isIPv6 bool) {
+		messageChan := make(chan *entities.Message)
+		input := AggregationInput{
+			MessageChan:     messageChan,
+			WorkerNum:       1, // not relevant for this benchmark (not calling Start)
+			CorrelateFields: fields,
+		}
+		for i := 0; i < b.N; i++ {
+			b.StopTimer()
+			ap, err := InitAggregationProcess(input)
+			require.NoError(b, err)
+			msg1 := createDataMsgForSrc(b, isIPv6, false, false, false, false)
+			msg2 := createDataMsgForDst(b, isIPv6, false, false, false, false)
+			b.StartTimer()
+			require.NoError(b, ap.AggregateMsgByFlowKey(msg1))
+			require.NoError(b, ap.AggregateMsgByFlowKey(msg2))
+			assert.EqualValues(b, 1, ap.GetNumFlows())
+		}
+	}
+
+	b.Run("ipv4", func(b *testing.B) { bench(b, false) })
+	b.Run("ipv6", func(b *testing.B) { bench(b, true) })
 }
 
 func TestCorrelateRecordsForInterNodeFlow(t *testing.T) {
