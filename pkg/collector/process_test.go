@@ -166,6 +166,10 @@ func TestTCPCollectingProcess_ReceiveDataRecordsMemoryUsage(t *testing.T) {
 
 	const numRecords = 1000
 
+	// We collect the IEs containing the source IPv4 address from all the records received by
+	// the collector. We need to make sure that we access the values from this slice *after*
+	// running the garbage collector and collecting memory stats, otherwise everything may be
+	// garbage collected too early and the results of the test will be inaccurate.
 	ies := make([]entities.InfoElementWithValue, 0, numRecords)
 
 	t.Logf("Data packet length: %d", len(validDataPacket))
@@ -185,7 +189,7 @@ func TestTCPCollectingProcess_ReceiveDataRecordsMemoryUsage(t *testing.T) {
 	conn.Close()
 	cp.Stop()
 
-	// force the GC to run before collecting memory stats
+	// Force the GC to run before collecting memory stats
 	runtime.GC()
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
