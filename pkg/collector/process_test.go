@@ -19,12 +19,14 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
+	"runtime"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/pion/dtls/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
@@ -142,6 +144,60 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 	assert.Error(t, err)
 	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+}
+
+// This test was added to easily measure memory usage when collecting and storing data records.
+func TestTCPCollectingProcess_ReceiveDataRecordsMemoryUsage(t *testing.T) {
+	input := getCollectorInput(tcpTransport, false, false)
+	cp, err := InitCollectingProcess(input)
+	require.NoError(t, err)
+	// Add the templates before sending data record
+	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
+
+	go cp.Start()
+
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+
+	var conn net.Conn
+	collectorAddr := cp.GetAddress()
+	conn, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
+	require.NoError(t, err)
+
+	const numRecords = 1000
+
+	ies := make([]entities.InfoElementWithValue, 0, numRecords)
+
+	t.Logf("Data packet length: %d", len(validDataPacket))
+
+	for i := 0; i < numRecords; i++ {
+		conn.Write(validDataPacket)
+		message := <-cp.GetMsgChan()
+		set := message.GetSet()
+		require.NotNil(t, set)
+		records := set.GetRecords()
+		require.NotEmpty(t, records)
+		ie, _, exist := records[0].GetInfoElementWithValue("sourceIPv4Address")
+		require.True(t, exist)
+		ies = append(ies, ie)
+	}
+
+	conn.Close()
+	cp.Stop()
+
+	// force the GC to run before collecting memory stats
+	runtime.GC()
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+
+	ipAddress := net.IP([]byte{1, 2, 3, 4})
+	for _, ie := range ies {
+		ip := ie.GetIPAddressValue()
+		assert.Equal(t, ipAddress, ip)
+	}
+
+	t.Logf("Live objects: %d\n", m.Mallocs-m.Frees)
+	t.Logf("Bytes of allocated heap objects: %d\n", m.HeapAlloc)
 }
 
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
