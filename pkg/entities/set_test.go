@@ -11,30 +11,61 @@ import (
 
 const (
 	testTemplateID = uint16(256)
+
+	testIPv4Addr1 = "10.0.0.1"
+	testIPv4Addr2 = "10.0.0.2"
+	testIPv6Addr1 = "2001:0:3238:dfe1:63::fefb"
+	testIPv6Addr2 = "2001:0:3238:dfe1:63::fefc"
 )
 
-func testAddRecordIPv4Addresses(t testing.TB) {
+func testAddRecordIPAddresses(t testing.TB, isIPv6 bool) {
+	var sourceIE, destinationIE *InfoElement
+	if isIPv6 {
+		sourceIE = NewInfoElement("sourceIPv6Address", 27, 19, 0, 16)
+		destinationIE = NewInfoElement("destinationIPv6Address", 28, 19, 0, 16)
+	} else {
+		sourceIE = NewInfoElement("sourceIPv4Address", 8, 18, 0, 4)
+		destinationIE = NewInfoElement("destinationIPv4Address", 12, 18, 0, 4)
+	}
+
 	// Test with template record
-	elements := make([]InfoElementWithValue, 0, 2)
-	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
-	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
-	elements = append(elements, ie1, ie2)
+	elements := []InfoElementWithValue{
+		NewIPAddressInfoElement(sourceIE, nil),
+		NewIPAddressInfoElement(destinationIE, nil),
+	}
 	newSet := NewSet(false)
 	require.NoError(t, newSet.PrepareSet(Template, testTemplateID))
 	require.NoError(t, newSet.AddRecord(elements, 256))
-	_, _, exist := newSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
-	assert.Equal(t, true, exist)
-	_, _, exist = newSet.GetRecords()[0].GetInfoElementWithValue("destinationIPv4Address")
-	assert.Equal(t, true, exist)
+	records := newSet.GetRecords()
+	require.NotEmpty(t, records)
+	record := records[0]
+	if isIPv6 {
+		_, _, exist := record.GetInfoElementWithValue("sourceIPv6Address")
+		assert.Equal(t, true, exist)
+		_, _, exist = record.GetInfoElementWithValue("destinationIPv6Address")
+		assert.Equal(t, true, exist)
+	} else {
+		_, _, exist := record.GetInfoElementWithValue("sourceIPv4Address")
+		assert.Equal(t, true, exist)
+		_, _, exist = record.GetInfoElementWithValue("destinationIPv4Address")
+		assert.Equal(t, true, exist)
+	}
 	newSet.ResetSet()
+
 	// Test with data record
 	require.NoError(t, newSet.PrepareSet(Data, testTemplateID))
-	elements = make([]InfoElementWithValue, 0, 2)
-	ip1 := net.ParseIP("10.0.0.1").To4()
-	ip2 := net.ParseIP("10.0.0.2").To4()
-	ie1 = NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), ip1)
-	ie2 = NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), ip2)
-	elements = append(elements, ie1, ie2)
+	var ip1, ip2 net.IP
+	if isIPv6 {
+		ip1 = net.ParseIP(testIPv6Addr1)
+		ip2 = net.ParseIP(testIPv6Addr2)
+	} else {
+		ip1 = net.ParseIP(testIPv4Addr1).To4()
+		ip2 = net.ParseIP(testIPv4Addr2).To4()
+	}
+	elements = []InfoElementWithValue{
+		NewIPAddressInfoElement(sourceIE, ip1),
+		NewIPAddressInfoElement(destinationIE, ip2),
+	}
 	require.NoError(t, newSet.AddRecord(elements, 256))
 	expectedBuf := make([]byte, 0, len(ip1)+len(ip2))
 	expectedBuf = append(expectedBuf, ip1...)
@@ -42,50 +73,19 @@ func testAddRecordIPv4Addresses(t testing.TB) {
 	assert.Equal(t, expectedBuf, newSet.GetRecords()[0].GetBuffer())
 }
 
-func TestAddRecordIPv4Addresses(t *testing.T) {
-	testAddRecordIPv4Addresses(t)
+func TestAddRecordIPAddresses(t *testing.T) {
+	t.Run("ipv4", func(t *testing.T) { testAddRecordIPAddresses(t, false) })
+	t.Run("ipv6", func(t *testing.T) { testAddRecordIPAddresses(t, true) })
 }
 
-func BenchmarkAddRecordIPv4Addresses(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		testAddRecordIPv4Addresses(b)
+func BenchmarkAddRecordIPAddresses(b *testing.B) {
+	bench := func(b *testing.B, isIPv6 bool) {
+		for i := 0; i < b.N; i++ {
+			testAddRecordIPAddresses(b, isIPv6)
+		}
 	}
-}
-
-func testAddRecordIPv6Addresses(t testing.TB) {
-	// Test with template record
-	elements := make([]InfoElementWithValue, 0, 2)
-	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv6Address", 27, 19, 0, 16), nil)
-	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), nil)
-	elements = append(elements, ie1, ie2)
-	newSet := NewSet(false)
-	require.NoError(t, newSet.PrepareSet(Template, testTemplateID))
-	newSet.AddRecord(elements, 256)
-	assert.Equal(t, []byte{0x1, 0x0, 0x0, 0x2, 0x0, 0x1b, 0x0, 0x10, 0x0, 0x1c, 0x0, 0x10}, newSet.GetRecords()[0].GetBuffer())
-	newSet.ResetSet()
-	// Test with data record
-	require.NoError(t, newSet.PrepareSet(Data, testTemplateID))
-	elements = make([]InfoElementWithValue, 0, 2)
-	ip1 := net.ParseIP("2001:0:3238:DFE1:63::FEFB")
-	ip2 := net.ParseIP("2001:0:3238:DFE1:63::FEFC")
-	ie1 = NewIPAddressInfoElement(NewInfoElement("sourceIPv6Address", 27, 19, 0, 16), ip1)
-	ie2 = NewIPAddressInfoElement(NewInfoElement("destinationIPv6Address", 28, 19, 0, 16), ip2)
-	elements = append(elements, ie1, ie2)
-	require.NoError(t, newSet.AddRecord(elements, 256))
-	expectedBuf := make([]byte, 0, len(ip1)+len(ip2))
-	expectedBuf = append(expectedBuf, ip1...)
-	expectedBuf = append(expectedBuf, ip2...)
-	assert.Equal(t, expectedBuf, newSet.GetRecords()[0].GetBuffer())
-}
-
-func TestAddRecordIPv6Addresses(t *testing.T) {
-	testAddRecordIPv6Addresses(t)
-}
-
-func BenchmarkAddRecordIPv6Addresses(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		testAddRecordIPv6Addresses(b)
-	}
+	b.Run("ipv4", func(b *testing.B) { bench(b, false) })
+	b.Run("ipv6", func(b *testing.B) { bench(b, true) })
 }
 
 func TestGetSetType(t *testing.T) {
