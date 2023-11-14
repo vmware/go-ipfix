@@ -6,6 +6,7 @@ PROTOC_GEN_GO_VERSION  := v1.28.1
 GOLANGCI_LINT_VERSION  := v1.54.2
 GOLANGCI_LINT_BINDIR   := .golangci-bin
 GOLANGCI_LINT_BIN      := $(GOLANGCI_LINT_BINDIR)/$(GOLANGCI_LINT_VERSION)/golangci-lint
+GO_FILES               := $(shell find . -type d -name '.cache' -prune -o -type f -name '*.go' -print)
 
 .PHONY: all
 all: collector consumer
@@ -81,6 +82,12 @@ docker-consumer:
 manifest:
 	@echo "===> Generating dev manifest for Go-ipfix <==="
 	$(CURDIR)/hack/generate-manifest-collector.sh --mode dev > build/yamls/ipfix-collector.yaml
+
+.PHONY: fmt
+fmt:
+	@echo
+	@echo "===> Formatting Go files <==="
+	@gofmt -s -l -w $(GO_FILES)
 
 .PHONY: clean
 clean:
