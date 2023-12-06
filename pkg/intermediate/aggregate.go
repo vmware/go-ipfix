@@ -16,6 +16,7 @@ package intermediate
 
 import (
 	"container/heap"
+	"encoding/json"
 	"fmt"
 	"net"
 	"strings"
@@ -542,6 +543,16 @@ func (a *AggregationProcess) aggregateRecords(incomingRecord, existingRecord ent
 					incomingVal := ieWithValue.GetStringValue()
 					existingIeWithValue.SetStringValue(incomingVal)
 				}
+			case "httpVals":
+				incomingVal := ieWithValue.GetStringValue()
+				existingVal := existingIeWithValue.GetStringValue()
+				updatedHttpVals, err := fillHttpVals(incomingVal, existingVal)
+				if err != nil {
+					klog.Errorf("httpVals could not be updated, err: %v", err)
+					existingIeWithValue.SetStringValue(incomingVal)
+				} else {
+					existingIeWithValue.SetStringValue(updatedHttpVals)
+				}
 			default:
 				klog.Errorf("Fields with name %v is not supported in aggregation fields list.", element)
 			}
@@ -983,4 +994,28 @@ func isCorrelationRequired(flowType uint8, record entities.Record) bool {
 		return true
 	}
 	return false
+}
+
+func fillHttpVals(incomingHttpVals, existingHttpVals string) (string, error) {
+	incomingHttpValsJson := make(map[int32]string)
+	existingHttpValsJson := make(map[int32]string)
+
+	if incomingHttpVals != "" {
+		if err := json.Unmarshal([]byte(incomingHttpVals), &incomingHttpValsJson); err != nil {
+			return "", fmt.Errorf("error parsing JSON: %v", err)
+		}
+	}
+	if existingHttpVals != "" {
+		if err := json.Unmarshal([]byte(existingHttpVals), &existingHttpValsJson); err != nil {
+			return "", fmt.Errorf("error parsing JSON: %v", err)
+		}
+	}
+	for key, value := range existingHttpValsJson {
+		incomingHttpValsJson[key] = value
+	}
+	updatedHttpVals, err := json.Marshal(incomingHttpValsJson)
+	if err != nil {
+		return "", fmt.Errorf("error converting JSON to string: %v", err)
+	}
+	return string(updatedHttpVals), nil
 }
