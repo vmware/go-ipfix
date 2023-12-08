@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.8.1 12-07-2023
+### Added
+- Added new Go Benchmarks. (#329, @antoninbas)
+### Changed
+- Improve memory performance of collector. (#330 #331, @antoninbas)
+- Rename l7ProtocolName to appProtocolName. (#333, @tushartathgur)
+- Updated aggregation logic for httpVals field. (#334, @tushartathgur)
 ## 0.8.0 10-02-2023
 ### Added
 - Add L7 visibility fields. (#315, @tushartathgur)
