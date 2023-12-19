@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.8.2 12-19-2023
+### Changed
+- Improve IPFIX collector. (#338, @yuntanghsu)
 ## 0.8.1 12-07-2023
 ### Added
 - Added new Go Benchmarks. (#329, @antoninbas)
