@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.8.3 02-15-2024
+### Added
+- Add EgressNodeName field to the Antrea registry. (#343, @Atish-iaf)
 ## 0.8.2 12-19-2023
 ### Changed
 - Improve IPFIX collector. (#338, @yuntanghsu)
