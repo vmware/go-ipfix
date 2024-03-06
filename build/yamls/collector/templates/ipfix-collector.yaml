@@ -49,7 +49,7 @@ spec:
         {{- end }}
         - --ipfix.port={{ .Values.port }}
         - --ipfix.transport={{ .Values.protocol }}
-        image: projects.registry.vmware.com/antrea/ipfix-collector:{{ .Values.image_tag }}
+        image: antrea/ipfix-collector:{{ .Values.image_tag }}
         imagePullPolicy: IfNotPresent
         name: ipfix-collector
         ports:
