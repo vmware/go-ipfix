@@ -50,7 +50,7 @@ spec:
       - args:
         - --ipfix.port=4739
         - --ipfix.transport=tcp
-        image: projects.registry.vmware.com/antrea/ipfix-collector:latest
+        image: antrea/ipfix-collector:latest
         imagePullPolicy: IfNotPresent
         name: ipfix-collector
         ports:
