@@ -9,7 +9,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/mock v0.3.0
-	google.golang.org/protobuf v1.28.1
+	google.golang.org/protobuf v1.33.0
 	k8s.io/apimachinery v0.24.9
 	k8s.io/component-base v0.24.9
 	k8s.io/klog/v2 v2.80.1
