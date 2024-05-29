@@ -8,12 +8,12 @@ import (
 
 type worker struct {
 	id          int
-	messageChan chan *entities.Message
+	messageChan <-chan *entities.Message
 	errChan     chan bool
 	job         func(*entities.Message) error
 }
 
-func createWorker(id int, messageChan chan *entities.Message, job func(*entities.Message) error) *worker {
+func createWorker(id int, messageChan <-chan *entities.Message, job func(*entities.Message) error) *worker {
 	return &worker{
 		id,
 		messageChan,

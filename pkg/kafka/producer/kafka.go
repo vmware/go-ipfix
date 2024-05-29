@@ -186,7 +186,7 @@ func (kp *KafkaProducer) SendFlowMessage(msg protoreflect.Message, kafkaDelimitM
 // PublishIPFIXMessages takes in a message channel as input and converts all the messages on
 // the message channel to flow messages in proto schema. This function exits when
 // the input message channel is closed.
-func (kp *KafkaProducer) PublishIPFIXMessages(msgCh chan *entities.Message) {
+func (kp *KafkaProducer) PublishIPFIXMessages(msgCh <-chan *entities.Message) {
 	for msg := range msgCh {
 		flowMsgs := kp.input.ProtoSchemaConvertor.ConvertIPFIXMsgToFlowMsgs(msg)
 		for _, flowMsg := range flowMsgs {

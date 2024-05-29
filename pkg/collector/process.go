@@ -127,7 +127,7 @@ func (cp *CollectingProcess) GetAddress() net.Addr {
 	return cp.netAddress
 }
 
-func (cp *CollectingProcess) GetMsgChan() chan *entities.Message {
+func (cp *CollectingProcess) GetMsgChan() <-chan *entities.Message {
 	return cp.messageChan
 }
 
