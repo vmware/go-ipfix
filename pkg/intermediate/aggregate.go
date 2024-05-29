@@ -43,7 +43,7 @@ type AggregationProcess struct {
 	// mutex allows multiple readers or one writer at the same time
 	mutex sync.RWMutex
 	// messageChan is the channel to receive the message
-	messageChan chan *entities.Message
+	messageChan <-chan *entities.Message
 	// workerNum is the number of workers to process the messages
 	workerNum int
 	// workerList is the list of workers
@@ -71,7 +71,7 @@ type AggregationProcess struct {
 }
 
 type AggregationInput struct {
-	MessageChan           chan *entities.Message
+	MessageChan           <-chan *entities.Message
 	WorkerNum             int
 	CorrelateFields       []string
 	AggregateElements     *AggregationElements
