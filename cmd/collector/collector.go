@@ -40,6 +40,8 @@ import (
 
 const (
 	logToStdErrFlag = "logtostderr"
+	// An arbitrary limit, to prevent unbounded memory usage.
+	maxFlowRecords = 4096
 )
 
 var (
@@ -48,7 +50,13 @@ var (
 	IPFIXTransport string
 	flowRecords    []string
 	mutex          sync.Mutex
+
+	flowTextSeparator = bytes.Repeat([]byte("="), 80)
 )
+
+type jsonResponse struct {
+	FlowRecords []string `json:"flowRecords"`
+}
 
 func initLoggingToFile(fs *pflag.FlagSet) {
 	var err error
@@ -134,6 +142,11 @@ func addIPFIXMessage(msg *entities.Message) {
 	}
 	mutex.Lock()
 	defer mutex.Unlock()
+	if len(flowRecords) >= maxFlowRecords {
+		// Zero and remove first element.
+		flowRecords[0] = "" // Ensure first element can be garbage-collected.
+		flowRecords = flowRecords[1:]
+	}
 	flowRecords = append(flowRecords, buf.String())
 }
 
@@ -240,21 +253,54 @@ func newCollectorCommand() *cobra.Command {
 
 func flowRecordHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		mutex.Lock()
-		defer mutex.Unlock()
-		// Retrieve data
-		klog.InfoS("Return flow records", "length", len(flowRecords))
-		// Convert data to JSON
-		responseData := map[string]interface{}{"flowRecords": flowRecords}
-		jsonData, err := json.Marshal(responseData)
-		if err != nil {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		countP := r.URL.Query().Get("count")
+		var count int
+		if countP != "" {
+			var err error
+			if count, err = strconv.Atoi(countP); err != nil || count < 0 {
+				http.Error(w, "Invalid count query parameter", http.StatusBadRequest)
+				return
+			}
+		} else {
+			count = -1
+		}
+		format := r.URL.Query().Get("format")
+		if format == "" {
+			format = "json"
+		}
+		if format != "text" && format != "json" {
+			http.Error(w, "Invalid format query parameter", http.StatusBadRequest)
 			return
 		}
-		// Set response headers
-		w.Header().Set("Content-Type", "application/json")
-		// Write JSON response
-		w.Write(jsonData)
+		mutex.Lock()
+		defer mutex.Unlock()
+		if count < 0 || count > len(flowRecords) {
+			count = len(flowRecords)
+		}
+		// Retrieve data
+		klog.InfoS("Return flow records", "length", count)
+		records := flowRecords[len(flowRecords)-count:]
+		if format == "json" {
+			// Convert data to JSON
+			responseData := &jsonResponse{
+				FlowRecords: records,
+			}
+			jsonData, err := json.Marshal(responseData)
+			if err != nil {
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			// Write JSON response
+			w.Write(jsonData)
+		} else {
+			w.Header().Set("Content-Type", "text/plain")
+			for idx := range records {
+				w.Write([]byte(records[idx]))
+				// Write a separator
+				w.Write(flowTextSeparator)
+			}
+		}
 	} else {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 	}
