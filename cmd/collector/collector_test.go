@@ -1,4 +1,4 @@
-// Copyright 2024 VMware, Inc.
+// Copyright 2024 Broadcom, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -82,59 +82,61 @@ func TestFlowRecordHandler(t *testing.T) {
 			name:          "both params set",
 			countParam:    "2",
 			formatParam:   "text",
-			expectedFlows: []string{"flow1", "flow2"},
+			expectedFlows: []string{"flow2", "flow3"},
 		},
 	}
 
 	for _, tc := range testCases {
-		expectedStatus := tc.expectedStatus
-		if expectedStatus == 0 {
-			expectedStatus = http.StatusOK
-		}
-		format := tc.formatParam
-		if format == "" {
-			format = "json"
-		}
-		rr := httptest.NewRecorder()
-		u := url.URL{
-			Path: "/records",
-		}
-		q := u.Query()
-		if tc.countParam != "" {
-			q.Set("count", tc.countParam)
-		}
-		if tc.formatParam != "" {
-			q.Set("format", tc.formatParam)
-		}
-		u.RawQuery = q.Encode()
-		req, err := http.NewRequest("GET", u.String(), nil)
-		require.NoError(t, err)
-		flowRecordHandler(rr, req)
-		resp := rr.Result()
-		defer resp.Body.Close()
-		require.Equal(t, expectedStatus, resp.StatusCode)
-		body, err := io.ReadAll(resp.Body)
-		require.NoError(t, err)
+		t.Run(tc.name, func(t *testing.T) {
+			expectedStatus := tc.expectedStatus
+			if expectedStatus == 0 {
+				expectedStatus = http.StatusOK
+			}
+			format := tc.formatParam
+			if format == "" {
+				format = "json"
+			}
+			rr := httptest.NewRecorder()
+			u := url.URL{
+				Path: "/records",
+			}
+			q := u.Query()
+			if tc.countParam != "" {
+				q.Set("count", tc.countParam)
+			}
+			if tc.formatParam != "" {
+				q.Set("format", tc.formatParam)
+			}
+			u.RawQuery = q.Encode()
+			req, err := http.NewRequest("GET", u.String(), nil)
+			require.NoError(t, err)
+			flowRecordHandler(rr, req)
+			resp := rr.Result()
+			defer resp.Body.Close()
+			require.Equal(t, expectedStatus, resp.StatusCode)
+			body, err := io.ReadAll(resp.Body)
+			require.NoError(t, err)
 
-		if expectedStatus != http.StatusOK {
-			return
-		}
+			if expectedStatus != http.StatusOK {
+				return
+			}
 
-		contentType := resp.Header.Get("Content-type")
-		if format == "json" {
-			require.Equal(t, "application/json", contentType)
-			var data jsonResponse
-			err := json.Unmarshal(body, &data)
-			require.NoError(t, err, "Invalid JSON response")
-			assert.Equal(t, tc.expectedFlows, data.FlowRecords)
-		} else if format == "text" {
-			require.Equal(t, "text/plain", contentType)
-			flows := strings.Split(string(body), string(flowTextSeparator))
-			// Ignore the last empty fragment.
-			assert.Equal(t, tc.expectedFlows, flows[:len(flows)-1])
-		} else {
-			require.FailNow(t, "Invalid format specified for test case")
-		}
+			contentType := resp.Header.Get("Content-type")
+			if format == "json" {
+				require.Equal(t, "application/json", contentType)
+				var data jsonResponse
+				err := json.Unmarshal(body, &data)
+				require.NoError(t, err, "Invalid JSON response")
+				assert.Equal(t, tc.expectedFlows, data.FlowRecords)
+			} else if format == "text" {
+				require.Equal(t, "text/plain", contentType)
+				flows := strings.Split(string(body), string(flowTextSeparator))
+				// Ignore the last empty fragment.
+				assert.Equal(t, tc.expectedFlows, flows[:len(flows)-1])
+			} else {
+				require.FailNow(t, "Invalid format specified for test case")
+			}
+		})
 	}
 }
 
