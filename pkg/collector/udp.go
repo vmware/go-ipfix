@@ -80,10 +80,9 @@ func (cp *CollectingProcess) startUDPServer() {
 					return
 				}
 				klog.V(2).Infof("Receiving %d bytes from %s", size, address.String())
-				cp.handleUDPClient(address)
 				buffBytes := make([]byte, size)
 				copy(buffBytes, buff[0:size])
-				cp.clients[address.String()].packetChan <- bytes.NewBuffer(buffBytes)
+				cp.handleUDPMessage(address, buffBytes)
 			}
 		}()
 	} else { // use udp
@@ -107,45 +106,63 @@ func (cp *CollectingProcess) startUDPServer() {
 					return
 				}
 				klog.V(2).Infof("Receiving %d bytes from %s", size, address.String())
-				cp.handleUDPClient(address)
-				cp.clients[address.String()].packetChan <- bytes.NewBuffer(buff[0:size])
+				cp.handleUDPMessage(address, buff[0:size])
 			}
 		}()
 	}
 	<-cp.stopChan
 }
 
-func (cp *CollectingProcess) handleUDPClient(address net.Addr) {
-	if _, exist := cp.clients[address.String()]; !exist {
-		client := cp.createClient()
-		cp.addClient(address.String(), client)
-		cp.wg.Add(1)
-		go func() {
-			defer cp.wg.Done()
-			ticker := time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
-			for {
-				select {
-				case <-cp.stopChan:
-					klog.Infof("Collecting process from %s has stopped.", address.String())
-					cp.deleteClient(address.String())
-					return
-				case <-ticker.C: // set timeout for udp connection
-					klog.Errorf("UDP connection from %s timed out.", address.String())
-					cp.deleteClient(address.String())
-					return
-				case packet := <-client.packetChan:
-					// get the message here
-					message, err := cp.decodePacket(packet, address.String())
-					if err != nil {
-						klog.Error(err)
-						return
-					}
-					klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
-						message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
-					ticker.Stop()
-					ticker = time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
-				}
-			}
+func (cp *CollectingProcess) handleUDPMessage(address net.Addr, buf []byte) {
+	addr := address.String()
+	client := func() *clientHandler {
+		cp.mutex.Lock()
+		defer cp.mutex.Unlock()
+		if client, ok := cp.clients[addr]; ok {
+			return client
+		}
+		return cp.createUDPClient(addr)
+	}()
+	client.packetChan <- bytes.NewBuffer(buf)
+}
+
+// createUDPClient is invoked with an exclusive lock on cp.mutex.
+func (cp *CollectingProcess) createUDPClient(addr string) *clientHandler {
+	client := cp.createClient()
+	cp.clients[addr] = client
+	cp.wg.Add(1)
+	go func() {
+		defer cp.wg.Done()
+		ticker := time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
+		defer ticker.Stop()
+		defer func() {
+			cp.mutex.Lock()
+			defer cp.mutex.Unlock()
+			delete(cp.clients, addr)
 		}()
-	}
+		for {
+			select {
+			case <-cp.stopChan:
+				klog.Infof("Collecting process from %s has stopped.", addr)
+				return
+			case <-ticker.C: // set timeout for udp connection
+				klog.Errorf("UDP connection from %s timed out.", addr)
+				return
+			case packet := <-client.packetChan:
+				// get the message here
+				message, err := cp.decodePacket(packet, addr)
+				if err != nil {
+					klog.Error(err)
+					// For UDP, there is no point in returning here, as the
+					// client would not become aware that there is an issue.
+					// This is why the template refresh mechanism exists.
+					continue
+				}
+				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
+					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
+				ticker.Reset(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
+			}
+		}
+	}()
+	return client
 }

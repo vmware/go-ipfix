@@ -132,8 +132,6 @@ func (cp *CollectingProcess) GetMsgChan() <-chan *entities.Message {
 }
 
 func (cp *CollectingProcess) CloseMsgChan() {
-	cp.mutex.Lock()
-	defer cp.mutex.Unlock()
 	close(cp.messageChan)
 }
 
@@ -159,18 +157,6 @@ func (cp *CollectingProcess) createClient() *clientHandler {
 	return &clientHandler{
 		packetChan: make(chan *bytes.Buffer),
 	}
-}
-
-func (cp *CollectingProcess) addClient(address string, client *clientHandler) {
-	cp.mutex.Lock()
-	defer cp.mutex.Unlock()
-	cp.clients[address] = client
-}
-
-func (cp *CollectingProcess) deleteClient(name string) {
-	cp.mutex.Lock()
-	defer cp.mutex.Unlock()
-	delete(cp.clients, name)
 }
 
 func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {

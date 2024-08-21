@@ -301,6 +301,48 @@ func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
 	cp.Stop()
 }
 
+func TestUDPCollectingProcess_DecodePacketError(t *testing.T) {
+	input := getCollectorInput(udpTransport, false, false)
+	cp, _ := InitCollectingProcess(input)
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
+	resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
+	if err != nil {
+		t.Errorf("UDP Address cannot be resolved.")
+	}
+
+	defer cp.CloseMsgChan()
+	go func() {
+		// consume all messages to avoid blocking
+		ch := cp.GetMsgChan()
+		for range ch {
+		}
+	}()
+
+	conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
+	if err != nil {
+		t.Errorf("UDP Collecting Process does not start correctly.")
+	}
+	defer conn.Close()
+	// write data packet before template, decodePacket should fail
+	conn.Write(validDataPacket)
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Equal(t, int64(1), cp.GetNumConnToCollector())
+	}, 100*time.Millisecond, 10*time.Millisecond)
+	time.Sleep(10 * time.Millisecond)
+	assert.Zero(t, cp.GetNumRecordsReceived())
+
+	conn.Write(validTemplatePacket)
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Equal(t, int64(1), cp.GetNumConnToCollector())
+		assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+	}, 100*time.Millisecond, 10*time.Millisecond)
+
+	cp.Stop()
+}
+
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := CollectingProcess{}
 	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
