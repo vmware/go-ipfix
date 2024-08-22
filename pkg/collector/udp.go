@@ -127,18 +127,32 @@ func (cp *CollectingProcess) handleUDPMessage(address net.Addr, buf []byte) {
 		}
 		return cp.createUDPClient(addr)
 	}()
-	client.packetChan <- bytes.NewBuffer(buf)
+	// closeClientChan is necessary to make sure that there is no possibility of deadlock when
+	// the client goroutine decides that shutting down is necessary. Otherwise we could end up
+	// in a situation where the client goroutine is no longer consuming messages, but this
+	// goroutine is blocked on writing to packetChan. Therefore, when the client goroutine needs
+	// to shutdown, it will also close closeClientChan, to ensure that we don't block here.
+	select {
+	case client.packetChan <- bytes.NewBuffer(buf):
+		break
+	case <-client.closeClientChan:
+		break
+	}
 }
 
 // createUDPClient is invoked with an exclusive lock on cp.mutex.
 func (cp *CollectingProcess) createUDPClient(addr string) *clientHandler {
-	client := cp.createClient()
+	client := &clientHandler{
+		packetChan:      make(chan *bytes.Buffer),
+		closeClientChan: make(chan struct{}),
+	}
 	cp.clients[addr] = client
 	cp.wg.Add(1)
 	go func() {
 		defer cp.wg.Done()
 		ticker := time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
 		defer ticker.Stop()
+		defer close(client.closeClientChan)
 		defer func() {
 			cp.mutex.Lock()
 			defer cp.mutex.Unlock()

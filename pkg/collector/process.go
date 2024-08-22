@@ -83,7 +83,8 @@ type CollectorInput struct {
 }
 
 type clientHandler struct {
-	packetChan chan *bytes.Buffer
+	packetChan      chan *bytes.Buffer
+	closeClientChan chan struct{}
 }
 
 func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
@@ -151,12 +152,6 @@ func (cp *CollectingProcess) incrementNumRecordsReceived() {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 	cp.numOfRecordsReceived = cp.numOfRecordsReceived + 1
-}
-
-func (cp *CollectingProcess) createClient() *clientHandler {
-	return &clientHandler{
-		packetChan: make(chan *bytes.Buffer),
-	}
 }
 
 func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {

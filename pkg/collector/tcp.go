@@ -66,7 +66,9 @@ func (cp *CollectingProcess) startTCPServer() {
 
 func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	address := conn.RemoteAddr().String()
-	client := cp.createClient()
+	// The channels stored in clientHandler are not needed for the TCP client, so we do not
+	// initialize them.
+	client := &clientHandler{}
 	func() {
 		cp.mutex.Lock()
 		defer cp.mutex.Unlock()
