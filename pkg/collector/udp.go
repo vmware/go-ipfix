@@ -63,7 +63,9 @@ func (cp *CollectingProcess) startUDPServer() {
 			return
 		}
 		defer conn.Close()
+		cp.wg.Add(1)
 		go func() {
+			defer cp.wg.Done()
 			buff := make([]byte, cp.maxBufferSize)
 			for {
 				size, err := conn.Read(buff)
@@ -94,7 +96,9 @@ func (cp *CollectingProcess) startUDPServer() {
 		cp.updateAddress(conn.LocalAddr())
 		klog.Infof("Start UDP collecting process on %s", cp.netAddress)
 		defer conn.Close()
+		cp.wg.Add(1)
 		go func() {
+			defer cp.wg.Done()
 			for {
 				buff := make([]byte, cp.maxBufferSize)
 				size, address, err := conn.ReadFromUDP(buff)
