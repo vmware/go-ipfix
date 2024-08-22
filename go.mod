@@ -7,7 +7,7 @@ require (
 	github.com/pion/dtls/v2 v2.2.4
 	github.com/spf13/cobra v1.6.1
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.1
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/mock v0.3.0
 	google.golang.org/protobuf v1.33.0
 	k8s.io/apimachinery v0.24.9
