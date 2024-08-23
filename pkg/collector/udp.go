@@ -150,7 +150,7 @@ func (cp *CollectingProcess) createUDPClient(addr string) *clientHandler {
 	cp.wg.Add(1)
 	go func() {
 		defer cp.wg.Done()
-		ticker := time.NewTicker(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
+		ticker := time.NewTicker(time.Duration(entities.TemplateTTL) * time.Second)
 		defer ticker.Stop()
 		defer close(client.closeClientChan)
 		defer func() {
@@ -178,7 +178,7 @@ func (cp *CollectingProcess) createUDPClient(addr string) *clientHandler {
 				}
 				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
 					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
-				ticker.Reset(time.Duration(entities.TemplateRefreshTimeOut) * time.Second)
+				ticker.Reset(time.Duration(entities.TemplateTTL) * time.Second)
 			}
 		}
 	}()
