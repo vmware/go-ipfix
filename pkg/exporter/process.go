@@ -20,7 +20,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net"
 	"sync"
 	"time"
@@ -32,7 +31,6 @@ import (
 )
 
 const startTemplateID uint16 = 255
-const defaultCheckConnInterval = 10 * time.Second
 const defaultJSONBufferLen = 5000
 
 type templateValue struct {
@@ -59,6 +57,7 @@ type ExportingProcess struct {
 	templateMutex   sync.Mutex
 	sendJSONRecord  bool
 	jsonBufferLen   int
+	wg              sync.WaitGroup
 }
 
 type ExporterTLSClientConfig struct {
@@ -156,30 +155,7 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 		templatesMap:    make(map[uint16]templateValue),
 		templateRefCh:   make(chan struct{}),
 		sendJSONRecord:  input.SendJSONRecord,
-	}
-
-	// Start a goroutine for checking whether connection to collector is still open
-	if input.CollectorProtocol == "tcp" {
-		interval := input.CheckConnInterval
-		if interval == 0 {
-			interval = defaultCheckConnInterval
-		}
-		go func() {
-			ticker := time.NewTicker(interval)
-			oneByteForRead := make([]byte, 1)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					isConnected := expProc.checkConnToCollector(oneByteForRead)
-					if !isConnected {
-						expProc.CloseConnToCollector()
-						klog.Error("Error when connecting to collector because connection is closed.")
-						return
-					}
-				}
-			}
-		}()
+		wg:              sync.WaitGroup{},
 	}
 
 	// Template refresh logic is only for UDP transport.
@@ -188,19 +164,19 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			// Default value
 			input.TempRefTimeout = entities.TemplateRefreshTimeOut
 		}
+		expProc.wg.Add(1)
 		go func() {
+			defer expProc.wg.Done()
 			ticker := time.NewTicker(time.Duration(input.TempRefTimeout) * time.Second)
 			defer ticker.Stop()
 			for {
 				select {
 				case <-expProc.templateRefCh:
-					break
+					return
 				case <-ticker.C:
 					err := expProc.sendRefreshedTemplates()
 					if err != nil {
-						// Other option is sending messages through channel to library consumers
-						klog.Errorf("Error when sending refreshed templates: %v. Closing the connection to IPFIX controller", err)
-						expProc.CloseConnToCollector()
+						klog.Errorf("Error when sending refreshed templates: %v", err)
 					}
 				}
 			}
@@ -254,26 +230,17 @@ func (ep *ExportingProcess) GetMsgSizeLimit() int {
 	return entities.MaxSocketMsgSize
 }
 
+// CloseConnToCollector closes the connection to the collector.
+// It should not be called twice. InitExportingProcess can be called again after calling
+// CloseConnToCollector.
 func (ep *ExportingProcess) CloseConnToCollector() {
-	if !isChanClosed(ep.templateRefCh) {
-		close(ep.templateRefCh) // Close template refresh channel
-	}
-	err := ep.connToCollector.Close()
-	// Just log the error that happened when closing the connection. Not returning error as we do not expect library
-	// consumers to exit their programs with this error.
-	if err != nil {
+	close(ep.templateRefCh)
+	if err := ep.connToCollector.Close(); err != nil {
+		// Just log the error that happened when closing the connection. Not returning error
+		// as we do not expect library consumers to exit their programs with this error.
 		klog.Errorf("Error when closing connection to collector: %v", err)
 	}
-}
-
-// checkConnToCollector checks whether the connection from exporter is still open
-// by trying to read from connection. Closed connection will return EOF from read.
-func (ep *ExportingProcess) checkConnToCollector(oneByteForRead []byte) bool {
-	ep.connToCollector.SetReadDeadline(time.Now().Add(time.Millisecond))
-	if _, err := ep.connToCollector.Read(oneByteForRead); err == io.EOF {
-		return false
-	}
-	return true
+	ep.wg.Wait()
 }
 
 // NewTemplateID is called to get ID when creating new template record.
@@ -448,15 +415,6 @@ func (ep *ExportingProcess) dataRecSanityCheck(rec entities.Record) error {
 		return fmt.Errorf("process: Data Record does not pass the min required length (%d) check for template ID %d", ep.templatesMap[templateID].minDataRecLen, templateID)
 	}
 	return nil
-}
-
-func isChanClosed(ch <-chan struct{}) bool {
-	select {
-	case <-ch:
-		return true
-	default:
-	}
-	return false
 }
 
 func createClientConfig(config *ExporterTLSClientConfig) (*tls.Config, error) {
