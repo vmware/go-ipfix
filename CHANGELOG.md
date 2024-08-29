@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.10.0 09-30-2024
+### Added
+- Add more features to the test IPFIX collector web API. (#351, @antoninbas)
+### Changed
+- Return receive-only channel in the GetMsgChan() method of the collector
+  process. (#350, @antoninbas)
+- Use recommended default value of 600s for templateRefreshTimeout. (#353,
+  @antoninbas)
+- Stop referencing the VMware Harbor registry for ipfix-collector. (#347,
+  @antoninbas)
+### Fixed
+- Fix how decoding errors are handled for UDP clients in collector
+  process. (#352, @antoninbas)
+- Fix how collector connections are closed in exporter process. (#354, @antoninbas)
 ## 0.9.0 02-15-2024
 ### Added
 - Add EgressNodeName field to the Antrea registry. (#343, @Atish-iaf)
