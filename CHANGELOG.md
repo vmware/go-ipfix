@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.10.1 09-06-2024
+Go module version v0.10.0 has been retracted; it should not be used.
+### Fixed
+- Restore check for closed TCP connection in exporter process. (#360, @antoninbas)
 ## 0.10.0 08-30-2024
 ### Added
 - Add more features to the test IPFIX collector web API. (#351, @antoninbas)
