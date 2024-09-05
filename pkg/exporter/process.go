@@ -20,8 +20,10 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/pion/dtls/v2"
@@ -31,6 +33,7 @@ import (
 )
 
 const startTemplateID uint16 = 255
+const defaultCheckConnInterval = 10 * time.Second
 const defaultJSONBufferLen = 5000
 
 type templateValue struct {
@@ -53,11 +56,12 @@ type ExportingProcess struct {
 	seqNumber       uint32
 	templateID      uint16
 	templatesMap    map[uint16]templateValue
-	templateRefCh   chan struct{}
 	templateMutex   sync.Mutex
 	sendJSONRecord  bool
 	jsonBufferLen   int
 	wg              sync.WaitGroup
+	isClosed        atomic.Bool
+	stopCh          chan struct{}
 }
 
 type ExporterTLSClientConfig struct {
@@ -153,9 +157,37 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 		seqNumber:       0,
 		templateID:      startTemplateID,
 		templatesMap:    make(map[uint16]templateValue),
-		templateRefCh:   make(chan struct{}),
 		sendJSONRecord:  input.SendJSONRecord,
 		wg:              sync.WaitGroup{},
+		stopCh:          make(chan struct{}),
+	}
+
+	// Start a goroutine to check whether the collector has already closed the TCP connection.
+	if input.CollectorProtocol == "tcp" {
+		interval := input.CheckConnInterval
+		if interval == 0 {
+			interval = defaultCheckConnInterval
+		}
+		expProc.wg.Add(1)
+		go func() {
+			defer expProc.wg.Done()
+			ticker := time.NewTicker(interval)
+			oneByteForRead := make([]byte, 1)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-expProc.stopCh:
+					return
+				case <-ticker.C:
+					isConnected := expProc.checkConnToCollector(oneByteForRead)
+					if !isConnected {
+						klog.Error("Connector has closed its side of the TCP connection, closing our side")
+						expProc.closeConnToCollector()
+						return
+					}
+				}
+			}
+		}()
 	}
 
 	// Template refresh logic is only for UDP transport.
@@ -171,12 +203,14 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			defer ticker.Stop()
 			for {
 				select {
-				case <-expProc.templateRefCh:
+				case <-expProc.stopCh:
 					return
 				case <-ticker.C:
 					err := expProc.sendRefreshedTemplates()
 					if err != nil {
-						klog.Errorf("Error when sending refreshed templates: %v", err)
+						klog.Errorf("Error when sending refreshed templates, closing the connection to the collector: %v", err)
+						expProc.closeConnToCollector()
+						return
 					}
 				}
 			}
@@ -231,16 +265,35 @@ func (ep *ExportingProcess) GetMsgSizeLimit() int {
 }
 
 // CloseConnToCollector closes the connection to the collector.
-// It should not be called twice. InitExportingProcess can be called again after calling
-// CloseConnToCollector.
+// It can safely be closed more than once, and subsequent calls will be no-ops.
 func (ep *ExportingProcess) CloseConnToCollector() {
-	close(ep.templateRefCh)
+	ep.closeConnToCollector()
+	ep.wg.Wait()
+}
+
+// closeConnToCollector is the internal version of CloseConnToCollector. It closes all the resources
+// but does not wait for the ep.wg counter to get to 0. Goroutines which need to terminate in order
+// for ep.wg to be decremented can safely call closeConnToCollector.
+func (ep *ExportingProcess) closeConnToCollector() {
+	if ep.isClosed.Swap(true) {
+		return
+	}
+	close(ep.stopCh)
 	if err := ep.connToCollector.Close(); err != nil {
 		// Just log the error that happened when closing the connection. Not returning error
 		// as we do not expect library consumers to exit their programs with this error.
 		klog.Errorf("Error when closing connection to collector: %v", err)
 	}
-	ep.wg.Wait()
+}
+
+// checkConnToCollector checks whether the connection from exporter is still open
+// by trying to read from connection. Closed connection will return EOF from read.
+func (ep *ExportingProcess) checkConnToCollector(oneByteForRead []byte) bool {
+	ep.connToCollector.SetReadDeadline(time.Now().Add(time.Millisecond))
+	if _, err := ep.connToCollector.Read(oneByteForRead); err == io.EOF {
+		return false
+	}
+	return true
 }
 
 // NewTemplateID is called to get ID when creating new template record.
