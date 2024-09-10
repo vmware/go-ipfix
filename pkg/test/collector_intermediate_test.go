@@ -18,6 +18,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -252,7 +253,7 @@ func copyFlowKeyRecordMap(key intermediate.FlowKey, aggregationFlowRecord *inter
 }
 
 func waitForCollectorReady(t *testing.T, cp *collector.CollectingProcess) {
-	checkConn := func() (bool, error) {
+	checkConn := func(ctx context.Context) (bool, error) {
 		if strings.Split(cp.GetAddress().String(), ":")[1] == "0" {
 			return false, fmt.Errorf("random port is not resolved")
 		}
@@ -263,13 +264,13 @@ func waitForCollectorReady(t *testing.T, cp *collector.CollectingProcess) {
 		conn.Close()
 		return true, nil
 	}
-	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 500*time.Millisecond, false, checkConn); err != nil {
 		t.Errorf("Cannot establish connection to %s", cp.GetAddress().String())
 	}
 }
 
 func waitForAggregationToFinish(t *testing.T, ap *intermediate.AggregationProcess, key intermediate.FlowKey) {
-	checkConn := func() (bool, error) {
+	checkConn := func(ctx context.Context) (bool, error) {
 		ap.ForAllRecordsDo(copyFlowKeyRecordMap)
 		if len(flowKeyRecordMap) > 0 {
 			ie1, _, _ := flowKeyRecordMap[key].Record.GetInfoElementWithValue("sourcePodName")
@@ -283,7 +284,7 @@ func waitForAggregationToFinish(t *testing.T, ap *intermediate.AggregationProces
 			return false, fmt.Errorf("aggregation process does not process and store data correctly")
 		}
 	}
-	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 500*time.Millisecond, false, checkConn); err != nil {
 		t.Error(err)
 	}
 }

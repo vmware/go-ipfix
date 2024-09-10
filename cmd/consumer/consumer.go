@@ -15,6 +15,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 	"os/signal"
@@ -22,7 +23,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -88,7 +89,7 @@ func run() error {
 	}
 	consumer := consumer.NewKafkaConsumer(input)
 	go func() {
-		err := wait.PollImmediateInfinite(500*time.Millisecond, func() (bool, error) {
+		err := wait.PollUntilContextCancel(context.TODO(), 500*time.Millisecond, true, func(ctx context.Context) (bool, error) {
 			if err := consumer.InitSaramaConsumer(); err != nil {
 				return false, nil
 			} else {
