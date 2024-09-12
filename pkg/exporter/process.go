@@ -206,12 +206,14 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 				case <-expProc.stopCh:
 					return
 				case <-ticker.C:
+					klog.V(2).Info("Sending refreshed templates to the collector")
 					err := expProc.sendRefreshedTemplates()
 					if err != nil {
 						klog.Errorf("Error when sending refreshed templates, closing the connection to the collector: %v", err)
 						expProc.closeConnToCollector()
 						return
 					}
+					klog.V(2).Info("Sent refreshed templates to the collector")
 				}
 			}
 		}()
@@ -278,11 +280,12 @@ func (ep *ExportingProcess) closeConnToCollector() {
 	if ep.isClosed.Swap(true) {
 		return
 	}
+	klog.Info("Closing connection to the collector")
 	close(ep.stopCh)
 	if err := ep.connToCollector.Close(); err != nil {
 		// Just log the error that happened when closing the connection. Not returning error
 		// as we do not expect library consumers to exit their programs with this error.
-		klog.Errorf("Error when closing connection to collector: %v", err)
+		klog.Errorf("Error when closing connection to the collector: %v", err)
 	}
 }
 
