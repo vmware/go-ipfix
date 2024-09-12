@@ -1,4 +1,4 @@
-FROM golang:1.21 as go-ipfix-build
+FROM golang:1.23 as go-ipfix-build
 
 WORKDIR /go-ipfix
 
