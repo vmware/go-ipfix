@@ -18,6 +18,7 @@
 package test
 
 import (
+	"context"
 	"net"
 	"testing"
 	"time"
@@ -210,7 +211,7 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 		record = dataSet.GetRecords()[1]
 		matchDataRecordElements(t, record, isSrcNode, isIPv6)
 	}
-	checkError := func() (bool, error) {
+	checkError := func(ctx context.Context) (bool, error) {
 		_, err = export.SendSet(set)
 		if err != nil {
 			return true, nil
@@ -218,7 +219,7 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 			return false, nil
 		}
 	}
-	if err = wait.Poll(time.Millisecond, 10*time.Millisecond, checkError); err != nil {
+	if err = wait.PollUntilContextTimeout(context.Background(), time.Millisecond, 10*time.Millisecond, false, checkError); err != nil {
 		t.Errorf("Collector process did not close correctly.")
 	}
 }

@@ -18,6 +18,7 @@
 package test
 
 import (
+	"context"
 	"flag"
 	"net"
 	"testing"
@@ -174,7 +175,7 @@ func disableLogToStderr() {
 }
 
 func waitForCollectorStatus(b *testing.B, cp *collector.CollectingProcess, checkReady bool) {
-	checkConn := func() (bool, error) {
+	checkConn := func(ctx context.Context) (bool, error) {
 		if conn, err := net.Dial(cp.GetAddress().Network(), cp.GetAddress().String()); err != nil {
 			if checkReady {
 				return false, err
@@ -190,7 +191,7 @@ func waitForCollectorStatus(b *testing.B, cp *collector.CollectingProcess, check
 			}
 		}
 	}
-	if err := wait.Poll(100*time.Millisecond, 500*time.Millisecond, checkConn); err != nil {
+	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 500*time.Millisecond, false, checkConn); err != nil {
 		b.Fatalf("cannot establish connection to %s", cp.GetAddress().String())
 	}
 }

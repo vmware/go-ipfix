@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 	"google.golang.org/protobuf/proto"
 	"k8s.io/klog/v2"
 )

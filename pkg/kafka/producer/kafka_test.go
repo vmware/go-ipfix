@@ -19,7 +19,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/Shopify/sarama"
+	"github.com/IBM/sarama"
 	"github.com/stretchr/testify/assert"
 
 	testcerts "github.com/vmware/go-ipfix/pkg/test/certs"
@@ -47,7 +47,9 @@ func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, client
 	seedBroker := sarama.NewMockBrokerListener(t, 1, seedListener)
 	defer seedBroker.Close()
 
-	seedBroker.Returns(new(sarama.MetadataResponse))
+	metadataResponse := new(sarama.MetadataResponse)
+	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
+	seedBroker.Returns(metadataResponse)
 
 	caCertFile := createTmpFileAndWrite(t, testcerts.FakeCACert, "ca-")
 	certFile := createTmpFileAndWrite(t, testcerts.FakeClientCert, "clientCert-")

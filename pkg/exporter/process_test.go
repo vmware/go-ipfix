@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -764,11 +765,17 @@ func TestExportingProcess_CheckConnToCollector(t *testing.T) {
 
 func TestExportingProcess_CloseConnToCollectorTwice(t *testing.T) {
 	stopCh := make(chan struct{})
-	defer close(stopCh)
 	buffCh := make(chan []byte)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err, "Error when creating a local server")
-	go runTCPServer(t, listener, stopCh, buffCh)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		runTCPServer(t, listener, stopCh, buffCh)
+	}()
+	defer wg.Wait()
+	defer close(stopCh)
 
 	input := ExporterInput{
 		CollectorAddress:    listener.Addr().String(),

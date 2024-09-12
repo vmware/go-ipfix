@@ -22,8 +22,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/Shopify/sarama"
-	saramamock "github.com/Shopify/sarama/mocks"
+	"github.com/IBM/sarama"
+	saramamock "github.com/IBM/sarama/mocks"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
