@@ -10,10 +10,10 @@ COPY . /go-ipfix
 
 RUN make consumer
 
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 LABEL maintainer="go-ipfix"
-LABEL description="A Docker image based on Ubuntu 18.04 which contains a Kafka consumer"
+LABEL description="A Docker image based on Ubuntu which contains a Kafka consumer"
 
 COPY --from=go-ipfix-build /go-ipfix/bin/consumer /usr/local/bin/
 ENTRYPOINT ["consumer"]
