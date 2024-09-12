@@ -96,7 +96,7 @@ type ExporterInput struct {
 // InitExportingProcess takes in collector address(net.Addr format), obsID(observation ID)
 // and tempRefTimeout(template refresh timeout). tempRefTimeout is applicable only
 // for collectors listening over UDP; unit is seconds. For TCP, you can pass any
-// value. For UDP, if 0 is passed, consider 1800s as default.
+// value and it will be ignored. For UDP, if 0 is passed, 600s is used as the default.
 //
 // PathMTU is recommended for UDP transport. If not given a valid value, i.e., either
 // 0 or a value more than 1500, we consider a default value of 512B as per RFC7011.
