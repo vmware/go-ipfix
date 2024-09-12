@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.11.0 09-13-2024
+### Changed
+- Bump Go to 1.23. (#365, @antoninbas)
+- Add a few log messages to exporter process. (#367, @antoninbas)
+- Bump Ubuntu to 24.04 for Docker images. (#369, @antoninbas)
 ## 0.10.1 09-06-2024
 Go module version v0.10.0 has been retracted; it should not be used.
 ### Fixed
