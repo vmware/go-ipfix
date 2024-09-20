@@ -71,7 +71,7 @@ jobs:
         go-version-file: 'go.mod'
 
     - name: Install Protoc
-      uses: arduino/setup-protoc@v1
+      uses: arduino/setup-protoc@v3
       with:
         version: '3.15.0'
 
