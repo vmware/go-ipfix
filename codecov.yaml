@@ -11,4 +11,4 @@ comment:
 
 ignore:
   - "**/testing/mock_*.go"
-  - "pkg/producer/protobuf/*.pb.go"
+  - "**/*.pb.go"
