@@ -14,7 +14,7 @@ jobs:
   build-ipfix-collector:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build ipfix-collector Docker image
         run: make docker-collector
       - name: Push ipfix-collector Docker image to Antrea Docker registry
@@ -28,7 +28,7 @@ jobs:
   build-kafka-consumer:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build kafka-consumer Docker image
         run: make docker-consumer
       - name: Push kafka-consumer Docker image to Antrea Docker registry
