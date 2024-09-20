@@ -9,7 +9,7 @@ jobs:
   build-ipfix-collector:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build assets
         env:
           TAG: ${{ github.ref }}
@@ -28,7 +28,7 @@ jobs:
   build-kafka-collector:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Build assets
         run: cp ./build/yamls/kafka-flow-collector.yaml ./assets
       - name: Upload kafka-flow-collector.yaml
