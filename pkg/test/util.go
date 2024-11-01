@@ -159,18 +159,15 @@ func getTestRecord(isSrcNode, isIPv6 bool, options ...testRecordOptions) *testRe
 }
 
 func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
-	templateSet := entities.NewSet(false)
-	templateSet.PrepareSet(entities.Template, templateID)
-	elements := make([]entities.InfoElementWithValue, 0, numFields)
+	ies := make([]*entities.InfoElement, 0, numFields)
 	ianaFields := ianaIPv4Fields
 	if isIPv6 {
 		ianaFields = ianaIPv6Fields
 	}
 	ianaFields = append(ianaFields, commonFields...)
 	for _, name := range ianaFields {
-		element, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
-		ie, _ := entities.DecodeAndCreateInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
+		ie, _ := registry.GetInfoElement(name, registry.IANAEnterpriseID)
+		ies = append(ies, ie)
 	}
 	antreaFields := antreaCommonFields
 	if !isIPv6 {
@@ -179,16 +176,14 @@ func createTemplateSet(templateID uint16, isIPv6 bool) entities.Set {
 		antreaFields = append(antreaFields, antreaIPv6...)
 	}
 	for _, name := range antreaFields {
-		element, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
-		ie, _ := entities.DecodeAndCreateInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
+		ie, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
+		ies = append(ies, ie)
 	}
 	for _, name := range reverseFields {
-		element, _ := registry.GetInfoElement(name, registry.IANAReversedEnterpriseID)
-		ie, _ := entities.DecodeAndCreateInfoElementWithValue(element, nil)
-		elements = append(elements, ie)
+		ie, _ := registry.GetInfoElement(name, registry.IANAReversedEnterpriseID)
+		ies = append(ies, ie)
 	}
-	templateSet.AddRecord(elements, templateID)
+	templateSet, _ := entities.MakeTemplateSet(templateID, ies)
 	return templateSet
 }
 
