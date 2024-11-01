@@ -428,18 +428,7 @@ func (ep *ExportingProcess) sendRefreshedTemplates() error {
 
 	ep.templateMutex.Lock()
 	for templateID, tempValue := range ep.templatesMap {
-		tempSet := entities.NewSet(false)
-		if err := tempSet.PrepareSet(entities.Template, templateID); err != nil {
-			return err
-		}
-		elements := make([]entities.InfoElementWithValue, len(tempValue.elements))
-		var err error
-		for i, element := range tempValue.elements {
-			if elements[i], err = entities.DecodeAndCreateInfoElementWithValue(element, nil); err != nil {
-				return err
-			}
-		}
-		err = tempSet.AddRecord(elements, templateID)
+		tempSet, err := entities.MakeTemplateSet(templateID, tempValue.elements)
 		if err != nil {
 			return err
 		}

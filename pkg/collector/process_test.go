@@ -19,6 +19,8 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/binary"
+	"fmt"
 	"net"
 	"runtime"
 	"sync"
@@ -31,6 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
+	"github.com/vmware/go-ipfix/pkg/exporter"
 	"github.com/vmware/go-ipfix/pkg/registry"
 	testcerts "github.com/vmware/go-ipfix/pkg/test/certs"
 )
@@ -89,6 +92,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
 	}
 	go cp.Start()
+
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
 	collectorAddr := cp.GetAddress()
@@ -603,6 +607,79 @@ func TestUDPCollectingProcessIPv6(t *testing.T) {
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
 	assert.Equal(t, net.ParseIP("2001:0:3238:DFE1:63::FEFB"), ie.GetIPAddressValue())
+}
+
+// TestUnknownInformationElement validates that message decoding when dealing with unknown IEs (not
+// part of the static registry included in this project). All 3 supported decoding modes are tested.
+func TestUnknownInformationElement(t *testing.T) {
+	const (
+		templateID   = 100
+		obsDomainID  = 0xabcd
+		unknownID    = 999
+		unknownValue = uint32(0x1234)
+	)
+
+	for _, enterpriseID := range []uint32{registry.IANAEnterpriseID, registry.AntreaEnterpriseID} {
+		for _, mode := range []DecodingMode{DecodingModeStrict, DecodingModeLenientKeepUnknown, DecodingModeLenientDropUnknown} {
+			t.Run(fmt.Sprintf("enterpriseID-%d_%s", enterpriseID, mode), func(t *testing.T) {
+				input := getCollectorInput(tcpTransport, false, false)
+				input.DecodingMode = mode
+				cp, err := InitCollectingProcess(input)
+				require.NoError(t, err)
+				defer cp.Stop()
+
+				go func() { // remove the message from the message channel
+					for range cp.GetMsgChan() {
+					}
+				}()
+
+				// First, send template set.
+
+				unknownIE := entities.NewInfoElement("foo", unknownID, entities.Unsigned32, enterpriseID, 4)
+				knownIE1, _ := registry.GetInfoElement("octetDeltaCount", registry.IANAEnterpriseID)
+				knownIE2, _ := registry.GetInfoElement("sourceNodeName", registry.AntreaEnterpriseID)
+				templateSet, err := entities.MakeTemplateSet(templateID, []*entities.InfoElement{knownIE1, unknownIE, knownIE2})
+				require.NoError(t, err)
+				templateBytes, err := exporter.CreateIPFIXMsg(templateSet, obsDomainID, 0 /* seqNumber */, time.Now())
+				require.NoError(t, err)
+				_, err = cp.decodePacket(bytes.NewBuffer(templateBytes), "1.2.3.4:12345")
+				// If decoding is strict, there will be an error and we need to stop the test.
+				if mode == DecodingModeStrict {
+					require.Error(t, err)
+					return
+				}
+				require.NoError(t, err)
+
+				// Second, send data set.
+
+				unknownIEWithValue := entities.NewUnsigned32InfoElement(unknownIE, unknownValue)
+				knownIE1WithValue := entities.NewUnsigned64InfoElement(knownIE1, 0x100)
+				knownIE2WithValue := entities.NewStringInfoElement(knownIE2, "node-1")
+				dataSet, err := entities.MakeDataSet(templateID, []entities.InfoElementWithValue{knownIE1WithValue, unknownIEWithValue, knownIE2WithValue})
+				require.NoError(t, err)
+				dataBytes, err := exporter.CreateIPFIXMsg(dataSet, obsDomainID, 1 /* seqNumber */, time.Now())
+				require.NoError(t, err)
+				msg, err := cp.decodePacket(bytes.NewBuffer(dataBytes), "1.2.3.4:12345")
+				require.NoError(t, err)
+				records := msg.GetSet().GetRecords()
+				require.Len(t, records, 1)
+				record := records[0]
+				ies := record.GetOrderedElementList()
+
+				if mode == DecodingModeLenientKeepUnknown {
+					require.Len(t, ies, 3)
+					// the unknown IE after decoding
+					ieWithValue := ies[1]
+					// the decoded IE has no name and the type always defaults to OctetArray
+					require.Equal(t, entities.NewInfoElement("", unknownID, entities.OctetArray, enterpriseID, 4), ieWithValue.GetInfoElement())
+					value := ieWithValue.GetOctetArrayValue()
+					assert.Equal(t, unknownValue, binary.BigEndian.Uint32(value))
+				} else if mode == DecodingModeLenientDropUnknown {
+					require.Len(t, ies, 2)
+				}
+			})
+		}
+	}
 }
 
 func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorInput {
