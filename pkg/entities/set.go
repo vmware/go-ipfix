@@ -68,7 +68,7 @@ type set struct {
 	length       int
 }
 
-func NewSet(isDecoding bool) Set {
+func NewSet(isDecoding bool) *set {
 	if isDecoding {
 		return &set{
 			records:    make([]Record, 0),
@@ -188,4 +188,35 @@ func (s *set) createHeader(setType ContentType, templateID uint16) {
 	} else if setType == Data {
 		binary.BigEndian.PutUint16(s.headerBuffer[0:2], templateID)
 	}
+}
+
+// MakeTemplateSet is a convenience function which creates a template Set with a single Record.
+func MakeTemplateSet(templateID uint16, ies []*InfoElement) (*set, error) {
+	tempSet := NewSet(false)
+	if err := tempSet.PrepareSet(Template, templateID); err != nil {
+		return nil, err
+	}
+	elements := make([]InfoElementWithValue, len(ies))
+	for idx, ie := range ies {
+		var err error
+		if elements[idx], err = DecodeAndCreateInfoElementWithValue(ie, nil); err != nil {
+			return nil, err
+		}
+	}
+	if err := tempSet.AddRecord(elements, templateID); err != nil {
+		return nil, err
+	}
+	return tempSet, nil
+}
+
+// MakeDataSet is a convenience function which creates a data Set with a single Record.
+func MakeDataSet(templateID uint16, ies []InfoElementWithValue) (*set, error) {
+	dataSet := NewSet(false)
+	if err := dataSet.PrepareSet(Data, templateID); err != nil {
+		return nil, err
+	}
+	if err := dataSet.AddRecord(ies, templateID); err != nil {
+		return nil, err
+	}
+	return dataSet, nil
 }

@@ -31,6 +31,25 @@ import (
 	"github.com/vmware/go-ipfix/pkg/util"
 )
 
+// DecodingMode specifies how unknown information elements (in templates) are handled when decoding.
+// Unknown information elements are elements which are not part of the static registry included with
+// the library.
+// Note that regardless of the DecodingMode, data sets must always match the corresponding template.
+type DecodingMode string
+
+const (
+	// DecodingModeStrict will cause decoding to fail when an unknown IE is encountered in a template.
+	DecodingModeStrict DecodingMode = "Strict"
+	// DecodingModeLenientKeepUnknown will accept unknown IEs in templates. When decoding the
+	// corresponding field in a data record, the value will be preserved (as an octet array).
+	DecodingModeLenientKeepUnknown DecodingMode = "LenientKeepUnknown"
+	// DecodingModeLenientDropUnknown will accept unknown IEs in templates. When decoding the
+	// corresponding field in a data record, the value will be dropped (information element will
+	// not be present in the resulting Record). Be careful when using this mode as the IEs
+	// included in the resulting Record will no longer match the received template.
+	DecodingModeLenientDropUnknown DecodingMode = "LenientDropUnknown"
+)
+
 type CollectingProcess struct {
 	// for each obsDomainID, there is a map of templates
 	templatesMap map[uint32]map[uint16][]*entities.InfoElement
@@ -57,6 +76,9 @@ type CollectingProcess struct {
 	// numExtraElements specifies number of elements that could be added after
 	// decoding the IPFIX data packet.
 	numExtraElements int
+	// decodingMode specifies how unknown information elements (in templates) are handled when
+	// decoding.
+	decodingMode DecodingMode
 	// caCert, serverCert and serverKey are for storing encryption info when using TLS/DTLS
 	caCert               []byte
 	serverCert           []byte
@@ -80,6 +102,10 @@ type CollectorInput struct {
 	ServerCert       []byte
 	ServerKey        []byte
 	NumExtraElements int
+	// DecodingMode specifies how unknown information elements (in templates) are handled when
+	// decoding. The default value is DecodingModeStrict for historical reasons. For most uses,
+	// DecodingModeLenientKeepUnknown is the most appropriate mode.
+	DecodingMode DecodingMode
 }
 
 type clientHandler struct {
@@ -103,6 +129,10 @@ func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 		serverCert:       input.ServerCert,
 		serverKey:        input.ServerKey,
 		numExtraElements: input.NumExtraElements,
+		decodingMode:     input.DecodingMode,
+	}
+	if collectProc.decodingMode == "" {
+		collectProc.decodingMode = DecodingModeStrict
 	}
 	return collectProc, nil
 }
@@ -228,7 +258,11 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 			enterpriseID = registry.IANAEnterpriseID
 			element, err = registry.GetInfoElementFromID(elementID, enterpriseID)
 			if err != nil {
-				return nil, err
+				if cp.decodingMode == DecodingModeStrict {
+					return nil, err
+				}
+				klog.InfoS("Template includes an information element that is not present in registry", "obsDomainID", obsDomainID, "templateID", templateID, "enterpriseID", enterpriseID, "elementID", elementID)
+				element = entities.NewInfoElement("", elementID, entities.OctetArray, enterpriseID, elementLength)
 			}
 		} else {
 			/*
@@ -254,7 +288,11 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 			elementID = binary.BigEndian.Uint16(elementid)
 			element, err = registry.GetInfoElementFromID(elementID, enterpriseID)
 			if err != nil {
-				return nil, err
+				if cp.decodingMode == DecodingModeStrict {
+					return nil, err
+				}
+				klog.InfoS("Template includes an information element that is not present in registry", "obsDomainID", obsDomainID, "templateID", templateID, "enterpriseID", enterpriseID, "elementID", elementID)
+				element = entities.NewInfoElement("", elementID, entities.OctetArray, enterpriseID, elementLength)
 			}
 		}
 		if elementsWithValue[i], err = entities.DecodeAndCreateInfoElementWithValue(element, nil); err != nil {
@@ -281,17 +319,24 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 	}
 
 	for dataBuffer.Len() > 0 {
-		elements := make([]entities.InfoElementWithValue, len(template), len(template)+cp.numExtraElements)
-		for i, element := range template {
+		elements := make([]entities.InfoElementWithValue, 0, len(template)+cp.numExtraElements)
+		for _, ie := range template {
 			var length int
-			if element.Len == entities.VariableLength { // string
+			if ie.Len == entities.VariableLength { // string / octet array
 				length = getFieldLength(dataBuffer)
 			} else {
-				length = int(element.Len)
+				length = int(ie.Len)
 			}
-			if elements[i], err = entities.DecodeAndCreateInfoElementWithValue(element, dataBuffer.Next(length)); err != nil {
+			element, err := entities.DecodeAndCreateInfoElementWithValue(ie, dataBuffer.Next(length))
+			if err != nil {
 				return nil, err
 			}
+			// A missing name means an unknown element was received
+			if cp.decodingMode == DecodingModeLenientDropUnknown && ie.Name == "" {
+				klog.V(5).InfoS("Dropping field for unknown information element", "obsDomainID", obsDomainID, "ie", ie)
+				continue
+			}
+			elements = append(elements, element)
 		}
 		err = dataSet.AddRecordV2(elements, templateID)
 		if err != nil {

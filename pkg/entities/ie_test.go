@@ -78,7 +78,7 @@ func TestNewInfoElementWithValue(t *testing.T) {
 func BenchmarkEncodeInfoElementValueToBuffShortString(b *testing.B) {
 	// a short string has a max length of 254
 	str := strings.Repeat("x", 128)
-	element := NewStringInfoElement(NewInfoElement("interfaceDescription", 83, 13, 0, 65535), str)
+	element := NewStringInfoElement(NewInfoElement("interfaceDescription", 83, 13, 0, VariableLength), str)
 	const numCopies = 1000
 	length := element.GetLength()
 	buffer := make([]byte, numCopies*length)
@@ -95,7 +95,7 @@ func BenchmarkEncodeInfoElementValueToBuffShortString(b *testing.B) {
 func BenchmarkEncodeInfoElementValueToBuffLongString(b *testing.B) {
 	// a long string has a max length of 65535
 	str := strings.Repeat("x", 10000)
-	element := NewStringInfoElement(NewInfoElement("interfaceDescription", 83, 13, 0, 65535), str)
+	element := NewStringInfoElement(NewInfoElement("interfaceDescription", 83, 13, 0, VariableLength), str)
 	const numCopies = 1000
 	length := element.GetLength()
 	buffer := make([]byte, numCopies*length)
@@ -106,5 +106,45 @@ func BenchmarkEncodeInfoElementValueToBuffLongString(b *testing.B) {
 			require.NoError(b, encodeInfoElementValueToBuff(element, buffer, index))
 			index += length
 		}
+	}
+}
+
+func TestEncodeInfoElementValueToBuffOctetArray(t *testing.T) {
+	shortArray := make([]byte, 128)
+	longArray := make([]byte, 10000)
+	testCases := []struct {
+		name           string
+		ieLen          uint16
+		array          []byte
+		expectedBuffer []byte
+	}{
+		{
+			name:           "fixed length",
+			ieLen:          uint16(len(shortArray)),
+			array:          shortArray,
+			expectedBuffer: shortArray,
+		},
+		{
+			name:           "variable length - short",
+			ieLen:          VariableLength,
+			array:          shortArray,
+			expectedBuffer: append([]byte{128}, shortArray...),
+		},
+		{
+			name:  "variable length - long",
+			ieLen: VariableLength,
+			array: longArray,
+			// 10000 is 0x2710
+			expectedBuffer: append([]byte{255, 0x27, 0x10}, longArray...),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			element := NewOctetArrayInfoElement(NewInfoElement("", 999, OctetArray, 56506, tc.ieLen), tc.array)
+			buffer := make([]byte, len(tc.expectedBuffer))
+			require.NoError(t, encodeInfoElementValueToBuff(element, buffer, 0))
+			assert.Equal(t, tc.expectedBuffer, buffer)
+		})
 	}
 }
