@@ -152,3 +152,27 @@ func TestSet_UpdateLenInHeader(t *testing.T) {
 	// Check the bytes in the header for set length
 	assert.Equal(t, uint16(setForEncoding.GetSetLength()), binary.BigEndian.Uint16(setForEncoding.GetHeaderBuffer()[2:4]))
 }
+
+func TestMakeTemplateSet(t *testing.T) {
+	ie1 := NewInfoElement("sourceIPv4Address", 8, 18, 0, 4)
+	ie2 := NewInfoElement("destinationIPv4Address", 12, 18, 0, 4)
+	s, err := MakeTemplateSet(testTemplateID, []*InfoElement{ie1, ie2})
+	require.NoError(t, err)
+	assert.Equal(t, Template, s.setType)
+	require.Len(t, s.records, 1)
+	assert.Equal(t, map[string]interface{}{
+		"sourceIPv4Address":      net.IP(nil),
+		"destinationIPv4Address": net.IP(nil),
+	}, s.records[0].GetElementMap())
+}
+
+func TestMakeDataSet(t *testing.T) {
+	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("1.1.1.1"))
+	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP("1.1.2.1"))
+	elements := []InfoElementWithValue{ie1, ie2}
+	s, err := MakeDataSet(testTemplateID, elements)
+	require.NoError(t, err)
+	assert.Equal(t, Data, s.setType)
+	require.Len(t, s.records, 1)
+	assert.Equal(t, elements, s.records[0].GetOrderedElementList())
+}
