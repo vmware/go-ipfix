@@ -31,6 +31,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
+	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/exporter"
@@ -80,7 +81,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
-	template, _ := cp.getTemplate(1, 256)
+	template, _ := cp.getTemplateIEs(1, 256)
 	assert.NotNil(t, template, "TCP Collecting Process should receive and store the received template.")
 	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
 }
@@ -110,7 +111,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
-	template, _ := cp.getTemplate(1, 256)
+	template, _ := cp.getTemplateIEs(1, 256)
 	assert.NotNil(t, template, "UDP Collecting Process should receive and store the received template.")
 	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
 }
@@ -350,7 +351,7 @@ func TestUDPCollectingProcess_DecodePacketError(t *testing.T) {
 
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	cp := CollectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16]*template)
 	cp.mutex = sync.RWMutex{}
 	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
 	if err != nil {
@@ -381,7 +382,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	assert.NotNil(t, err, "Error should be logged for invalid version")
 	// Malformed record
 	templateRecord = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0}
-	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16]*template)
 	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord), address.String())
 	assert.NotNil(t, err, "Error should be logged for malformed template record")
 	if _, exist := cp.templatesMap[uint32(1)]; exist {
@@ -391,7 +392,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 
 func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := CollectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16][]*entities.InfoElement)
+	cp.templatesMap = make(map[uint32]map[uint16]*template)
 	cp.mutex = sync.RWMutex{}
 	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
 	if err != nil {
@@ -425,20 +426,49 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	assert.NotNil(t, err, "Error should be logged for malformed data record")
 }
 
+// testClock is a wrapper around clocktesting.FakeClock. Unfortunately, FakeClock does not support
+// calling clock.Now() when executing an AfterFunc() function, which is require in our case. So we
+// have to define this wrapper which lets us do it. It may not have the same guarantees as
+// FakeClock, as waiters are not executed "atomically" with time advances, but it should be
+// sufficient for our use case.
+type testClock struct {
+	*clocktesting.FakeClock
+	mutex sync.Mutex
+	now   time.Time
+}
+
+func newTestClock(now time.Time) *testClock {
+	return &testClock{
+		FakeClock: clocktesting.NewFakeClock(now),
+		now:       now,
+	}
+}
+
+func (c *testClock) Now() time.Time {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	return c.now
+}
+
+func (c *testClock) Step(d time.Duration) {
+	func() {
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
+		c.now = c.now.Add(d)
+	}()
+	c.FakeClock.Step(d)
+}
+
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
+	clock := newTestClock(time.Now())
 	input := CollectorInput{
 		Address:       hostPortIPv4,
 		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   1,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
 	}
-	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
-	}
+	cp, err := initCollectingProcess(input, clock)
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
@@ -460,13 +490,113 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	}()
 	<-cp.GetMsgChan()
 	cp.Stop()
-	template, err := cp.getTemplate(1, 256)
+	template, err := cp.getTemplateIEs(1, 256)
 	assert.NotNil(t, template, "Template should be stored in the template map.")
 	assert.Nil(t, err, "Template should be stored in the template map.")
-	time.Sleep(2 * time.Second)
-	template, err = cp.getTemplate(1, 256)
-	assert.Nil(t, template, "Template should be deleted after 5 seconds.")
-	assert.NotNil(t, err, "Template should be deleted after 5 seconds.")
+	clock.Step(time.Duration(input.TemplateTTL) * time.Second)
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		_, err := cp.getTemplateIEs(1, 256)
+		assert.ErrorContains(t, err, "does not exist", "template should be deleted after timeout")
+	}, 1*time.Second, 50*time.Millisecond)
+}
+
+func TestUDPCollectingProcess_TemplateAddAndDelete(t *testing.T) {
+	const (
+		templateID  = 100
+		obsDomainID = 0xabcd
+	)
+	input := CollectorInput{
+		Address:       hostPortIPv4,
+		Protocol:      udpTransport,
+		MaxBufferSize: 1024,
+		TemplateTTL:   1,
+	}
+	// We should be using the fake clock for this test, but unfortunately
+	// the behavior of the Stop method for fake timers do not conform to
+	// https://pkg.go.dev/time#Timer.Stop.
+	// Stop should return false if the timer has already been stopped, which
+	// is not the case of the fake timer.
+	cp, err := InitCollectingProcess(input)
+	require.NoError(t, err)
+	cp.addTemplate(obsDomainID, templateID, elementsWithValueIPv4)
+	// Get a copy of the stored template
+	tpl := func() template {
+		cp.mutex.RLock()
+		defer cp.mutex.RUnlock()
+		return *cp.templatesMap[obsDomainID][templateID]
+	}()
+	require.NotNil(t, tpl.expiryTimer)
+	require.True(t, cp.deleteTemplate(obsDomainID, templateID))
+	// Stop returns false if the timer has already been stopped, which
+	// should be done by the call to deleteTemplate.
+	assert.False(t, tpl.expiryTimer.Stop())
+	// Deleting the template a second time should return false
+	assert.False(t, cp.deleteTemplate(obsDomainID, templateID))
+}
+
+// TestUDPCollectingProcess_TemplateUpdate checks the behavior of addTemplate
+// when a template is refreshed.
+func TestUDPCollectingProcess_TemplateUpdate(t *testing.T) {
+	const (
+		templateID  = 100
+		obsDomainID = 0xabcd
+	)
+	now := time.Now()
+	clock := newTestClock(now)
+	input := CollectorInput{
+		Address:       hostPortIPv4,
+		Protocol:      udpTransport,
+		MaxBufferSize: 1024,
+		TemplateTTL:   1,
+	}
+	cp, err := initCollectingProcess(input, clock)
+	require.NoError(t, err)
+	cp.addTemplate(obsDomainID, templateID, elementsWithValueIPv4)
+	// Get a copy of the stored template
+	getTemplate := func() template {
+		cp.mutex.RLock()
+		defer cp.mutex.RUnlock()
+		return *cp.templatesMap[obsDomainID][templateID]
+	}
+	tpl := getTemplate()
+	require.NotNil(t, tpl.expiryTimer)
+	assert.Equal(t, now.Add(time.Duration(input.TemplateTTL)*time.Second), tpl.expiryTime)
+	// Advance the clock by half the TTL
+	clock.Step(500 * time.Millisecond)
+	// Template should still be present in map
+	_, err = cp.getTemplateIEs(obsDomainID, templateID)
+	require.NoError(t, err)
+	// "Update" the template (template is being refreshed)
+	cp.addTemplate(obsDomainID, templateID, elementsWithValueIPv4)
+	tpl = getTemplate()
+	assert.Equal(t, clock.Now().Add(time.Duration(input.TemplateTTL)*time.Second), tpl.expiryTime)
+	// Advance the clock by half the TTL again, template should still be present
+	clock.Step(500 * time.Millisecond)
+	_, err = cp.getTemplateIEs(obsDomainID, templateID)
+	require.NoError(t, err)
+	// Advance the clock by half the TTL again, template should be expired
+	clock.Step(500 * time.Millisecond)
+	_, err = cp.getTemplateIEs(obsDomainID, templateID)
+	assert.Error(t, err)
+}
+
+func BenchmarkAddTemplateUDP(b *testing.B) {
+	input := CollectorInput{
+		Address:       hostPortIPv4,
+		Protocol:      udpTransport,
+		MaxBufferSize: 1024,
+		IsEncrypted:   false,
+		ServerCert:    nil,
+		ServerKey:     nil,
+	}
+	cp, err := initCollectingProcess(input, clocktesting.NewFakeClock(time.Now()))
+	require.NoError(b, err)
+	obsDomainID := uint32(1)
+	b.ResetTimer()
+	for range b.N {
+		cp.addTemplate(obsDomainID, 256, elementsWithValueIPv4)
+		obsDomainID = (obsDomainID + 1) % 1000
+	}
 }
 
 func TestTLSCollectingProcess(t *testing.T) {
@@ -573,7 +703,7 @@ func TestTCPCollectingProcessIPv6(t *testing.T) {
 	<-cp.GetMsgChan()
 	message := <-cp.GetMsgChan()
 	cp.Stop()
-	template, _ := cp.getTemplate(1, 256)
+	template, _ := cp.getTemplateIEs(1, 256)
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
@@ -602,7 +732,7 @@ func TestUDPCollectingProcessIPv6(t *testing.T) {
 	<-cp.GetMsgChan()
 	message := <-cp.GetMsgChan()
 	cp.Stop()
-	template, _ := cp.getTemplate(1, 256)
+	template, _ := cp.getTemplateIEs(1, 256)
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
