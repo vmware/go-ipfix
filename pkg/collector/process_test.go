@@ -349,43 +349,97 @@ func TestUDPCollectingProcess_DecodePacketError(t *testing.T) {
 }
 
 func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
-	cp := CollectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16]*template)
-	cp.mutex = sync.RWMutex{}
-	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
-	if err != nil {
-		t.Error(err)
-	}
-	cp.netAddress = address
-	cp.messageChan = make(chan *entities.Message)
-	go func() { // remove the message from the message channel
-		for range cp.GetMsgChan() {
-		}
-	}()
-	message, err := cp.decodePacket(bytes.NewBuffer(validTemplatePacket), address.String())
-	if err != nil {
-		t.Fatalf("Got error in decoding template record: %v", err)
-	}
-	assert.Equal(t, uint16(10), message.GetVersion(), "Flow record version should be 10.")
-	assert.Equal(t, uint32(1), message.GetObsDomainID(), "Flow record obsDomainID should be 1.")
-	assert.NotNil(t, cp.templatesMap[message.GetObsDomainID()], "Template should be stored in template map")
+	// This is the observation domain ID used by test template records
+	const obsDomainID = uint32(1)
+	// This is the template ID used by test template records
+	const templateID = uint16(256)
 
-	templateSet := message.GetSet()
-	assert.NotNil(t, templateSet, "Template record should be stored in message flowset")
-	sourceIPv4Address, _, exist := templateSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
-	assert.Equal(t, true, exist)
-	assert.Equal(t, uint32(0), sourceIPv4Address.GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
-	// Invalid version
-	templateRecord := []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
-	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord), address.String())
-	assert.NotNil(t, err, "Error should be logged for invalid version")
-	// Malformed record
-	templateRecord = []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0}
-	cp.templatesMap = make(map[uint32]map[uint16]*template)
-	_, err = cp.decodePacket(bytes.NewBuffer(templateRecord), address.String())
-	assert.NotNil(t, err, "Error should be logged for malformed template record")
-	if _, exist := cp.templatesMap[uint32(1)]; exist {
-		t.Fatal("Template should not be stored for malformed template record")
+	testCases := []struct {
+		name              string
+		existingTemplates map[uint32]map[uint16]*template
+		templateRecord    []byte
+		expectedErr       string
+		// whether an entry is expected in the templates map after decoding the packet
+		isTemplateExpected bool
+	}{
+		{
+			name:               "valid template",
+			existingTemplates:  map[uint32]map[uint16]*template{},
+			templateRecord:     validTemplatePacket,
+			isTemplateExpected: true,
+		},
+		{
+			name: "invalid version",
+			existingTemplates: map[uint32]map[uint16]*template{
+				obsDomainID: {
+					templateID: &template{},
+				},
+			},
+			templateRecord: []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21},
+			expectedErr:    "collector only supports IPFIX (v10)",
+			// Invalid  version means we stop decoding the packet right away, so we will not modify the existing template map
+			isTemplateExpected: true,
+		},
+		{
+			name: "malformed record fields",
+			existingTemplates: map[uint32]map[uint16]*template{
+				obsDomainID: {
+					templateID: &template{},
+				},
+			},
+			templateRecord:     []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0},
+			expectedErr:        "error in decoding data",
+			isTemplateExpected: false,
+		},
+		{
+			name: "malformed record header",
+			existingTemplates: map[uint32]map[uint16]*template{
+				obsDomainID: {
+					templateID: &template{},
+				},
+			},
+			// We truncate the record header (3 bytes instead of 4)
+			templateRecord: []byte{0, 10, 0, 40, 95, 154, 107, 127, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0},
+			expectedErr:    "error in decoding data",
+			// If we cannot decode the message to get a template ID, then the existing template entry will not be removed
+			isTemplateExpected: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			cp := CollectingProcess{}
+			cp.templatesMap = tc.existingTemplates
+			cp.mutex = sync.RWMutex{}
+			address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
+			require.NoError(t, err)
+			cp.netAddress = address
+			cp.messageChan = make(chan *entities.Message)
+			go func() { // remove the message from the message channel
+				for range cp.GetMsgChan() {
+				}
+			}()
+			message, err := cp.decodePacket(bytes.NewBuffer(tc.templateRecord), address.String())
+			if tc.expectedErr != "" {
+				require.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err, "failed to decode template record")
+
+				assert.Equal(t, uint16(10), message.GetVersion(), "Unexpected IPFIX version in message")
+				assert.Equal(t, obsDomainID, message.GetObsDomainID(), "Unexpected obsDomainID in message")
+
+				templateSet := message.GetSet()
+				assert.NotNil(t, templateSet, "Template record should be stored in message flowset")
+				sourceIPv4Address, _, exist := templateSet.GetRecords()[0].GetInfoElementWithValue("sourceIPv4Address")
+				assert.Equal(t, true, exist)
+				assert.Equal(t, uint32(0), sourceIPv4Address.GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
+			}
+			if tc.isTemplateExpected {
+				assert.NotNil(t, cp.templatesMap[obsDomainID][templateID], "Template should be stored in template map")
+			} else {
+				assert.Nil(t, cp.templatesMap[obsDomainID][templateID], "Template should not be stored in template map")
+			}
+		})
 	}
 }
 

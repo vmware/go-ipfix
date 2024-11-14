@@ -261,12 +261,7 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		return nil, err
 	}
 
-	templateSet := entities.NewSet(true)
-	if err := templateSet.PrepareSet(entities.Template, templateID); err != nil {
-		return nil, err
-	}
-	elementsWithValue := make([]entities.InfoElementWithValue, int(fieldCount))
-	for i := 0; i < int(fieldCount); i++ {
+	decodeField := func() (entities.InfoElementWithValue, error) {
 		var element *entities.InfoElement
 		var enterpriseID uint32
 		var elementID uint16
@@ -320,12 +315,37 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 				element = entities.NewInfoElement("", elementID, entities.OctetArray, enterpriseID, elementLength)
 			}
 		}
-		if elementsWithValue[i], err = entities.DecodeAndCreateInfoElementWithValue(element, nil); err != nil {
-			return nil, err
-		}
+
+		return entities.DecodeAndCreateInfoElementWithValue(element, nil)
 	}
-	err := templateSet.AddRecordV2(elementsWithValue, templateID)
+
+	elementsWithValue, err := func() ([]entities.InfoElementWithValue, error) {
+		elementsWithValue := make([]entities.InfoElementWithValue, int(fieldCount))
+		for i := range fieldCount {
+			elementWithValue, err := decodeField()
+			if err != nil {
+				return nil, err
+			}
+			elementsWithValue[i] = elementWithValue
+		}
+		return elementsWithValue, nil
+	}()
 	if err != nil {
+		// Delete existing template (if one exists) from template map if the new one is invalid.
+		// This is particularly useful for UDP collection, as there is no feedback mechanism
+		// to let the sender know that the new template is invalid (while with TCP, we can close
+		// the connection). If we keep the old template and the sender sends data records
+		// which use the new template, we would try to decode them according to the old
+		// template, which would cause issues.
+		cp.deleteTemplate(obsDomainID, templateID)
+		return nil, err
+	}
+
+	templateSet := entities.NewSet(true)
+	if err := templateSet.PrepareSet(entities.Template, templateID); err != nil {
+		return nil, err
+	}
+	if err := templateSet.AddRecordV2(elementsWithValue, templateID); err != nil {
 		return nil, err
 	}
 	cp.addTemplate(obsDomainID, templateID, elementsWithValue)
