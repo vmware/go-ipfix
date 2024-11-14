@@ -174,7 +174,7 @@ func (cp *CollectingProcess) Stop() {
 	close(cp.stopChan)
 	// wait for all connections to be safely deleted and returned
 	cp.wg.Wait()
-	klog.Info("Stopping the collecting process")
+	klog.Info("Stopped the collecting process")
 }
 
 func (cp *CollectingProcess) GetAddress() net.Addr {

@@ -21,6 +21,7 @@ import (
 	"crypto/x509"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"net"
 	"runtime"
 	"sync"
@@ -38,10 +39,14 @@ import (
 	testcerts "github.com/vmware/go-ipfix/pkg/test/certs"
 )
 
-var validTemplatePacket = []byte{0, 10, 0, 40, 95, 154, 107, 127, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 101, 255, 255, 0, 0, 220, 186}
-var validTemplatePacketIPv6 = []byte{0, 10, 0, 32, 96, 27, 70, 6, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 16, 1, 0, 0, 2, 0, 27, 0, 16, 0, 28, 0, 16}
-var validDataPacket = []byte{0, 10, 0, 33, 95, 154, 108, 18, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 112, 111, 100, 49}
-var validDataPacketIPv6 = []byte{0, 10, 0, 52, 96, 27, 75, 252, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 36, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251}
+var (
+	validTemplatePacket     = []byte{0, 10, 0, 40, 95, 154, 107, 127, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 101, 255, 255, 0, 0, 220, 186}
+	validTemplatePacketIPv6 = []byte{0, 10, 0, 32, 96, 27, 70, 6, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 16, 1, 0, 0, 2, 0, 27, 0, 16, 0, 28, 0, 16}
+	validDataPacket         = []byte{0, 10, 0, 33, 95, 154, 108, 18, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 17, 1, 2, 3, 4, 5, 6, 7, 8, 4, 112, 111, 100, 49}
+	validDataPacketIPv6     = []byte{0, 10, 0, 52, 96, 27, 75, 252, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 36, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251, 32, 1, 0, 0, 50, 56, 223, 225, 0, 99, 0, 0, 0, 0, 254, 251}
+
+	invalidTemplatePacketWrongVersion = []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21}
+)
 
 const (
 	tcpTransport = "tcp"
@@ -83,6 +88,36 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	template, _ := cp.getTemplateIEs(1, 256)
 	assert.NotNil(t, template, "TCP Collecting Process should receive and store the received template.")
 	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+}
+
+func TestTCPCollectingProcess_ReceiveInvalidTemplateRecord(t *testing.T) {
+	input := getCollectorInput(tcpTransport, false, false)
+	cp, err := InitCollectingProcess(input)
+	if err != nil {
+		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
+	}
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	go func() {
+		// consume all messages to avoid blocking
+		ch := cp.GetMsgChan()
+		for range ch {
+		}
+	}()
+	collectorAddr := cp.GetAddress()
+	// client
+	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+	if err != nil {
+		t.Errorf("Cannot establish connection to %s", collectorAddr.String())
+	}
+	defer conn.Close()
+	conn.SetReadDeadline(time.Now().Add(1 * time.Second))
+	conn.Write(invalidTemplatePacketWrongVersion)
+	readBuffer := make([]byte, 100)
+	_, err = conn.Read(readBuffer)
+	assert.ErrorIs(t, err, io.EOF)
+	cp.Stop()
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
@@ -375,7 +410,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 					templateID: &template{},
 				},
 			},
-			templateRecord: []byte{0, 9, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0, 218, 21},
+			templateRecord: invalidTemplatePacketWrongVersion,
 			expectedErr:    "collector only supports IPFIX (v10)",
 			// Invalid  version means we stop decoding the packet right away, so we will not modify the existing template map
 			isTemplateExpected: true,

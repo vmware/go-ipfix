@@ -81,9 +81,14 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	}()
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
+	doneCh := make(chan struct{})
 	cp.wg.Add(1)
+	// We read from the connection in a separate goroutine, so we can stop immediately when
+	// cp.StopChan is closed. An alternative would be to use a read deadline, and check
+	// cp.StopChan at every iteration.
 	go func() {
 		defer cp.wg.Done()
+		defer close(doneCh)
 		for {
 			length, err := getMessageLength(reader)
 			if errors.Is(err, io.EOF) {
@@ -102,16 +107,22 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 			}
 			message, err := cp.decodePacket(bytes.NewBuffer(buff), address)
 			if err != nil {
-				// TODO: should we close the connection instead and force the client to
-				// re-open it?
-				klog.ErrorS(err, "Error when decoding packet")
-				continue
+				// This can be an invalid template record, or invalid data record.
+				// We close the connection, which is the best way to let the client
+				// (exporter) know that something is wrong.
+				klog.ErrorS(err, "Error when decoding packet, closing connection")
+				return
 			}
 			klog.V(4).InfoS("Processed message from exporter",
 				"observationDomainID", message.GetObsDomainID(), "setType", message.GetSet().GetSetType(), "numRecords", message.GetSet().GetNumberOfRecords())
 		}
 	}()
-	<-cp.stopChan
+	select {
+	case <-cp.stopChan:
+		break
+	case <-doneCh:
+		break
+	}
 }
 
 func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
