@@ -437,7 +437,7 @@ func (cp *CollectingProcess) deleteTemplateWithConds(obsDomainID uint32, templat
 			return false
 		}
 	}
-	// expiryTimer will be nil when the protocol is UDP.
+	// expiryTimer will be nil when the protocol is TCP.
 	if template.expiryTimer != nil {
 		// expiryTimer may have been stopped already (if the timer
 		// expired and is the reason why the template is being deleted),
