@@ -50,9 +50,15 @@ const (
 	DecodingModeLenientDropUnknown DecodingMode = "LenientDropUnknown"
 )
 
+type template struct {
+	ies         []*entities.InfoElement
+	expiryTime  time.Time
+	expiryTimer timer
+}
+
 type CollectingProcess struct {
 	// for each obsDomainID, there is a map of templates
-	templatesMap map[uint32]map[uint16][]*entities.InfoElement
+	templatesMap map[uint32]map[uint16]*template
 	// mutex allows multiple readers or one writer at the same time
 	mutex sync.RWMutex
 	// template lifetime
@@ -85,6 +91,8 @@ type CollectingProcess struct {
 	serverKey            []byte
 	wg                   sync.WaitGroup
 	numOfRecordsReceived uint64
+	// clock implementation: enables injecting a fake clock for testing
+	clock clock
 }
 
 type CollectorInput struct {
@@ -113,7 +121,7 @@ type clientHandler struct {
 	closeClientChan chan struct{}
 }
 
-func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
+func initCollectingProcess(input CollectorInput, clock clock) (*CollectingProcess, error) {
 	templateTTLSeconds := input.TemplateTTL
 	if input.Protocol == "udp" && templateTTLSeconds == 0 {
 		templateTTLSeconds = entities.TemplateTTL
@@ -128,8 +136,8 @@ func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 		"encrypted", input.IsEncrypted, "address", input.Address, "protocol", input.Protocol, "maxBufferSize", input.MaxBufferSize,
 		"templateTTL", templateTTL, "numExtraElements", input.NumExtraElements, "decodingMode", decodingMode,
 	)
-	collectProc := &CollectingProcess{
-		templatesMap:     make(map[uint32]map[uint16][]*entities.InfoElement),
+	cp := &CollectingProcess{
+		templatesMap:     make(map[uint32]map[uint16]*template),
 		mutex:            sync.RWMutex{},
 		templateTTL:      templateTTL,
 		address:          input.Address,
@@ -144,8 +152,13 @@ func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 		serverKey:        input.ServerKey,
 		numExtraElements: input.NumExtraElements,
 		decodingMode:     decodingMode,
+		clock:            clock,
 	}
-	return collectProc, nil
+	return cp, nil
+}
+
+func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
+	return initCollectingProcess(input, realClock{})
 }
 
 func (cp *CollectingProcess) Start() {
@@ -321,7 +334,7 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 
 func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (entities.Set, error) {
 	// make sure template exists
-	template, err := cp.getTemplate(obsDomainID, templateID)
+	template, err := cp.getTemplateIEs(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
@@ -361,45 +374,93 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []entities.InfoElementWithValue) {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
-	if _, exists := cp.templatesMap[obsDomainID]; !exists {
-		cp.templatesMap[obsDomainID] = make(map[uint16][]*entities.InfoElement)
+	if _, ok := cp.templatesMap[obsDomainID]; !ok {
+		cp.templatesMap[obsDomainID] = make(map[uint16]*template)
 	}
 	elements := make([]*entities.InfoElement, 0)
 	for _, elementWithValue := range elementsWithValue {
 		elements = append(elements, elementWithValue.GetInfoElement())
 	}
-	cp.templatesMap[obsDomainID][templateID] = elements
-	// template lifetime management
+	tpl, ok := cp.templatesMap[obsDomainID][templateID]
+	if !ok {
+		tpl = &template{}
+		cp.templatesMap[obsDomainID][templateID] = tpl
+	}
+	tpl.ies = elements
+	klog.V(4).InfoS("Added template to template map", "obsDomainID", obsDomainID, "templateID", templateID)
+	// Template lifetime management for UDP.
 	if cp.protocol != "udp" {
 		return
 	}
-	// Handle udp template expiration
-	go func() {
-		ticker := time.NewTicker(cp.templateTTL)
-		defer ticker.Stop()
-		select {
-		case <-ticker.C:
+	tpl.expiryTime = cp.clock.Now().Add(cp.templateTTL)
+	if tpl.expiryTimer == nil {
+		tpl.expiryTimer = cp.clock.AfterFunc(cp.templateTTL, func() {
 			klog.Infof("Template with id %d, and obsDomainID %d is expired.", templateID, obsDomainID)
-			cp.deleteTemplate(obsDomainID, templateID)
-			break
-		}
-	}()
-}
-
-func (cp *CollectingProcess) getTemplate(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
-	cp.mutex.RLock()
-	defer cp.mutex.RUnlock()
-	if elements, exists := cp.templatesMap[obsDomainID][templateID]; exists {
-		return elements, nil
+			now := cp.clock.Now()
+			// From the Go documentation:
+			//   For a func-based timer created with AfterFunc(d, f), Reset either
+			//   reschedules when f will run, in which case Reset returns true, or
+			//   schedules f to run again, in which case it returns false. When Reset
+			//   returns false, Reset neither waits for the prior f to complete before
+			//   returning nor does it guarantee that the subsequent goroutine running f
+			//   does not run concurrently with the prior one. If the caller needs to
+			//   know whether the prior execution of f is completed, it must coordinate
+			//   with f explicitly.
+			// In our case, when f executes, we have to verify that the record is indeed
+			// scheduled for deletion by checking expiryTime. We cannot just
+			// automatically delete the template.
+			cp.deleteTemplateWithConds(obsDomainID, templateID, func(tpl *template) bool {
+				// lock will be held when this executes
+				return !tpl.expiryTime.After(now)
+			})
+		})
 	} else {
-		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
+		tpl.expiryTimer.Reset(cp.templateTTL)
 	}
 }
 
-func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) {
+// deleteTemplate returns true iff a template was actually deleted.
+func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) bool {
+	return cp.deleteTemplateWithConds(obsDomainID, templateID)
+}
+
+// deleteTemplateWithConds returns true iff a template was actually deleted.
+func (cp *CollectingProcess) deleteTemplateWithConds(obsDomainID uint32, templateID uint16, condFns ...func(*template) bool) bool {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
+	template, ok := cp.templatesMap[obsDomainID][templateID]
+	if !ok {
+		return false
+	}
+	for _, condFn := range condFns {
+		if !condFn(template) {
+			return false
+		}
+	}
+	// expiryTimer will be nil when the protocol is TCP.
+	if template.expiryTimer != nil {
+		// expiryTimer may have been stopped already (if the timer
+		// expired and is the reason why the template is being deleted),
+		// but it is safe to call Stop() on an expired timer.
+		template.expiryTimer.Stop()
+	}
 	delete(cp.templatesMap[obsDomainID], templateID)
+	klog.V(4).InfoS("Deleted template from template map", "obsDomainID", obsDomainID, "templateID", templateID)
+	if len(cp.templatesMap[obsDomainID]) == 0 {
+		delete(cp.templatesMap, obsDomainID)
+		klog.V(4).InfoS("No more templates for observation domain", "obsDomainID", obsDomainID)
+	}
+	return true
+}
+
+func (cp *CollectingProcess) getTemplateIEs(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
+	if template, ok := cp.templatesMap[obsDomainID][templateID]; ok {
+		return template.ies, nil
+	} else {
+		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
+	}
 }
 
 func (cp *CollectingProcess) updateAddress(address net.Addr) {
