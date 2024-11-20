@@ -25,7 +25,6 @@ import (
 	"time"
 
 	"k8s.io/klog/v2"
-	"k8s.io/utils/clock"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/registry"
@@ -54,7 +53,7 @@ const (
 type template struct {
 	ies         []*entities.InfoElement
 	expiryTime  time.Time
-	expiryTimer clock.Timer
+	expiryTimer timer
 }
 
 type CollectingProcess struct {
@@ -93,7 +92,7 @@ type CollectingProcess struct {
 	wg                   sync.WaitGroup
 	numOfRecordsReceived uint64
 	// clock implementation: enables injecting a fake clock for testing
-	clock clock.WithDelayedExecution
+	clock clock
 }
 
 type CollectorInput struct {
@@ -122,7 +121,7 @@ type clientHandler struct {
 	closeClientChan chan struct{}
 }
 
-func initCollectingProcess(input CollectorInput, clock clock.WithDelayedExecution) (*CollectingProcess, error) {
+func initCollectingProcess(input CollectorInput, clock clock) (*CollectingProcess, error) {
 	templateTTLSeconds := input.TemplateTTL
 	if input.Protocol == "udp" && templateTTLSeconds == 0 {
 		templateTTLSeconds = entities.TemplateTTL
@@ -159,7 +158,7 @@ func initCollectingProcess(input CollectorInput, clock clock.WithDelayedExecutio
 }
 
 func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
-	return initCollectingProcess(input, clock.RealClock{})
+	return initCollectingProcess(input, realClock{})
 }
 
 func (cp *CollectingProcess) Start() {
@@ -410,10 +409,7 @@ func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 			// In our case, when f executes, we have to verify that the record is indeed
 			// scheduled for deletion by checking expiryTime. We cannot just
 			// automatically delete the template.
-
-			// No reason to try to stop the timer in this case, even though it would be
-			// technically correct, so we pass false for stopTimer.
-			cp.deleteTemplateWithConds(obsDomainID, templateID, false, func(tpl *template) bool {
+			cp.deleteTemplateWithConds(obsDomainID, templateID, func(tpl *template) bool {
 				// lock will be held when this executes
 				return !tpl.expiryTime.After(now)
 			})
@@ -425,11 +421,11 @@ func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, 
 
 // deleteTemplate returns true iff a template was actually deleted.
 func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) bool {
-	return cp.deleteTemplateWithConds(obsDomainID, templateID, true)
+	return cp.deleteTemplateWithConds(obsDomainID, templateID)
 }
 
 // deleteTemplateWithConds returns true iff a template was actually deleted.
-func (cp *CollectingProcess) deleteTemplateWithConds(obsDomainID uint32, templateID uint16, stopTimer bool, condFns ...func(*template) bool) bool {
+func (cp *CollectingProcess) deleteTemplateWithConds(obsDomainID uint32, templateID uint16, condFns ...func(*template) bool) bool {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
 	template, ok := cp.templatesMap[obsDomainID][templateID]
@@ -441,7 +437,11 @@ func (cp *CollectingProcess) deleteTemplateWithConds(obsDomainID uint32, templat
 			return false
 		}
 	}
-	if stopTimer && template.expiryTimer != nil {
+	// expiryTimer will be nil when the protocol is UDP.
+	if template.expiryTimer != nil {
+		// expiryTimer may have been stopped already (if the timer
+		// expired and is the reason why the template is being deleted),
+		// but it is safe to call Stop() on an expired timer.
 		template.expiryTimer.Stop()
 	}
 	delete(cp.templatesMap[obsDomainID], templateID)

@@ -31,7 +31,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
-	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/exporter"
@@ -426,41 +425,8 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	assert.NotNil(t, err, "Error should be logged for malformed data record")
 }
 
-// testClock is a wrapper around clocktesting.FakeClock. Unfortunately, FakeClock does not support
-// calling clock.Now() when executing an AfterFunc() function, which is require in our case. So we
-// have to define this wrapper which lets us do it. It may not have the same guarantees as
-// FakeClock, as waiters are not executed "atomically" with time advances, but it should be
-// sufficient for our use case.
-type testClock struct {
-	*clocktesting.FakeClock
-	mutex sync.Mutex
-	now   time.Time
-}
-
-func newTestClock(now time.Time) *testClock {
-	return &testClock{
-		FakeClock: clocktesting.NewFakeClock(now),
-		now:       now,
-	}
-}
-
-func (c *testClock) Now() time.Time {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	return c.now
-}
-
-func (c *testClock) Step(d time.Duration) {
-	func() {
-		c.mutex.Lock()
-		defer c.mutex.Unlock()
-		c.now = c.now.Add(d)
-	}()
-	c.FakeClock.Step(d)
-}
-
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
-	clock := newTestClock(time.Now())
+	clock := newFakeClock(time.Now())
 	input := CollectorInput{
 		Address:       hostPortIPv4,
 		Protocol:      udpTransport,
@@ -505,18 +471,14 @@ func TestUDPCollectingProcess_TemplateAddAndDelete(t *testing.T) {
 		templateID  = 100
 		obsDomainID = 0xabcd
 	)
+	clock := newFakeClock(time.Now())
 	input := CollectorInput{
 		Address:       hostPortIPv4,
 		Protocol:      udpTransport,
 		MaxBufferSize: 1024,
 		TemplateTTL:   1,
 	}
-	// We should be using the fake clock for this test, but unfortunately
-	// the behavior of the Stop method for fake timers do not conform to
-	// https://pkg.go.dev/time#Timer.Stop.
-	// Stop should return false if the timer has already been stopped, which
-	// is not the case of the fake timer.
-	cp, err := InitCollectingProcess(input)
+	cp, err := initCollectingProcess(input, clock)
 	require.NoError(t, err)
 	cp.addTemplate(obsDomainID, templateID, elementsWithValueIPv4)
 	// Get a copy of the stored template
@@ -542,7 +504,7 @@ func TestUDPCollectingProcess_TemplateUpdate(t *testing.T) {
 		obsDomainID = 0xabcd
 	)
 	now := time.Now()
-	clock := newTestClock(now)
+	clock := newFakeClock(now)
 	input := CollectorInput{
 		Address:       hostPortIPv4,
 		Protocol:      udpTransport,
@@ -589,7 +551,7 @@ func BenchmarkAddTemplateUDP(b *testing.B) {
 		ServerCert:    nil,
 		ServerKey:     nil,
 	}
-	cp, err := initCollectingProcess(input, clocktesting.NewFakeClock(time.Now()))
+	cp, err := initCollectingProcess(input, newFakeClock(time.Now()))
 	require.NoError(b, err)
 	obsDomainID := uint32(1)
 	b.ResetTimer()
