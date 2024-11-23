@@ -82,6 +82,10 @@ func (t *fakeTimer) Reset(d time.Duration) bool {
 		fired = false
 		t.targetTime = clock.now.Add(d)
 	}
+	if fired {
+		t.targetTime = clock.now.Add(d)
+		clock.timers = append(clock.timers, t)
+	}
 	return !fired
 }
 
