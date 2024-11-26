@@ -74,13 +74,16 @@ func (t *fakeTimer) Reset(d time.Duration) bool {
 	clock.m.Lock()
 	defer clock.m.Unlock()
 	fired := true
+	t.targetTime = clock.now.Add(d)
 	for i := range clock.timers {
-		if clock.timers[i] != t {
-			continue
+		if clock.timers[i] == t {
+			// timer is found so it hasn't been fired yet
+			fired = false
+			break
 		}
-		// timer is found so it hasn't been fired yet
-		fired = false
-		t.targetTime = clock.now.Add(d)
+	}
+	if fired {
+		clock.timers = append(clock.timers, t)
 	}
 	return !fired
 }
