@@ -22,8 +22,17 @@ import (
 // timer allows for injecting fake or real timers into code that needs to do arbitrary things based
 // on time. We do not include the C() method, as we only support timers created with AfterFunc.
 type timer interface {
+	C() <-chan time.Time
 	Stop() bool
 	Reset(d time.Duration) bool
+}
+
+type realTimer struct {
+	*time.Timer
+}
+
+func (t *realTimer) C() <-chan time.Time {
+	return t.Timer.C
 }
 
 // clock allows for injecting fake or real clocks into code that needs to do arbitrary things based
@@ -32,6 +41,7 @@ type timer interface {
 type clock interface {
 	Now() time.Time
 	AfterFunc(d time.Duration, f func()) timer
+	NewTimer(d time.Duration) timer
 }
 
 // realClock implements the clock interface using functions from the time package.
@@ -42,13 +52,26 @@ func (realClock) Now() time.Time {
 }
 
 func (realClock) AfterFunc(d time.Duration, f func()) timer {
-	return time.AfterFunc(d, f)
+	return &realTimer{
+		Timer: time.AfterFunc(d, f),
+	}
+}
+
+func (realClock) NewTimer(d time.Duration) timer {
+	return &realTimer{
+		Timer: time.NewTimer(d),
+	}
 }
 
 type fakeTimer struct {
 	targetTime time.Time
 	f          func()
+	ch         chan time.Time
 	clock      *fakeClock
+}
+
+func (t *fakeTimer) C() <-chan time.Time {
+	return t.ch
 }
 
 func (t *fakeTimer) Stop() bool {
@@ -57,6 +80,7 @@ func (t *fakeTimer) Stop() bool {
 	defer clock.m.Unlock()
 	newTimers := make([]*fakeTimer, 0, len(clock.timers))
 	fired := true
+	t.targetTime = time.Time{}
 	for i := range clock.timers {
 		if clock.timers[i] != t {
 			newTimers = append(newTimers, t)
@@ -70,6 +94,9 @@ func (t *fakeTimer) Stop() bool {
 }
 
 func (t *fakeTimer) Reset(d time.Duration) bool {
+	if d <= 0 {
+		panic("negative duration not supported")
+	}
 	clock := t.clock
 	clock.m.Lock()
 	defer clock.m.Unlock()
@@ -124,11 +151,28 @@ func (c *fakeClock) AfterFunc(d time.Duration, f func()) timer {
 	return t
 }
 
+func (c *fakeClock) NewTimer(d time.Duration) timer {
+	if d <= 0 {
+		panic("negative duration not supported")
+	}
+	c.m.Lock()
+	defer c.m.Unlock()
+	t := &fakeTimer{
+		targetTime: c.now.Add(d),
+		// The channel is synchronous (unbuffered, capacity 0), as per Go documentation for
+		// time package.
+		ch:    make(chan time.Time),
+		clock: c,
+	}
+	c.timers = append(c.timers, t)
+	return t
+}
+
 func (c *fakeClock) Step(d time.Duration) {
 	if d < 0 {
 		panic("invalid duration")
 	}
-	timerFuncs := []func(){}
+	expiredTimers := []*fakeTimer{}
 	func() {
 		c.m.Lock()
 		defer c.m.Unlock()
@@ -140,18 +184,41 @@ func (c *fakeClock) Step(d time.Duration) {
 		// Collect timer functions to run and remove them from list.
 		newTimers := make([]*fakeTimer, 0, len(c.timers))
 		for _, t := range c.timers {
-			if !t.targetTime.After(c.now) {
-				timerFuncs = append(timerFuncs, t.f)
-			} else {
+			if t.targetTime.After(c.now) {
 				newTimers = append(newTimers, t)
+			} else {
+				expiredTimers = append(expiredTimers, t)
 			}
 		}
 		c.timers = newTimers
 	}()
-	// Run the timer functions, without holding a lock. This allows these functions to call
-	// clock.Now(), but also timer.Stop().
-	for _, f := range timerFuncs {
-		f()
+	for _, t := range expiredTimers {
+		if t.f != nil {
+			// Run the timer function, without holding a lock. This allows these
+			// functions to call clock.Now(), but also timer.Stop().
+			t.f()
+		} else {
+			retry := func() bool {
+				if !c.m.TryRLock() {
+					return true
+				}
+				defer c.m.RUnlock()
+				// If timer has been stopped or reset, do not fire.
+				if t.targetTime.IsZero() || t.targetTime.After(c.now) {
+					return false
+				}
+				select {
+				case t.ch <- c.now:
+					return false
+				default:
+				}
+				return true
+			}
+			// Spin until we can acquire a read lock and write to the C channel: this
+			// accounts for concurrent calls to Reset / Stop.
+			for retry() {
+			}
+		}
 	}
 	c.m.Lock()
 	defer c.m.Unlock()
