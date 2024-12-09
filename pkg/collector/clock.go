@@ -20,7 +20,7 @@ import (
 )
 
 // timer allows for injecting fake or real timers into code that needs to do arbitrary things based
-// on time. We do not include the C() method, as we only support timers created with AfterFunc.
+// on time.
 type timer interface {
 	C() <-chan time.Time
 	Stop() bool
