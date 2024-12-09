@@ -24,7 +24,6 @@ import (
 	"io"
 	"net"
 	"runtime"
-	"sync"
 	"testing"
 	"time"
 
@@ -65,27 +64,51 @@ func init() {
 	registry.LoadRegistry()
 }
 
+func (cp *CollectingProcess) getSession(id string) *transportSession {
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
+	return cp.sessions[id]
+}
+
+func (cp *CollectingProcess) getTemplateIEs(sessionID string, obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
+	session := cp.getSession(sessionID)
+	if session == nil {
+		return nil, fmt.Errorf("unknown sessionID %s", sessionID)
+	}
+	return session.getTemplateIEs(obsDomainID, templateID)
+}
+
+func (cp *CollectingProcess) addTemplate(sessionID string, obsDomainID uint32, templateID uint16, elementsWithValue []entities.InfoElementWithValue) {
+	session := cp.getSession(sessionID)
+	if session == nil {
+		return
+	}
+	session.addTemplate(cp.clock, obsDomainID, templateID, elementsWithValue, cp.templateTTL)
+}
+
+func localConnSessionID(conn net.Conn) string {
+	return conn.LocalAddr().String()
+}
+
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
-	}
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
 	collectorAddr := cp.GetAddress()
-	go func() {
-		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
-		}
-		defer conn.Close()
-		conn.Write(validTemplatePacket)
-	}()
+	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+	if err != nil {
+		t.Errorf("Cannot establish connection to %s", collectorAddr.String())
+	}
+	defer conn.Close()
+	conn.Write(validTemplatePacket)
+
 	<-cp.GetMsgChan()
-	cp.Stop()
-	template, _ := cp.getTemplateIEs(1, 256)
+	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
 	assert.NotNil(t, template, "TCP Collecting Process should receive and store the received template.")
 	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
 }
@@ -93,12 +116,11 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 func TestTCPCollectingProcess_ReceiveInvalidTemplateRecord(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
-	}
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	defer cp.Stop()
 	go func() {
 		// consume all messages to avoid blocking
 		ch := cp.GetMsgChan()
@@ -117,35 +139,26 @@ func TestTCPCollectingProcess_ReceiveInvalidTemplateRecord(t *testing.T) {
 	readBuffer := make([]byte, 100)
 	_, err = conn.Read(readBuffer)
 	assert.ErrorIs(t, err, io.EOF)
-	cp.Stop()
 }
 
 func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	input := getCollectorInput(udpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
-	}
+	require.NoError(t, err)
 	go cp.Start()
-
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
 	collectorAddr := cp.GetAddress()
-	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("UDP Address cannot be resolved.")
-		}
-		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
-		if err != nil {
-			t.Errorf("UDP Collecting Process does not start correctly.")
-		}
-		defer conn.Close()
-		conn.Write(validTemplatePacket)
-	}()
+	resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
+	require.NoError(t, err, "UDP Address cannot be resolved")
+	conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
+	require.NoError(t, err, "UDP Collecting Process did not start correctly")
+	defer conn.Close()
+	conn.Write(validTemplatePacket)
 	<-cp.GetMsgChan()
-	cp.Stop()
-	template, _ := cp.getTemplateIEs(1, 256)
+	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
 	assert.NotNil(t, template, "UDP Collecting Process should receive and store the received template.")
 	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
 }
@@ -153,37 +166,39 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
-	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
-	if err != nil {
-		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
-	}
-
+	require.NoError(t, err)
 	go cp.Start()
-
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
-	var conn net.Conn
+
 	collectorAddr := cp.GetAddress()
+	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+	if err != nil {
+		t.Errorf("Cannot establish connection to %s", collectorAddr.String())
+	}
+
 	go func() {
-		conn, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
-		}
-		conn.Write(validDataPacket)
+		// template packate
+		<-cp.GetMsgChan()
+		// data packet
+		<-cp.GetMsgChan()
+		cp.Stop()
 	}()
-	<-cp.GetMsgChan()
-	cp.Stop()
-	// Check if connection has closed properly or not by trying to write to it
-	_, err = conn.Write(validDataPacket)
-	time.Sleep(time.Millisecond)
-	_, err = conn.Write(validDataPacket)
-	assert.Error(t, err)
+	conn.Write(validTemplatePacket)
+	conn.Write(validDataPacket)
+
+	// Check if connection has closed properly or not by trying to write to it.
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		_, err = conn.Write(validDataPacket)
+		assert.Error(t, err)
+	}, 100*time.Millisecond, 10*time.Millisecond)
 	conn.Close()
 	// Check if connection has closed properly or not by trying to create a new connection.
 	_, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 	assert.Error(t, err)
-	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+
+	// template packet + data packet -> 2
+	assert.Equal(t, int64(2), cp.GetNumRecordsReceived())
 }
 
 // This test was added to easily measure memory usage when collecting and storing data records.
@@ -191,9 +206,6 @@ func TestTCPCollectingProcess_ReceiveDataRecordsMemoryUsage(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
 	require.NoError(t, err)
-	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
-
 	go cp.Start()
 
 	// wait until collector is ready
@@ -203,6 +215,11 @@ func TestTCPCollectingProcess_ReceiveDataRecordsMemoryUsage(t *testing.T) {
 	collectorAddr := cp.GetAddress()
 	conn, err = net.Dial(collectorAddr.Network(), collectorAddr.String())
 	require.NoError(t, err)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.NotNil(t, cp.getSession(localConnSessionID(conn)))
+	}, 500*time.Millisecond, 50*time.Millisecond)
+	// Add the templates before sending data records
+	cp.addTemplate(localConnSessionID(conn), uint32(1), uint16(256), elementsWithValueIPv4)
 
 	const numRecords = 1000
 
@@ -247,39 +264,40 @@ func TestTCPCollectingProcess_ReceiveDataRecordsMemoryUsage(t *testing.T) {
 func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	input := getCollectorInput(udpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
-	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
-	if err != nil {
-		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
-	}
-	// Add the templates before sending data record
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
-
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+
 	collectorAddr := cp.GetAddress()
 	resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
 	if err != nil {
 		t.Errorf("UDP Address cannot be resolved.")
 	}
-	go func() {
-		<-cp.GetMsgChan()
-		cp.Stop()
-	}()
 	conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
 	if err != nil {
 		t.Errorf("UDP Collecting Process does not start correctly.")
 	}
+
+	go func() {
+		// template packate
+		<-cp.GetMsgChan()
+		// data packet
+		<-cp.GetMsgChan()
+		cp.Stop()
+	}()
+	conn.Write(validTemplatePacket)
 	conn.Write(validDataPacket)
-	time.Sleep(time.Millisecond)
-	// Check if connection has closed properly or not by trying to write to it
-	_, _ = conn.Write(validDataPacket)
-	time.Sleep(time.Millisecond)
-	_, err = conn.Write(validDataPacket)
-	assert.Error(t, err)
+
+	// after the 2 packets are processed, the goroutine started above will stop the collector,
+	// which should close the UDP socket. Eventually, calling Write should fail.
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		_, err = conn.Write(validDataPacket)
+		assert.Error(t, err)
+	}, 100*time.Millisecond, 10*time.Millisecond)
 	conn.Close()
-	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+	// template packet + data packet -> 2
+	assert.Equal(t, int64(2), cp.GetNumRecordsReceived())
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
@@ -444,8 +462,6 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			cp := CollectingProcess{}
-			cp.templatesMap = tc.existingTemplates
-			cp.mutex = sync.RWMutex{}
 			address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
 			require.NoError(t, err)
 			cp.netAddress = address
@@ -454,7 +470,9 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 				for range cp.GetMsgChan() {
 				}
 			}()
-			message, err := cp.decodePacket(bytes.NewBuffer(tc.templateRecord), address.String())
+			session := newTCPSession(address.String())
+			session.templatesMap = tc.existingTemplates
+			message, err := cp.decodePacket(session, bytes.NewBuffer(tc.templateRecord), address.String())
 			if tc.expectedErr != "" {
 				require.ErrorContains(t, err, tc.expectedErr)
 			} else {
@@ -470,9 +488,9 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 				assert.Equal(t, uint32(0), sourceIPv4Address.GetInfoElement().EnterpriseId, "Template record is not stored correctly.")
 			}
 			if tc.isTemplateExpected {
-				assert.NotNil(t, cp.templatesMap[obsDomainID][templateID], "Template should be stored in template map")
+				assert.NotNil(t, session.templatesMap[obsDomainID][templateID], "Template should be stored in template map")
 			} else {
-				assert.Nil(t, cp.templatesMap[obsDomainID][templateID], "Template should not be stored in template map")
+				assert.Nil(t, session.templatesMap[obsDomainID][templateID], "Template should not be stored in template map")
 			}
 		})
 	}
@@ -480,8 +498,6 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 
 func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	cp := CollectingProcess{}
-	cp.templatesMap = make(map[uint32]map[uint16]*template)
-	cp.mutex = sync.RWMutex{}
 	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
 	if err != nil {
 		t.Error(err)
@@ -492,13 +508,14 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 		for range cp.GetMsgChan() {
 		}
 	}()
+	session := newTCPSession(address.String())
 	// Decode without template
-	_, err = cp.decodePacket(bytes.NewBuffer(validDataPacket), address.String())
-	assert.NotNil(t, err, "Error should be logged if corresponding template does not exist.")
+	_, err = cp.decodePacket(session, bytes.NewBuffer(validDataPacket), address.String())
+	assert.Error(t, err, "Error should be logged if corresponding template does not exist.")
 	// Decode with template
-	cp.addTemplate(uint32(1), uint16(256), elementsWithValueIPv4)
-	message, err := cp.decodePacket(bytes.NewBuffer(validDataPacket), address.String())
-	assert.Nil(t, err, "Error should not be logged if corresponding template exists.")
+	session.addTemplate(cp.clock, uint32(1), uint16(256), elementsWithValueIPv4, cp.templateTTL)
+	message, err := cp.decodePacket(session, bytes.NewBuffer(validDataPacket), address.String())
+	assert.NoError(t, err, "Error should not be logged if corresponding template exists.")
 	assert.Equal(t, uint16(10), message.GetVersion(), "Flow record version should be 10.")
 	assert.Equal(t, uint32(1), message.GetObsDomainID(), "Flow record obsDomainID should be 1.")
 
@@ -510,8 +527,8 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	assert.Equal(t, ipAddress, sourceIPv4Address.GetIPAddressValue(), "sourceIPv4Address should be decoded and stored correctly.")
 	// Malformed data record
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
-	_, err = cp.decodePacket(bytes.NewBuffer(dataRecord), address.String())
-	assert.NotNil(t, err, "Error should be logged for malformed data record")
+	_, err = cp.decodePacket(session, bytes.NewBuffer(dataRecord), address.String())
+	assert.Error(t, err, "Error should be logged for malformed data record")
 }
 
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
@@ -527,39 +544,34 @@ func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
 	collectorAddr := cp.GetAddress()
-	go func() {
-		resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("UDP Address cannot be resolved.")
-		}
-		conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
-		if err != nil {
-			t.Errorf("UDP Collecting Process does not start correctly.")
-		}
-		defer conn.Close()
-		_, err = conn.Write(validTemplatePacket)
-		if err != nil {
-			t.Errorf("Error in sending data to collector: %v", err)
-		}
-	}()
+	resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
+	require.NoError(t, err, "UDP Address cannot be resolved")
+	conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
+	require.NoError(t, err, "UDP Collecting Process did not start correctly")
+	defer conn.Close()
+	_, err = conn.Write(validTemplatePacket)
+	require.NoError(t, err, "Error when sending template to collector")
 	<-cp.GetMsgChan()
-	cp.Stop()
-	template, err := cp.getTemplateIEs(1, 256)
+	template, err := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
 	assert.NotNil(t, template, "Template should be stored in the template map.")
 	assert.Nil(t, err, "Template should be stored in the template map.")
-	clock.Step(time.Duration(input.TemplateTTL) * time.Second)
-	assert.EventuallyWithT(t, func(t *assert.CollectT) {
-		_, err := cp.getTemplateIEs(1, 256)
-		assert.ErrorContains(t, err, "does not exist", "template should be deleted after timeout")
-	}, 1*time.Second, 50*time.Millisecond)
+
+	// A data record has no influence on template expiry.
+	ttl := time.Duration(input.TemplateTTL) * time.Second
+	clock.Step(ttl - 100*time.Millisecond)
+	_, err = conn.Write(validDataPacket)
+	require.NoError(t, err, "Error when sending data to collector")
+	<-cp.GetMsgChan()
+
+	clock.Step(100 * time.Millisecond)
+	_, err = cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
+	assert.ErrorContains(t, err, "does not exist", "template should be deleted after timeout")
 }
 
-func TestUDPCollectingProcess_TemplateAddAndDelete(t *testing.T) {
-	const (
-		templateID  = 100
-		obsDomainID = 0xabcd
-	)
+func TestUDPCollectingProcess_SessionCleanup(t *testing.T) {
 	clock := newFakeClock(time.Now())
 	input := CollectorInput{
 		Address:       hostPortIPv4,
@@ -569,131 +581,106 @@ func TestUDPCollectingProcess_TemplateAddAndDelete(t *testing.T) {
 	}
 	cp, err := initCollectingProcess(input, clock)
 	require.NoError(t, err)
-	cp.addTemplate(obsDomainID, templateID, elementsWithValueIPv4)
-	// Get a copy of the stored template
-	tpl := func() template {
-		cp.mutex.RLock()
-		defer cp.mutex.RUnlock()
-		return *cp.templatesMap[obsDomainID][templateID]
-	}()
-	require.NotNil(t, tpl.expiryTimer)
-	require.True(t, cp.deleteTemplate(obsDomainID, templateID))
-	// Stop returns false if the timer has already been stopped, which
-	// should be done by the call to deleteTemplate.
-	assert.False(t, tpl.expiryTimer.Stop())
-	// Deleting the template a second time should return false
-	assert.False(t, cp.deleteTemplate(obsDomainID, templateID))
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
+	collectorAddr := cp.GetAddress()
+	resolveAddr, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
+	require.NoError(t, err, "UDP Address cannot be resolved")
+	conn, err := net.DialUDP(udpTransport, nil, resolveAddr)
+	require.NoError(t, err, "UDP Collecting Process did not start correctly")
+	defer conn.Close()
+	// No session until the first packet (template) is received.
+	require.Nil(t, cp.getSession(localConnSessionID(conn)))
+	_, err = conn.Write(validTemplatePacket)
+	require.NoError(t, err, "Error when sending data to collector")
+	<-cp.GetMsgChan()
+	require.NotNil(t, cp.getSession(localConnSessionID(conn)))
+
+	clock.Step(100 * time.Millisecond)
+	_, err = conn.Write(validTemplatePacket)
+	require.NoError(t, err, "Error when sending data to collector")
+	<-cp.GetMsgChan()
+
+	// We have to give time to the UDP handler to reset the timer, before advancing the clock.
+	time.Sleep(100 * time.Millisecond)
+
+	ttl := time.Duration(input.TemplateTTL) * time.Second
+	clock.Step(ttl - 100*time.Millisecond)
+	require.NotNil(t, cp.getSession(localConnSessionID(conn)))
+
+	// The session is cleaned up if no packet is received for TemplateTTL seconds.
+	clock.Step(100 * time.Millisecond)
+	// Session deletion happens asyncrhonously.
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Nil(t, cp.getSession(localConnSessionID(conn)))
+	}, 100*time.Millisecond, 10*time.Millisecond)
 }
 
-// TestUDPCollectingProcess_TemplateUpdate checks the behavior of addTemplate
-// when a template is refreshed.
-func TestUDPCollectingProcess_TemplateUpdate(t *testing.T) {
-	const (
-		templateID  = 100
-		obsDomainID = 0xabcd
-	)
-	now := time.Now()
-	clock := newFakeClock(now)
-	input := CollectorInput{
-		Address:       hostPortIPv4,
-		Protocol:      udpTransport,
-		MaxBufferSize: 1024,
-		TemplateTTL:   1,
-	}
-	cp, err := initCollectingProcess(input, clock)
+func TestTCPCollectingProcess_SessionCleanup(t *testing.T) {
+	input := getCollectorInput(tcpTransport, false, false)
+	cp, err := InitCollectingProcess(input)
 	require.NoError(t, err)
-	cp.addTemplate(obsDomainID, templateID, elementsWithValueIPv4)
-	// Get a copy of the stored template
-	getTemplate := func() template {
-		cp.mutex.RLock()
-		defer cp.mutex.RUnlock()
-		return *cp.templatesMap[obsDomainID][templateID]
-	}
-	tpl := getTemplate()
-	require.NotNil(t, tpl.expiryTimer)
-	assert.Equal(t, now.Add(time.Duration(input.TemplateTTL)*time.Second), tpl.expiryTime)
-	// Advance the clock by half the TTL
-	clock.Step(500 * time.Millisecond)
-	// Template should still be present in map
-	_, err = cp.getTemplateIEs(obsDomainID, templateID)
-	require.NoError(t, err)
-	// "Update" the template (template is being refreshed)
-	cp.addTemplate(obsDomainID, templateID, elementsWithValueIPv4)
-	tpl = getTemplate()
-	assert.Equal(t, clock.Now().Add(time.Duration(input.TemplateTTL)*time.Second), tpl.expiryTime)
-	// Advance the clock by half the TTL again, template should still be present
-	clock.Step(500 * time.Millisecond)
-	_, err = cp.getTemplateIEs(obsDomainID, templateID)
-	require.NoError(t, err)
-	// Advance the clock by half the TTL again, template should be expired
-	clock.Step(500 * time.Millisecond)
-	_, err = cp.getTemplateIEs(obsDomainID, templateID)
-	assert.Error(t, err)
-}
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	defer cp.Stop()
 
-func BenchmarkAddTemplateUDP(b *testing.B) {
-	input := CollectorInput{
-		Address:       hostPortIPv4,
-		Protocol:      udpTransport,
-		MaxBufferSize: 1024,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
+	collectorAddr := cp.GetAddress()
+	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+	if err != nil {
+		t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 	}
-	cp, err := initCollectingProcess(input, newFakeClock(time.Now()))
-	require.NoError(b, err)
-	obsDomainID := uint32(1)
-	b.ResetTimer()
-	for range b.N {
-		cp.addTemplate(obsDomainID, 256, elementsWithValueIPv4)
-		obsDomainID = (obsDomainID + 1) % 1000
-	}
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.NotNil(t, cp.getSession(localConnSessionID(conn)))
+	}, 100*time.Millisecond, 10*time.Millisecond)
+
+	conn.Close()
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Nil(t, cp.getSession(localConnSessionID(conn)))
+	}, 100*time.Millisecond, 10*time.Millisecond)
 }
 
 func TestTLSCollectingProcess(t *testing.T) {
 	input := getCollectorInput(tcpTransport, true, false)
 	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("Collecting Process does not initiate correctly: %v", err)
-	}
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
-	collectorAddr := cp.GetAddress()
-	var conn net.Conn
-	var config *tls.Config
-	go func() {
-		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCACert))
-		if !ok {
-			t.Error("Failed to parse root certificate")
-		}
-		cert, err := tls.X509KeyPair([]byte(testcerts.FakeClientCert), []byte(testcerts.FakeClientKey))
-		if err != nil {
-			t.Error(err)
-		}
-		config = &tls.Config{
-			RootCAs:      roots,
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
-		}
 
-		conn, err = tls.Dial("tcp", collectorAddr.String(), config)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		_, err = conn.Write(validTemplatePacket)
-		assert.NoError(t, err)
-	}()
+	collectorAddr := cp.GetAddress()
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCACert))
+	if !ok {
+		t.Error("Failed to parse root certificate")
+	}
+	cert, err := tls.X509KeyPair([]byte(testcerts.FakeClientCert), []byte(testcerts.FakeClientKey))
+	if err != nil {
+		t.Error(err)
+	}
+	config := &tls.Config{
+		RootCAs:      roots,
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	conn, err := tls.Dial("tcp", collectorAddr.String(), config)
+	require.NoError(t, err)
+	_, err = conn.Write(validTemplatePacket)
+	require.NoError(t, err)
+
 	<-cp.GetMsgChan()
+	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
+	assert.NotNil(t, template, "TLS Collecting Process should receive and store the received template")
 	cp.Stop()
-	assert.NotNil(t, cp.templatesMap[1], "TLS Collecting Process should receive and store the received template.")
-	// Check if connection has closed properly or not by trying to write to it
-	_, _ = conn.Write(validDataPacket)
-	time.Sleep(time.Millisecond)
-	_, err = conn.Write(validDataPacket)
-	assert.Error(t, err)
+	// Check if connection has closed properly or not by trying to write to it.
+	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+		_, err = conn.Write(validDataPacket)
+		assert.Error(t, err)
+	}, 100*time.Millisecond, 10*time.Millisecond)
 	conn.Close()
 	// Check if connection has closed properly or not by trying to create a new connection.
 	_, err = tls.Dial(collectorAddr.Network(), collectorAddr.String(), config)
@@ -703,58 +690,50 @@ func TestTLSCollectingProcess(t *testing.T) {
 func TestDTLSCollectingProcess(t *testing.T) {
 	input := getCollectorInput(udpTransport, true, false)
 	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("DTLS Collecting Process does not initiate correctly: %v", err)
-	}
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
 	collectorAddr, _ := net.ResolveUDPAddr("udp", cp.GetAddress().String())
-	go func() {
-		roots := x509.NewCertPool()
-		ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCert2))
-		if !ok {
-			t.Error("Failed to parse root certificate")
-		}
-		config := &dtls.Config{RootCAs: roots,
-			ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
-		conn, err := dtls.Dial("udp", collectorAddr, config)
-		if err != nil {
-			t.Error(err)
-			return
-		}
-		defer conn.Close()
-		_, err = conn.Write(validTemplatePacket)
-		assert.NoError(t, err)
-	}()
+	roots := x509.NewCertPool()
+	ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCert2))
+	if !ok {
+		t.Error("Failed to parse root certificate")
+	}
+	config := &dtls.Config{RootCAs: roots,
+		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
+	conn, err := dtls.Dial("udp", collectorAddr, config)
+	require.NoError(t, err)
+	defer conn.Close()
+	_, err = conn.Write(validTemplatePacket)
+	require.NoError(t, err)
 	<-cp.GetMsgChan()
-	cp.Stop()
-	assert.NotNil(t, cp.templatesMap[1], "DTLS Collecting Process should receive and store the received template.")
+	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
+	assert.NotNil(t, template, "DTLS Collecting Process should receive and store the received template")
 }
 
 func TestTCPCollectingProcessIPv6(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, true)
 	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("TCP Collecting Process does not start correctly: %v", err)
-	}
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
 	collectorAddr := cp.GetAddress()
+	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+	require.NoError(t, err)
+	defer conn.Close()
 	go func() {
-		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
-		}
-		defer conn.Close()
 		conn.Write(validTemplatePacketIPv6)
 		conn.Write(validDataPacketIPv6)
 	}()
 	<-cp.GetMsgChan()
 	message := <-cp.GetMsgChan()
-	cp.Stop()
-	template, _ := cp.getTemplateIEs(1, 256)
+	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
@@ -764,26 +743,23 @@ func TestTCPCollectingProcessIPv6(t *testing.T) {
 func TestUDPCollectingProcessIPv6(t *testing.T) {
 	input := getCollectorInput(udpTransport, false, true)
 	cp, err := InitCollectingProcess(input)
-	if err != nil {
-		t.Fatalf("UDP Collecting Process does not start correctly: %v", err)
-	}
+	require.NoError(t, err)
 	go cp.Start()
 	// wait until collector is ready
 	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
 	collectorAddr := cp.GetAddress()
+	conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+	require.NoError(t, err)
+	defer conn.Close()
 	go func() {
-		conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
-		}
-		defer conn.Close()
 		conn.Write(validTemplatePacketIPv6)
 		conn.Write(validDataPacketIPv6)
 	}()
 	<-cp.GetMsgChan()
 	message := <-cp.GetMsgChan()
-	cp.Stop()
-	template, _ := cp.getTemplateIEs(1, 256)
+	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
 	assert.NotNil(t, template)
 	ie, _, exist := message.GetSet().GetRecords()[0].GetInfoElementWithValue("sourceIPv6Address")
 	assert.True(t, exist)
@@ -808,6 +784,7 @@ func TestUnknownInformationElement(t *testing.T) {
 				cp, err := InitCollectingProcess(input)
 				require.NoError(t, err)
 				defer cp.Stop()
+				session := newTCPSession("foo")
 
 				go func() { // remove the message from the message channel
 					for range cp.GetMsgChan() {
@@ -823,7 +800,7 @@ func TestUnknownInformationElement(t *testing.T) {
 				require.NoError(t, err)
 				templateBytes, err := exporter.CreateIPFIXMsg(templateSet, obsDomainID, 0 /* seqNumber */, time.Now())
 				require.NoError(t, err)
-				_, err = cp.decodePacket(bytes.NewBuffer(templateBytes), "1.2.3.4:12345")
+				_, err = cp.decodePacket(session, bytes.NewBuffer(templateBytes), "1.2.3.4:12345")
 				// If decoding is strict, there will be an error and we need to stop the test.
 				if mode == DecodingModeStrict {
 					require.Error(t, err)
@@ -840,7 +817,7 @@ func TestUnknownInformationElement(t *testing.T) {
 				require.NoError(t, err)
 				dataBytes, err := exporter.CreateIPFIXMsg(dataSet, obsDomainID, 1 /* seqNumber */, time.Now())
 				require.NoError(t, err)
-				msg, err := cp.decodePacket(bytes.NewBuffer(dataBytes), "1.2.3.4:12345")
+				msg, err := cp.decodePacket(session, bytes.NewBuffer(dataBytes), "1.2.3.4:12345")
 				require.NoError(t, err)
 				records := msg.GetSet().GetRecords()
 				require.Len(t, records, 1)
