@@ -19,12 +19,9 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"net"
-	"time"
 
 	"github.com/pion/dtls/v2"
 	"k8s.io/klog/v2"
-
-	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
 func (cp *CollectingProcess) startUDPServer() {
@@ -76,7 +73,7 @@ func (cp *CollectingProcess) startUDPServer() {
 					klog.Errorf("Error in collecting process: %v", err)
 					return
 				}
-				address, err = net.ResolveUDPAddr(conn.LocalAddr().Network(), conn.LocalAddr().String())
+				address, err = net.ResolveUDPAddr(conn.RemoteAddr().Network(), conn.RemoteAddr().String())
 				if err != nil {
 					klog.Errorf("Error in dtls collecting process: %v", err)
 					return
@@ -119,56 +116,53 @@ func (cp *CollectingProcess) startUDPServer() {
 
 func (cp *CollectingProcess) handleUDPMessage(address net.Addr, buf []byte) {
 	addr := address.String()
-	client := func() *clientHandler {
+	session := func() *transportSession {
 		cp.mutex.Lock()
 		defer cp.mutex.Unlock()
-		if client, ok := cp.clients[addr]; ok {
-			return client
+		if session, ok := cp.sessions[addr]; ok {
+			return session
 		}
 		return cp.createUDPClient(addr)
 	}()
-	// closeClientChan is necessary to make sure that there is no possibility of deadlock when
+	// closeSessionChan is necessary to make sure that there is no possibility of deadlock when
 	// the client goroutine decides that shutting down is necessary. Otherwise we could end up
 	// in a situation where the client goroutine is no longer consuming messages, but this
 	// goroutine is blocked on writing to packetChan. Therefore, when the client goroutine needs
-	// to shutdown, it will also close closeClientChan, to ensure that we don't block here.
+	// to shutdown, it will also close closeSessionChan, to ensure that we don't block here.
 	select {
-	case client.packetChan <- bytes.NewBuffer(buf):
+	case session.packetChan <- bytes.NewBuffer(buf):
 		break
-	case <-client.closeClientChan:
+	case <-session.closeSessionChan:
 		break
 	}
 }
 
 // createUDPClient is invoked with an exclusive lock on cp.mutex.
-func (cp *CollectingProcess) createUDPClient(addr string) *clientHandler {
-	client := &clientHandler{
-		packetChan:      make(chan *bytes.Buffer),
-		closeClientChan: make(chan struct{}),
-	}
-	cp.clients[addr] = client
+func (cp *CollectingProcess) createUDPClient(addr string) *transportSession {
+	session := newUDPSession(addr)
+	cp.sessions[addr] = session
 	cp.wg.Add(1)
 	go func() {
 		defer cp.wg.Done()
-		ticker := time.NewTicker(time.Duration(entities.TemplateTTL) * time.Second)
-		defer ticker.Stop()
-		defer close(client.closeClientChan)
+		timer := cp.clock.NewTimer(cp.templateTTL)
+		defer timer.Stop()
+		defer close(session.closeSessionChan)
 		defer func() {
 			cp.mutex.Lock()
 			defer cp.mutex.Unlock()
-			delete(cp.clients, addr)
+			delete(cp.sessions, addr)
 		}()
 		for {
 			select {
 			case <-cp.stopChan:
 				klog.Infof("Collecting process from %s has stopped.", addr)
 				return
-			case <-ticker.C: // set timeout for udp connection
+			case <-timer.C(): // set timeout for udp connection
 				klog.Errorf("UDP connection from %s timed out.", addr)
 				return
-			case packet := <-client.packetChan:
+			case packet := <-session.packetChan:
 				// get the message here
-				message, err := cp.decodePacket(packet, addr)
+				message, err := cp.decodePacket(session, packet, addr)
 				if err != nil {
 					klog.Error(err)
 					// For UDP, there is no point in returning here, as the
@@ -178,9 +172,9 @@ func (cp *CollectingProcess) createUDPClient(addr string) *clientHandler {
 				}
 				klog.V(4).Infof("Processed message from exporter %v, number of records: %v, observation domain ID: %v",
 					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
-				ticker.Reset(time.Duration(entities.TemplateTTL) * time.Second)
+				timer.Reset(cp.templateTTL)
 			}
 		}
 	}()
-	return client
+	return session
 }

@@ -66,18 +66,16 @@ func (cp *CollectingProcess) startTCPServer() {
 
 func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	address := conn.RemoteAddr().String()
-	// The channels stored in clientHandler are not needed for the TCP client, so we do not
-	// initialize them.
-	client := &clientHandler{}
+	session := newTCPSession(address)
 	func() {
 		cp.mutex.Lock()
 		defer cp.mutex.Unlock()
-		cp.clients[address] = client
+		cp.sessions[address] = session
 	}()
 	defer func() {
 		cp.mutex.Lock()
 		defer cp.mutex.Unlock()
-		delete(cp.clients, address)
+		delete(cp.sessions, address)
 	}()
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
@@ -105,7 +103,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 				klog.ErrorS(err, "Error when reading the message")
 				return
 			}
-			message, err := cp.decodePacket(bytes.NewBuffer(buff), address)
+			message, err := cp.decodePacket(session, bytes.NewBuffer(buff), address)
 			if err != nil {
 				// This can be an invalid template record, or invalid data record.
 				// We close the connection, which is the best way to let the client

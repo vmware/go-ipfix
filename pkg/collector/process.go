@@ -57,8 +57,6 @@ type template struct {
 }
 
 type CollectingProcess struct {
-	// for each obsDomainID, there is a map of templates
-	templatesMap map[uint32]map[uint16]*template
 	// mutex allows multiple readers or one writer at the same time
 	mutex sync.RWMutex
 	// template lifetime
@@ -75,8 +73,8 @@ type CollectingProcess struct {
 	stopChan chan struct{}
 	// messageChan is the channel to output message
 	messageChan chan *entities.Message
-	// maps each client to its client handler (required channels)
-	clients map[string]*clientHandler
+	// a map of all transport sessions (clients) identified by the remote client address
+	sessions map[string]*transportSession
 	// isEncrypted indicates whether to use TLS/DTLS for communication
 	isEncrypted bool
 	// numExtraElements specifies number of elements that could be added after
@@ -116,11 +114,6 @@ type CollectorInput struct {
 	DecodingMode DecodingMode
 }
 
-type clientHandler struct {
-	packetChan      chan *bytes.Buffer
-	closeClientChan chan struct{}
-}
-
 func initCollectingProcess(input CollectorInput, clock clock) (*CollectingProcess, error) {
 	templateTTLSeconds := input.TemplateTTL
 	if input.Protocol == "udp" && templateTTLSeconds == 0 {
@@ -137,7 +130,6 @@ func initCollectingProcess(input CollectorInput, clock clock) (*CollectingProces
 		"templateTTL", templateTTL, "numExtraElements", input.NumExtraElements, "decodingMode", decodingMode,
 	)
 	cp := &CollectingProcess{
-		templatesMap:     make(map[uint32]map[uint16]*template),
 		mutex:            sync.RWMutex{},
 		templateTTL:      templateTTL,
 		address:          input.Address,
@@ -145,7 +137,7 @@ func initCollectingProcess(input CollectorInput, clock clock) (*CollectingProces
 		maxBufferSize:    input.MaxBufferSize,
 		stopChan:         make(chan struct{}),
 		messageChan:      make(chan *entities.Message),
-		clients:          make(map[string]*clientHandler),
+		sessions:         make(map[string]*transportSession),
 		isEncrypted:      input.IsEncrypted,
 		caCert:           input.CACert,
 		serverCert:       input.ServerCert,
@@ -200,7 +192,7 @@ func (cp *CollectingProcess) GetNumRecordsReceived() int64 {
 func (cp *CollectingProcess) GetNumConnToCollector() int64 {
 	cp.mutex.RLock()
 	defer cp.mutex.RUnlock()
-	return int64(len(cp.clients))
+	return int64(len(cp.sessions))
 }
 
 func (cp *CollectingProcess) incrementNumRecordsReceived() {
@@ -209,7 +201,7 @@ func (cp *CollectingProcess) incrementNumRecordsReceived() {
 	cp.numOfRecordsReceived = cp.numOfRecordsReceived + 1
 }
 
-func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
+func (cp *CollectingProcess) decodePacket(session *transportSession, packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
 	var length, version, setID, setLen uint16
 	var exportTime, sequencNum, obsDomainID uint32
 	if err := util.Decode(packetBuffer, binary.BigEndian, &version, &length, &exportTime, &sequencNum, &obsDomainID, &setID, &setLen); err != nil {
@@ -236,12 +228,12 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 	var set entities.Set
 	var err error
 	if setID == entities.TemplateSetID {
-		set, err = cp.decodeTemplateSet(packetBuffer, obsDomainID)
+		set, err = cp.decodeTemplateSet(session, packetBuffer, obsDomainID)
 		if err != nil {
 			return nil, fmt.Errorf("error in decoding message: %v", err)
 		}
 	} else {
-		set, err = cp.decodeDataSet(packetBuffer, obsDomainID, setID)
+		set, err = cp.decodeDataSet(session, packetBuffer, obsDomainID, setID)
 		if err != nil {
 			return nil, fmt.Errorf("error in decoding message: %v", err)
 		}
@@ -254,7 +246,7 @@ func (cp *CollectingProcess) decodePacket(packetBuffer *bytes.Buffer, exportAddr
 	return message, nil
 }
 
-func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obsDomainID uint32) (entities.Set, error) {
+func (cp *CollectingProcess) decodeTemplateSet(session *transportSession, templateBuffer *bytes.Buffer, obsDomainID uint32) (entities.Set, error) {
 	var templateID uint16
 	var fieldCount uint16
 	if err := util.Decode(templateBuffer, binary.BigEndian, &templateID, &fieldCount); err != nil {
@@ -337,7 +329,7 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 		// the connection). If we keep the old template and the sender sends data records
 		// which use the new template, we would try to decode them according to the old
 		// template, which would cause issues.
-		cp.deleteTemplate(obsDomainID, templateID)
+		session.deleteTemplate(obsDomainID, templateID)
 		return nil, err
 	}
 
@@ -348,13 +340,13 @@ func (cp *CollectingProcess) decodeTemplateSet(templateBuffer *bytes.Buffer, obs
 	if err := templateSet.AddRecordV2(elementsWithValue, templateID); err != nil {
 		return nil, err
 	}
-	cp.addTemplate(obsDomainID, templateID, elementsWithValue)
+	session.addTemplate(cp.clock, obsDomainID, templateID, elementsWithValue, cp.templateTTL)
 	return templateSet, nil
 }
 
-func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (entities.Set, error) {
+func (cp *CollectingProcess) decodeDataSet(session *transportSession, dataBuffer *bytes.Buffer, obsDomainID uint32, templateID uint16) (entities.Set, error) {
 	// make sure template exists
-	template, err := cp.getTemplateIEs(obsDomainID, templateID)
+	template, err := session.getTemplateIEs(obsDomainID, templateID)
 	if err != nil {
 		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
 	}
@@ -389,98 +381,6 @@ func (cp *CollectingProcess) decodeDataSet(dataBuffer *bytes.Buffer, obsDomainID
 		}
 	}
 	return dataSet, nil
-}
-
-func (cp *CollectingProcess) addTemplate(obsDomainID uint32, templateID uint16, elementsWithValue []entities.InfoElementWithValue) {
-	cp.mutex.Lock()
-	defer cp.mutex.Unlock()
-	if _, ok := cp.templatesMap[obsDomainID]; !ok {
-		cp.templatesMap[obsDomainID] = make(map[uint16]*template)
-	}
-	elements := make([]*entities.InfoElement, 0)
-	for _, elementWithValue := range elementsWithValue {
-		elements = append(elements, elementWithValue.GetInfoElement())
-	}
-	tpl, ok := cp.templatesMap[obsDomainID][templateID]
-	if !ok {
-		tpl = &template{}
-		cp.templatesMap[obsDomainID][templateID] = tpl
-	}
-	tpl.ies = elements
-	klog.V(4).InfoS("Added template to template map", "obsDomainID", obsDomainID, "templateID", templateID)
-	// Template lifetime management for UDP.
-	if cp.protocol != "udp" {
-		return
-	}
-	tpl.expiryTime = cp.clock.Now().Add(cp.templateTTL)
-	if tpl.expiryTimer == nil {
-		tpl.expiryTimer = cp.clock.AfterFunc(cp.templateTTL, func() {
-			klog.Infof("Template with id %d, and obsDomainID %d is expired.", templateID, obsDomainID)
-			now := cp.clock.Now()
-			// From the Go documentation:
-			//   For a func-based timer created with AfterFunc(d, f), Reset either
-			//   reschedules when f will run, in which case Reset returns true, or
-			//   schedules f to run again, in which case it returns false. When Reset
-			//   returns false, Reset neither waits for the prior f to complete before
-			//   returning nor does it guarantee that the subsequent goroutine running f
-			//   does not run concurrently with the prior one. If the caller needs to
-			//   know whether the prior execution of f is completed, it must coordinate
-			//   with f explicitly.
-			// In our case, when f executes, we have to verify that the record is indeed
-			// scheduled for deletion by checking expiryTime. We cannot just
-			// automatically delete the template.
-			cp.deleteTemplateWithConds(obsDomainID, templateID, func(tpl *template) bool {
-				// lock will be held when this executes
-				return !tpl.expiryTime.After(now)
-			})
-		})
-	} else {
-		tpl.expiryTimer.Reset(cp.templateTTL)
-	}
-}
-
-// deleteTemplate returns true iff a template was actually deleted.
-func (cp *CollectingProcess) deleteTemplate(obsDomainID uint32, templateID uint16) bool {
-	return cp.deleteTemplateWithConds(obsDomainID, templateID)
-}
-
-// deleteTemplateWithConds returns true iff a template was actually deleted.
-func (cp *CollectingProcess) deleteTemplateWithConds(obsDomainID uint32, templateID uint16, condFns ...func(*template) bool) bool {
-	cp.mutex.Lock()
-	defer cp.mutex.Unlock()
-	template, ok := cp.templatesMap[obsDomainID][templateID]
-	if !ok {
-		return false
-	}
-	for _, condFn := range condFns {
-		if !condFn(template) {
-			return false
-		}
-	}
-	// expiryTimer will be nil when the protocol is TCP.
-	if template.expiryTimer != nil {
-		// expiryTimer may have been stopped already (if the timer
-		// expired and is the reason why the template is being deleted),
-		// but it is safe to call Stop() on an expired timer.
-		template.expiryTimer.Stop()
-	}
-	delete(cp.templatesMap[obsDomainID], templateID)
-	klog.V(4).InfoS("Deleted template from template map", "obsDomainID", obsDomainID, "templateID", templateID)
-	if len(cp.templatesMap[obsDomainID]) == 0 {
-		delete(cp.templatesMap, obsDomainID)
-		klog.V(4).InfoS("No more templates for observation domain", "obsDomainID", obsDomainID)
-	}
-	return true
-}
-
-func (cp *CollectingProcess) getTemplateIEs(obsDomainID uint32, templateID uint16) ([]*entities.InfoElement, error) {
-	cp.mutex.RLock()
-	defer cp.mutex.RUnlock()
-	if template, ok := cp.templatesMap[obsDomainID][templateID]; ok {
-		return template.ies, nil
-	} else {
-		return nil, fmt.Errorf("template %d with obsDomainID %d does not exist", templateID, obsDomainID)
-	}
 }
 
 func (cp *CollectingProcess) updateAddress(address net.Addr) {
