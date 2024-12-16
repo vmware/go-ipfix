@@ -52,12 +52,10 @@ var (
 )
 
 func TestCollectorToProducer(t *testing.T) {
-	address, err := net.ResolveUDPAddr("udp", "0.0.0.0:4739")
-	require.NoError(t, err)
 	// Initialize collecting process
 	cpInput := collector.CollectorInput{
-		Address:       address.String(),
-		Protocol:      address.Network(),
+		Address:       "127.0.0.1:0",
+		Protocol:      "udp",
 		MaxBufferSize: 1024,
 		TemplateTTL:   0,
 		IsEncrypted:   false,
@@ -84,6 +82,9 @@ func TestCollectorToProducer(t *testing.T) {
 
 	go cp.Start()
 	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
+	address, err := net.ResolveUDPAddr(collectorAddr.Network(), collectorAddr.String())
+	require.NoError(t, err)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {

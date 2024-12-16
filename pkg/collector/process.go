@@ -166,6 +166,8 @@ func (cp *CollectingProcess) Stop() {
 	close(cp.stopChan)
 	// wait for all connections to be safely deleted and returned
 	cp.wg.Wait()
+	// the message channel can only be closed AFTER all goroutines have returned
+	close(cp.messageChan)
 	klog.Info("Stopped the collecting process")
 }
 
@@ -177,10 +179,6 @@ func (cp *CollectingProcess) GetAddress() net.Addr {
 
 func (cp *CollectingProcess) GetMsgChan() <-chan *entities.Message {
 	return cp.messageChan
-}
-
-func (cp *CollectingProcess) CloseMsgChan() {
-	close(cp.messageChan)
 }
 
 func (cp *CollectingProcess) GetNumRecordsReceived() int64 {

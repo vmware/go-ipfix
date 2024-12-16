@@ -171,7 +171,7 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 		messages[messageIdx] = message
 		messageIdx++
 		if messageIdx == 2 {
-			cp.CloseMsgChan()
+			break
 		}
 	}
 	cp.Stop() // Close collecting process
