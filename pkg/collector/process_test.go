@@ -371,7 +371,6 @@ func TestUDPCollectingProcess_DecodePacketError(t *testing.T) {
 		t.Errorf("UDP Address cannot be resolved.")
 	}
 
-	defer cp.CloseMsgChan()
 	go func() {
 		// consume all messages to avoid blocking
 		ch := cp.GetMsgChan()
