@@ -42,12 +42,14 @@ type AggregationProcess struct {
 	expirePriorityQueue TimeToExpirePriorityQueue
 	// mutex allows multiple readers or one writer at the same time
 	mutex sync.RWMutex
-	// messageChan is the channel to receive the message
+	// messageChan is the channel to receive the messages to process
 	messageChan <-chan *entities.Message
+	// recordChan is the channel to receive the records to process
+	recordChan <-chan entities.Record
 	// workerNum is the number of workers to process the messages
 	workerNum int
 	// workerList is the list of workers
-	workerList []*worker
+	workerList []aggregationWorker
 	// correlateFields are the fields to be filled when correlating records of the
 	// flow whose type is registry.InterNode(pkg/registry/registry.go).
 	correlateFields []string
@@ -71,7 +73,9 @@ type AggregationProcess struct {
 }
 
 type AggregationInput struct {
+	// Exactly one of MessageChan or RecordChan must be set.
 	MessageChan           <-chan *entities.Message
+	RecordChan            <-chan entities.Record
 	WorkerNum             int
 	CorrelateFields       []string
 	AggregateElements     *AggregationElements
@@ -83,9 +87,13 @@ type AggregationInput struct {
 // channel, workerNum(number of workers to process message), and
 // correlateFields(fields to be correlated and filled).
 func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error) {
-	if input.MessageChan == nil {
-		return nil, fmt.Errorf("cannot create AggregationProcess process without message channel")
-	} else if input.WorkerNum <= 0 {
+	if input.MessageChan == nil && input.RecordChan == nil {
+		return nil, fmt.Errorf("cannot create AggregationProcess process without input channel")
+	}
+	if input.MessageChan != nil && input.RecordChan != nil {
+		return nil, fmt.Errorf("only one input channel should be provided")
+	}
+	if input.WorkerNum <= 0 {
 		return nil, fmt.Errorf("worker number cannot be <= 0")
 	}
 	if input.AggregateElements != nil {
@@ -101,8 +109,9 @@ func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error)
 		make(TimeToExpirePriorityQueue, 0),
 		sync.RWMutex{},
 		input.MessageChan,
+		input.RecordChan,
 		input.WorkerNum,
-		make([]*worker, 0),
+		make([]aggregationWorker, 0),
 		input.CorrelateFields,
 		input.AggregateElements,
 		input.ActiveExpiryTimeout,
@@ -114,7 +123,12 @@ func InitAggregationProcess(input AggregationInput) (*AggregationProcess, error)
 func (a *AggregationProcess) Start() {
 	a.mutex.Lock()
 	for i := 0; i < a.workerNum; i++ {
-		w := createWorker(i, a.messageChan, a.AggregateMsgByFlowKey)
+		var w aggregationWorker
+		if a.messageChan != nil {
+			w = createWorker(i, a.messageChan, a.AggregateMsgByFlowKey)
+		} else {
+			w = createWorker(i, a.recordChan, a.aggregateRecordByFlowKey)
+		}
 		w.start()
 		a.workerList = append(a.workerList, w)
 	}
@@ -138,6 +152,17 @@ func (a *AggregationProcess) GetNumFlows() int64 {
 	return int64(len(a.flowKeyRecordMap))
 }
 
+func (a *AggregationProcess) aggregateRecordByFlowKey(record entities.Record) error {
+	flowKey, isIPv4, err := getFlowKeyFromRecord(record)
+	if err != nil {
+		return err
+	}
+	if err = a.addOrUpdateRecordInMap(flowKey, record, isIPv4); err != nil {
+		return err
+	}
+	return nil
+}
+
 // AggregateMsgByFlowKey gets flow key from records in message and stores in cache
 func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) error {
 	set := message.GetSet()
@@ -154,11 +179,7 @@ func (a *AggregationProcess) AggregateMsgByFlowKey(message *entities.Message) er
 			klog.Errorf("Invalid data record because decoded values of elements are not valid.")
 			invalidRecs = invalidRecs + 1
 		} else {
-			flowKey, isIPv4, err := getFlowKeyFromRecord(record)
-			if err != nil {
-				return err
-			}
-			if err = a.addOrUpdateRecordInMap(flowKey, record, isIPv4); err != nil {
+			if err := a.aggregateRecordByFlowKey(record); err != nil {
 				return err
 			}
 		}
