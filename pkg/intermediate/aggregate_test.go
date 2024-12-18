@@ -406,19 +406,40 @@ func createDataMsgForDst(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedR
 }
 
 func TestInitAggregationProcess(t *testing.T) {
-	input := AggregationInput{
-		MessageChan:     nil,
-		WorkerNum:       2,
-		CorrelateFields: fields,
-	}
-	aggregationProcess, err := InitAggregationProcess(input)
-	assert.NotNil(t, err)
-	assert.Nil(t, aggregationProcess)
-	messageChan := make(chan *entities.Message)
-	input.MessageChan = messageChan
-	aggregationProcess, err = InitAggregationProcess(input)
-	assert.Nil(t, err)
-	assert.Equal(t, 2, aggregationProcess.workerNum)
+	t.Run("no input channel", func(t *testing.T) {
+		_, err := InitAggregationProcess(AggregationInput{
+			WorkerNum:       2,
+			CorrelateFields: fields,
+		})
+		assert.Error(t, err)
+	})
+	t.Run("both input channels", func(t *testing.T) {
+		_, err := InitAggregationProcess(AggregationInput{
+			MessageChan:     make(chan *entities.Message),
+			RecordChan:      make(chan entities.Record),
+			WorkerNum:       2,
+			CorrelateFields: fields,
+		})
+		assert.Error(t, err)
+	})
+	t.Run("message input channel", func(t *testing.T) {
+		aggregationProcess, err := InitAggregationProcess(AggregationInput{
+			MessageChan:     make(chan *entities.Message),
+			WorkerNum:       2,
+			CorrelateFields: fields,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 2, aggregationProcess.workerNum)
+	})
+	t.Run("record input channel", func(t *testing.T) {
+		aggregationProcess, err := InitAggregationProcess(AggregationInput{
+			RecordChan:      make(chan entities.Record),
+			WorkerNum:       2,
+			CorrelateFields: fields,
+		})
+		require.NoError(t, err)
+		assert.Equal(t, 2, aggregationProcess.workerNum)
+	})
 }
 
 func TestGetTupleRecordMap(t *testing.T) {

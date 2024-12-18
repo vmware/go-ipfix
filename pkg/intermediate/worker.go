@@ -2,47 +2,48 @@ package intermediate
 
 import (
 	"k8s.io/klog/v2"
-
-	"github.com/vmware/go-ipfix/pkg/entities"
 )
 
-type worker struct {
-	id          int
-	messageChan <-chan *entities.Message
-	errChan     chan bool
-	job         func(*entities.Message) error
+type aggregationWorker interface {
+	start()
+	stop()
 }
 
-func createWorker(id int, messageChan <-chan *entities.Message, job func(*entities.Message) error) *worker {
-	return &worker{
+type worker[T any] struct {
+	id        int
+	inputChan <-chan T
+	errChan   chan bool
+	job       func(T) error
+}
+
+func createWorker[T any](id int, inputChan <-chan T, job func(T) error) *worker[T] {
+	return &worker[T]{
 		id,
-		messageChan,
+		inputChan,
 		make(chan bool),
 		job,
 	}
 }
 
-func (w *worker) start() {
+func (w *worker[T]) start() {
 	go func() {
 		for {
 			select {
 			case <-w.errChan:
 				return
-			case message, ok := <-w.messageChan:
-				if !ok { // messageChan is closed and empty
+			case v, ok := <-w.inputChan:
+				if !ok { // inputChan is closed and empty
 					break
 				}
-				err := w.job(message)
+				err := w.job(v)
 				if err != nil {
-					klog.Error(err)
+					klog.ErrorS(err, "Failed to process IPFIX input")
 				}
-				klog.V(4).Infof("Processed message from collector %v, number of records: %v, observation domain ID: %v",
-					message.GetExportAddress(), message.GetSet().GetNumberOfRecords(), message.GetObsDomainID())
 			}
 		}
 	}()
 }
 
-func (w *worker) stop() {
+func (w *worker[T]) stop() {
 	w.errChan <- true
 }
