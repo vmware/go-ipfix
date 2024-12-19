@@ -167,12 +167,49 @@ func TestMakeTemplateSet(t *testing.T) {
 }
 
 func TestMakeDataSet(t *testing.T) {
-	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("1.1.1.1"))
-	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP("1.1.2.1"))
+	ie1 := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP(testIPv4Addr1))
+	ie2 := NewIPAddressInfoElement(NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP(testIPv4Addr2))
 	elements := []InfoElementWithValue{ie1, ie2}
 	s, err := MakeDataSet(testTemplateID, elements)
 	require.NoError(t, err)
 	assert.Equal(t, Data, s.setType)
 	require.Len(t, s.records, 1)
 	assert.Equal(t, elements, s.records[0].GetOrderedElementList())
+}
+
+func BenchmarkSet(b *testing.B) {
+	const (
+		numRecords = 10
+		templateID = 256
+	)
+
+	sourceIE := NewInfoElement("sourceIPv4Address", 8, 18, 0, 4)
+	destinationIE := NewInfoElement("destinationIPv4Address", 12, 18, 0, 4)
+
+	records := make([]Record, numRecords)
+	for idx := range records {
+		records[idx] = NewDataRecordFromElements(
+			templateID,
+			[]InfoElementWithValue{
+				NewIPAddressInfoElement(sourceIE, net.ParseIP(testIPv4Addr1)),
+				NewIPAddressInfoElement(destinationIE, net.ParseIP(testIPv4Addr2)),
+			},
+			false,
+		)
+	}
+
+	set := NewSet(false)
+
+	addRecords := func() {
+		for _, record := range records {
+			set.AddRecordV3(record)
+		}
+	}
+
+	b.ResetTimer()
+	for range b.N {
+		set.ResetSet()
+		set.PrepareSet(Data, templateID)
+		addRecords()
+	}
 }
