@@ -34,6 +34,7 @@ const (
 	SetHeaderLen  int    = 4
 )
 
+// ContenType is used for both sets and records.
 type ContentType uint8
 
 const (
@@ -45,6 +46,8 @@ const (
 
 type Set interface {
 	PrepareSet(setType ContentType, templateID uint16) error
+	// Call ResetSet followd by a new call to PrepareSet in order to reuse an existing Set,
+	// instead of instantiating a new one.
 	ResetSet()
 	GetHeaderBuffer() []byte
 	GetSetLength() int
@@ -56,6 +59,11 @@ type Set interface {
 	// one. This can result in fewer memory allocations. The caller should not modify the
 	// contents of the slice after calling AddRecordV2.
 	AddRecordV2(elements []InfoElementWithValue, templateID uint16) error
+	// Unlike other AddRecord* variants, AddRecordV3 takes an actual existing Record as an input
+	// parameter, instead of a list of Information Elements with values. When calling
+	// AddRecordV3, the Set effectively takes ownership of the Record, and the Record should no
+	// longer be modified by the caller.
+	AddRecordV3(record Record) error
 	GetRecords() []Record
 	GetNumberOfRecords() uint32
 }
@@ -63,6 +71,7 @@ type Set interface {
 type set struct {
 	headerBuffer []byte
 	setType      ContentType
+	templateID   uint16
 	records      []Record
 	isDecoding   bool
 	length       int
@@ -90,6 +99,7 @@ func (s *set) PrepareSet(setType ContentType, templateID uint16) error {
 	} else {
 		s.setType = setType
 	}
+	s.templateID = templateID
 	if !s.isDecoding {
 		// Create the set header and append it when encoding
 		s.createHeader(s.setType, templateID)
@@ -99,13 +109,14 @@ func (s *set) PrepareSet(setType ContentType, templateID uint16) error {
 
 func (s *set) ResetSet() {
 	if !s.isDecoding {
-		s.headerBuffer = nil
-		s.headerBuffer = make([]byte, SetHeaderLen)
+		clear(s.headerBuffer)
 		s.length = SetHeaderLen
 	}
 	s.setType = Undefined
-	s.records = nil
-	s.records = make([]Record, 0)
+	// Clear before shrinking the slice so that existing elements are eligible for garbage collection.
+	clear(s.records)
+	// Shrink the slice: the slice capacity is preserved.
+	s.records = s.records[:0]
 }
 
 func (s *set) GetHeaderBuffer() []byte {
@@ -174,6 +185,20 @@ func (s *set) AddRecordV2(elements []InfoElementWithValue, templateID uint16) er
 	return nil
 }
 
+func (s *set) AddRecordV3(record Record) error {
+	// Sanity check: we need to make sure that the record is allowed to be added.
+	recordType := record.GetRecordType()
+	if recordType != s.setType {
+		return fmt.Errorf("Record and Set types don't match")
+	}
+	if recordType == Data && record.GetTemplateID() != s.templateID {
+		return fmt.Errorf("All Data Records in the same Data Set must have the same template ID")
+	}
+	s.records = append(s.records, record)
+	s.length += record.GetRecordLength()
+	return nil
+}
+
 func (s *set) GetRecords() []Record {
 	return s.records
 }
@@ -193,7 +218,7 @@ func (s *set) createHeader(setType ContentType, templateID uint16) {
 // MakeTemplateSet is a convenience function which creates a template Set with a single Record.
 func MakeTemplateSet(templateID uint16, ies []*InfoElement) (*set, error) {
 	tempSet := NewSet(false)
-	if err := tempSet.PrepareSet(Template, templateID); err != nil {
+	if err := tempSet.PrepareSet(Template, TemplateSetID); err != nil {
 		return nil, err
 	}
 	elements := make([]InfoElementWithValue, len(ies))
