@@ -15,6 +15,7 @@
 package exporter
 
 import (
+	"bytes"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -216,7 +217,6 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 	assert.Equal(t, uint32(0), exporter.seqNumber)
 
 	exporter.CloseConnToCollector()
-
 }
 
 func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
@@ -791,4 +791,97 @@ func TestExportingProcess_CloseConnToCollectorTwice(t *testing.T) {
 
 	exporter.CloseConnToCollector()
 	exporter.CloseConnToCollector()
+}
+
+func TestSendDataRecords(t *testing.T) {
+	// Create local server for testing
+	udpAddr, err := net.ResolveUDPAddr("udp", "127.0.0.1:0")
+	require.NoError(t, err)
+	conn, err := net.ListenUDP("udp", udpAddr)
+	require.NoError(t, err)
+	t.Log("Created local server on random available port for testing")
+
+	receivedLengthsCh := make(chan int, 10)
+	go func() {
+		defer conn.Close()
+		b := make([]byte, 512)
+		for {
+			n, err := conn.Read(b)
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			receivedLengthsCh <- n
+		}
+	}()
+
+	// Create exporter using local server info
+	input := ExporterInput{
+		CollectorAddress:    conn.LocalAddr().String(),
+		CollectorProtocol:   conn.LocalAddr().Network(),
+		ObservationDomainID: 1,
+		MaxMsgSize:          512,
+	}
+	exporter, err := InitExportingProcess(input)
+	require.NoError(t, err)
+	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
+	defer exporter.CloseConnToCollector()
+
+	// Create template record with two fields
+	templateID := exporter.NewTemplateID()
+	templateSet := entities.NewSet(false)
+	err = templateSet.PrepareSet(entities.Template, templateID)
+	assert.NoError(t, err)
+	elements := make([]entities.InfoElementWithValue, 0)
+	ieSrc, err := registry.GetInfoElement("sourceIPv4Address", registry.IANAEnterpriseID)
+	require.NoError(t, err, "Did not find the element with name sourceIPv4Address")
+	elements = append(elements, entities.NewIPAddressInfoElement(ieSrc, nil))
+	ieDst, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
+	require.NoError(t, err, "Did not find the element with name destinationIPv4Address")
+	elements = append(elements, entities.NewIPAddressInfoElement(ieDst, nil))
+
+	templateSet.AddRecord(elements, templateID)
+
+	bytesSent, err := exporter.SendSet(templateSet)
+	require.NoError(t, err, "Error when sending template set")
+	select {
+	case bytesReceived := <-receivedLengthsCh:
+		assert.Equal(t, bytesSent, bytesReceived)
+	case <-time.After(100 * time.Millisecond):
+		require.Fail(t, "Expected template not received")
+	}
+
+	getDataRecord := func() entities.Record {
+		elements := []entities.InfoElementWithValue{
+			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("1.2.3.4")),
+			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("5.6.7.8")),
+		}
+		return entities.NewDataRecordFromElements(templateID, elements, false)
+	}
+	// Each record will be 8B. The message size has been set to 512B above.
+	// The overheade per message is 16 (message header) + 4 (set header).
+	// So we can fit 61 records per message.
+	// If we send 200 records, we will need 4 messages.
+	records := make([]entities.Record, 200)
+	for idx := range records {
+		record := getDataRecord()
+		require.Equal(t, 8, record.GetRecordLength()) // sanity check
+		records[idx] = record
+	}
+	buf := bytes.NewBuffer(make([]byte, 0, 512))
+	recordsSent, bytesSent, err := exporter.SendDataRecords(templateID, records, buf)
+	require.NoError(t, err)
+	assert.Equal(t, len(records), recordsSent)
+	// 200*8 + 4*20
+	assert.Equal(t, 1680, bytesSent)
+
+	timerCh := time.After(100 * time.Millisecond)
+	for _, expectedBytesReceived := range []int{508, 508, 508, 156} {
+		select {
+		case bytesReceived := <-receivedLengthsCh:
+			assert.Equal(t, expectedBytesReceived, bytesReceived)
+		case <-timerCh:
+			require.Fail(t, "Expected message not received")
+		}
+	}
 }
