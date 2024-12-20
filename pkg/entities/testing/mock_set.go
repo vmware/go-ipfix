@@ -80,6 +80,20 @@ func (mr *MockSetMockRecorder) AddRecordV2(arg0, arg1 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordV2", reflect.TypeOf((*MockSet)(nil).AddRecordV2), arg0, arg1)
 }
 
+// AddRecordV3 mocks base method.
+func (m *MockSet) AddRecordV3(arg0 entities.Record) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AddRecordV3", arg0)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// AddRecordV3 indicates an expected call of AddRecordV3.
+func (mr *MockSetMockRecorder) AddRecordV3(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordV3", reflect.TypeOf((*MockSet)(nil).AddRecordV3), arg0)
+}
+
 // AddRecordWithExtraElements mocks base method.
 func (m *MockSet) AddRecordWithExtraElements(arg0 []entities.InfoElementWithValue, arg1 int, arg2 uint16) error {
 	m.ctrl.T.Helper()
