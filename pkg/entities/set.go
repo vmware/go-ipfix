@@ -46,7 +46,7 @@ const (
 
 type Set interface {
 	PrepareSet(setType ContentType, templateID uint16) error
-	// Call ResetSet followd by a new call to PrepareSet in order to reuse an existing Set,
+	// Call ResetSet followed by a new call to PrepareSet in order to reuse an existing Set,
 	// instead of instantiating a new one.
 	ResetSet()
 	GetHeaderBuffer() []byte
@@ -108,7 +108,9 @@ func (s *set) PrepareSet(setType ContentType, templateID uint16) error {
 }
 
 func (s *set) ResetSet() {
-	if !s.isDecoding {
+	if s.isDecoding {
+		s.length = 0
+	} else {
 		clear(s.headerBuffer)
 		s.length = SetHeaderLen
 	}
@@ -189,10 +191,10 @@ func (s *set) AddRecordV3(record Record) error {
 	// Sanity check: we need to make sure that the record is allowed to be added.
 	recordType := record.GetRecordType()
 	if recordType != s.setType {
-		return fmt.Errorf("Record and Set types don't match")
+		return fmt.Errorf("record and set types don't match")
 	}
 	if recordType == Data && record.GetTemplateID() != s.templateID {
-		return fmt.Errorf("All Data Records in the same Data Set must have the same template ID")
+		return fmt.Errorf("all data records in the same data set must have the same template ID")
 	}
 	s.records = append(s.records, record)
 	s.length += record.GetRecordLength()
