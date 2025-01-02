@@ -4,6 +4,22 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.12.0 01-02-2025
+### Added
+- Ability to support unknown IEs when decoding template sets. (#380, @antoninbas)
+- Add SendDataRecords to IPFIX Exporter to send multiple data records at once. (#391, @antoninbas)
+- Support Records as input for AggregationProcess. (#389, @antoninbas)
+- Add clusterId IE to Antrea registry. (#379, @antoninbas)
+### Changed
+- Manage templates per session instead of globally. (#386, @antoninbas)
+- Close TCP connection in case of error. (#384, @antoninbas)
+- Remove CloseMsgChan method from collector process. (#388, @antoninbas)
+- Improve IPFIX Set implementation: add AddRecordV3 method to interface and
+  optimize ResetSet to avoid memory allocations. (#390, @antoninbas)
+- Delete existing template if a new invalid one is received. (#383, @antoninbas)
+- Stop using projects.registry.vmware.com registry for Kafka images. (#373, @antoninbas)
+### Fixed
+- Fix UDP template expiry in collector process. (#381, @antoninbas)
 ## 0.11.0 09-13-2024
 ### Changed
 - Bump Go to 1.23. (#365, @antoninbas)
