@@ -84,11 +84,16 @@ type CollectingProcess struct {
 	// decoding.
 	decodingMode DecodingMode
 	// caCert, serverCert and serverKey are for storing encryption info when using TLS/DTLS
-	caCert               []byte
-	serverCert           []byte
-	serverKey            []byte
-	wg                   sync.WaitGroup
-	numOfRecordsReceived uint64
+	caCert     []byte
+	serverCert []byte
+	serverKey  []byte
+	wg         sync.WaitGroup
+	// stats for IPFIX objects received
+	numOfMessagesReceived        uint64
+	numOfTemplateSetsReceived    uint64
+	numOfDataSetsReceived        uint64
+	numOfTemplateRecordsReceived uint64
+	numOfDataRecordsReceived     uint64
 	// clock implementation: enables injecting a fake clock for testing
 	clock clock
 }
@@ -181,10 +186,18 @@ func (cp *CollectingProcess) GetMsgChan() <-chan *entities.Message {
 	return cp.messageChan
 }
 
+// GetNumRecordsReceived returns the number of data records received by the collector.
 func (cp *CollectingProcess) GetNumRecordsReceived() int64 {
 	cp.mutex.RLock()
 	defer cp.mutex.RUnlock()
-	return int64(cp.numOfRecordsReceived)
+	return int64(cp.numOfDataRecordsReceived)
+}
+
+// GetNumMessagesReceived returns the number of IPFIX messages received by the collector.
+func (cp *CollectingProcess) GetNumMessagesReceived() int64 {
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
+	return int64(cp.numOfMessagesReceived)
 }
 
 func (cp *CollectingProcess) GetNumConnToCollector() int64 {
@@ -193,10 +206,14 @@ func (cp *CollectingProcess) GetNumConnToCollector() int64 {
 	return int64(len(cp.sessions))
 }
 
-func (cp *CollectingProcess) incrementNumRecordsReceived() {
+func (cp *CollectingProcess) incrementReceivedStats(numMessages, numTemplateSets, numDataSets, numTemplateRecords, numDataRecords uint64) {
 	cp.mutex.Lock()
 	defer cp.mutex.Unlock()
-	cp.numOfRecordsReceived = cp.numOfRecordsReceived + 1
+	cp.numOfMessagesReceived += numMessages
+	cp.numOfTemplateSetsReceived += numTemplateSets
+	cp.numOfDataSetsReceived += numDataSets
+	cp.numOfTemplateRecordsReceived += numTemplateRecords
+	cp.numOfDataRecordsReceived += numDataRecords
 }
 
 func (cp *CollectingProcess) decodePacket(session *transportSession, packetBuffer *bytes.Buffer, exportAddress string) (*entities.Message, error) {
@@ -223,6 +240,8 @@ func (cp *CollectingProcess) decodePacket(session *transportSession, packetBuffe
 	exportAddress = strings.Replace(exportAddress, "]", "", -1)
 	message.SetExportAddress(exportAddress)
 
+	var numTemplateSets, numDataSets, numTemplateRecords, numDataRecords uint64
+
 	var set entities.Set
 	var err error
 	if setID == entities.TemplateSetID {
@@ -230,17 +249,22 @@ func (cp *CollectingProcess) decodePacket(session *transportSession, packetBuffe
 		if err != nil {
 			return nil, fmt.Errorf("error in decoding message: %v", err)
 		}
+		numTemplateSets += 1
+		numTemplateRecords += uint64(set.GetNumberOfRecords())
 	} else {
 		set, err = cp.decodeDataSet(session, packetBuffer, obsDomainID, setID)
 		if err != nil {
 			return nil, fmt.Errorf("error in decoding message: %v", err)
 		}
+		numDataSets += 1
+		numDataRecords += uint64(set.GetNumberOfRecords())
 	}
 	message.AddSet(set)
 
+	cp.incrementReceivedStats(1, numTemplateSets, numDataSets, numTemplateRecords, numDataRecords)
+
 	// the thread(s)/client(s) executing the code will get blocked until the message is consumed/read in other goroutines.
 	cp.messageChan <- message
-	cp.incrementNumRecordsReceived()
 	return message, nil
 }
 
