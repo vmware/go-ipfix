@@ -90,6 +90,17 @@ func localConnSessionID(conn net.Conn) string {
 	return conn.LocalAddr().String()
 }
 
+func checkReceivedStats(t *testing.T, cp *CollectingProcess, numMessages, numTemplateSets, numDataSets, numTemplateRecords, numDataRecords uint64) {
+	t.Helper()
+	cp.mutex.RLock()
+	defer cp.mutex.RUnlock()
+	assert.Equal(t, numMessages, cp.numOfMessagesReceived, "unexpected number of received messages")
+	assert.Equal(t, numTemplateSets, cp.numOfTemplateSetsReceived, "unexpected number of received template sets")
+	assert.Equal(t, numDataSets, cp.numOfDataSetsReceived, "unexpected number of received data sets")
+	assert.Equal(t, numTemplateRecords, cp.numOfTemplateRecordsReceived, "unexpected number of received template records")
+	assert.Equal(t, numDataRecords, cp.numOfDataRecordsReceived, "unexpected number of received data records")
+}
+
 func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, false)
 	cp, err := InitCollectingProcess(input)
@@ -110,7 +121,7 @@ func TestTCPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	<-cp.GetMsgChan()
 	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
 	assert.NotNil(t, template, "TCP Collecting Process should receive and store the received template.")
-	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+	checkReceivedStats(t, cp, 1, 1, 0, 1, 0)
 }
 
 func TestTCPCollectingProcess_ReceiveInvalidTemplateRecord(t *testing.T) {
@@ -160,7 +171,7 @@ func TestUDPCollectingProcess_ReceiveTemplateRecord(t *testing.T) {
 	<-cp.GetMsgChan()
 	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
 	assert.NotNil(t, template, "UDP Collecting Process should receive and store the received template.")
-	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+	checkReceivedStats(t, cp, 1, 1, 0, 1, 0)
 }
 
 func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
@@ -198,7 +209,9 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	assert.Error(t, err)
 
 	// template packet + data packet -> 2
-	assert.Equal(t, int64(2), cp.GetNumRecordsReceived())
+	assert.Equal(t, int64(2), cp.GetNumMessagesReceived())
+	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+	checkReceivedStats(t, cp, 2, 1, 1, 1, 1)
 }
 
 // This test was added to easily measure memory usage when collecting and storing data records.
@@ -297,7 +310,9 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	}, 100*time.Millisecond, 10*time.Millisecond)
 	conn.Close()
 	// template packet + data packet -> 2
-	assert.Equal(t, int64(2), cp.GetNumRecordsReceived())
+	assert.Equal(t, int64(2), cp.GetNumMessagesReceived())
+	assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+	checkReceivedStats(t, cp, 2, 1, 1, 1, 1)
 }
 
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
@@ -389,12 +404,12 @@ func TestUDPCollectingProcess_DecodePacketError(t *testing.T) {
 		assert.Equal(t, int64(1), cp.GetNumConnToCollector())
 	}, 100*time.Millisecond, 10*time.Millisecond)
 	time.Sleep(10 * time.Millisecond)
-	assert.Zero(t, cp.GetNumRecordsReceived())
+	assert.Zero(t, cp.GetNumMessagesReceived())
 
 	conn.Write(validTemplatePacket)
 	assert.EventuallyWithT(t, func(t *assert.CollectT) {
 		assert.Equal(t, int64(1), cp.GetNumConnToCollector())
-		assert.Equal(t, int64(1), cp.GetNumRecordsReceived())
+		assert.Equal(t, int64(1), cp.GetNumMessagesReceived())
 	}, 100*time.Millisecond, 10*time.Millisecond)
 
 	cp.Stop()
