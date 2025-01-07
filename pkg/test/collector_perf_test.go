@@ -136,6 +136,10 @@ func BenchmarkCollector(b *testing.B) {
 		exporter.SendSet(createTemplateSet(templateID, isIPv6))
 		dataSet := createDataSet(templateID, true, isIPv6, false)
 
+		msgChan := cp.GetMsgChan()
+		// template
+		<-msgChan
+
 		b.ResetTimer()
 
 		for i := 0; i < b.N; i++ {
@@ -143,7 +147,7 @@ func BenchmarkCollector(b *testing.B) {
 			ch := make(chan struct{})
 			go func() {
 				count := 0
-				for range cp.GetMsgChan() {
+				for range msgChan {
 					count++
 					if count == numOfRecords {
 						close(ch)

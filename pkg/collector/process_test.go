@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/exporter"
@@ -545,6 +547,30 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	assert.Error(t, err, "Error should be logged for malformed data record")
 }
 
+func BenchmarkCollectingProcess_DecodeDataRecord(b *testing.B) {
+	cp := CollectingProcess{}
+	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
+	require.NoError(b, err)
+	cp.netAddress = address
+	cp.messageChan = make(chan *entities.Message)
+	go func() { // remove the message from the message channel
+		for range cp.GetMsgChan() {
+		}
+	}()
+	session := newTCPSession(address.String())
+	session.addTemplate(cp.clock, uint32(1), uint16(256), elementsWithValueIPv4, cp.templateTTL)
+	disableLogToStderr()
+	b.ResetTimer()
+
+	for range b.N {
+		b.StopTimer()
+		buf := bytes.NewBuffer(validDataPacket)
+		b.StartTimer()
+		_, err := cp.decodePacket(session, buf, address.String())
+		require.NoError(b, err)
+	}
+}
+
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
 	clock := newFakeClock(time.Now())
 	input := CollectorInput{
@@ -919,4 +945,10 @@ func waitForCollectorReady(t *testing.T, cp *CollectingProcess) {
 	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 500*time.Millisecond, false, checkConn); err != nil {
 		t.Errorf("Cannot establish connection to %s", cp.GetAddress().String())
 	}
+}
+
+func disableLogToStderr() {
+	klogFlagSet := flag.NewFlagSet("klog", flag.ContinueOnError)
+	klog.InitFlags(klogFlagSet)
+	klogFlagSet.Parse([]string{"-logtostderr=false"})
 }
