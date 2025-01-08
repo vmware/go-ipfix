@@ -457,7 +457,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 				},
 			},
 			templateRecord:     []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0},
-			expectedErr:        "error in decoding data",
+			expectedErr:        "buffer too short",
 			isTemplateExpected: false,
 		},
 		{
@@ -469,7 +469,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 			},
 			// We truncate the record header (3 bytes instead of 4)
 			templateRecord: []byte{0, 10, 0, 40, 95, 154, 107, 127, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0},
-			expectedErr:    "error in decoding data",
+			expectedErr:    "buffer too short",
 			// If we cannot decode the message to get a template ID, then the existing template entry will not be removed
 			isTemplateExpected: true,
 		},

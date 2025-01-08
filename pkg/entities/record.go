@@ -29,6 +29,8 @@ import (
 // To begin with, we will have local buffer in record.
 // Have an interface and expose functions to user.
 
+const TemplateRecordHeaderLength = 4
+
 type Record interface {
 	PrepareRecord() error
 	AddInfoElement(element InfoElementWithValue) error
