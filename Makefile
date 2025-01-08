@@ -59,12 +59,12 @@ golangci-fix: $(GOLANGCI_LINT_BIN)
 .PHONY: collector
 collector:
 	@mkdir -p $(BINDIR)
-	GOOS=linux $(GO) build -o $(BINDIR) github.com/vmware/go-ipfix/cmd/collector/
+	$(GO) build -o $(BINDIR) github.com/vmware/go-ipfix/cmd/collector/
 
 .PHONY: consumer
 consumer:
 	@mkdir -p $(BINDIR)
-	GOOS=linux $(GO) build -o $(BINDIR) github.com/vmware/go-ipfix/cmd/consumer/
+	$(GO) build -o $(BINDIR) github.com/vmware/go-ipfix/cmd/consumer/
 
 ### Docker images ###
 
