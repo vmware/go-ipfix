@@ -66,12 +66,28 @@ func (mr *MockRecordMockRecorder) AddInfoElement(arg0 any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), arg0)
 }
 
+// AppendToBuffer mocks base method.
+func (m *MockRecord) AppendToBuffer(arg0 []byte) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "AppendToBuffer", arg0)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// AppendToBuffer indicates an expected call of AppendToBuffer.
+func (mr *MockRecordMockRecorder) AppendToBuffer(arg0 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendToBuffer", reflect.TypeOf((*MockRecord)(nil).AppendToBuffer), arg0)
+}
+
 // GetBuffer mocks base method.
-func (m *MockRecord) GetBuffer() []byte {
+func (m *MockRecord) GetBuffer() ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetBuffer")
 	ret0, _ := ret[0].([]byte)
-	return ret0
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // GetBuffer indicates an expected call of GetBuffer.
