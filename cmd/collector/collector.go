@@ -17,13 +17,16 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -48,10 +51,13 @@ var (
 	IPFIXAddr      string
 	IPFIXPort      uint16
 	IPFIXTransport string
+	decodingMode   string
 	flowRecords    []string
 	mutex          sync.Mutex
 
 	flowTextSeparator = bytes.Repeat([]byte("="), 80)
+
+	validDecodingModes = []string{string(collector.DecodingModeStrict), string(collector.DecodingModeLenientKeepUnknown), string(collector.DecodingModeLenientDropUnknown)}
 )
 
 type jsonResponse struct {
@@ -72,6 +78,7 @@ func addIPFIXFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&IPFIXAddr, "ipfix.addr", "0.0.0.0", "IPFIX collector address")
 	fs.Uint16Var(&IPFIXPort, "ipfix.port", 4739, "IPFIX collector port")
 	fs.StringVar(&IPFIXTransport, "ipfix.transport", "tcp", "IPFIX collector transport layer")
+	fs.StringVar(&decodingMode, "decoding-mode", string(collector.DecodingModeStrict), fmt.Sprintf("Decoding mode, must be one of %v", strings.Join(validDecodingModes, ",")))
 }
 
 func addIPFIXMessage(msg *entities.Message) {
@@ -97,7 +104,16 @@ func addIPFIXMessage(msg *entities.Message) {
 			fmt.Fprintf(&buf, "  DATA RECORD-%d:\n", i)
 			for _, ie := range record.GetOrderedElementList() {
 				elem := ie.GetInfoElement()
+				// elem.Name can be empty if the decoding mode is DecodingModeLenientKeepUnknown.
+				if elem.Name == "" {
+					// Log this with default verbosity, since this collector is
+					// primarily meant for development and testing.
+					klog.InfoS("Skipping unknown information element", "enterpriseID", elem.EnterpriseId, "elementID", elem.ElementId)
+					continue
+				}
 				switch elem.DataType {
+				case entities.OctetArray:
+					fmt.Fprintf(&buf, "    %s: %s \n", elem.Name, hex.EncodeToString(ie.GetOctetArrayValue()))
 				case entities.Unsigned8:
 					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned8Value())
 				case entities.Unsigned16:
@@ -170,6 +186,9 @@ func run() error {
 	// Load the IPFIX global registry
 	registry.LoadRegistry()
 	// Initialize collecting process
+	if !slices.Contains(validDecodingModes, decodingMode) {
+		return fmt.Errorf("not a valid decoding mode: %s", decodingMode)
+	}
 	cpInput := collector.CollectorInput{
 		Address:       IPFIXAddr + ":" + strconv.Itoa(int(IPFIXPort)),
 		Protocol:      IPFIXTransport,
@@ -178,6 +197,7 @@ func run() error {
 		IsEncrypted:   false,
 		ServerCert:    nil,
 		ServerKey:     nil,
+		DecodingMode:  collector.DecodingMode(decodingMode),
 	}
 	cp, err := collector.InitCollectingProcess(cpInput)
 	if err != nil {
