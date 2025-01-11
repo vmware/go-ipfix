@@ -20,6 +20,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"io"
 	"net"
@@ -31,6 +32,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/klog/v2"
 
 	"github.com/vmware/go-ipfix/pkg/entities"
 	"github.com/vmware/go-ipfix/pkg/exporter"
@@ -455,7 +457,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 				},
 			},
 			templateRecord:     []byte{0, 10, 0, 40, 95, 40, 211, 236, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0, 3, 0, 8, 0, 4, 0, 12, 0, 4, 128, 105, 255, 255, 0, 0},
-			expectedErr:        "error in decoding data",
+			expectedErr:        "buffer too short",
 			isTemplateExpected: false,
 		},
 		{
@@ -467,7 +469,7 @@ func TestCollectingProcess_DecodeTemplateRecord(t *testing.T) {
 			},
 			// We truncate the record header (3 bytes instead of 4)
 			templateRecord: []byte{0, 10, 0, 40, 95, 154, 107, 127, 0, 0, 0, 0, 0, 0, 0, 1, 0, 2, 0, 24, 1, 0, 0},
-			expectedErr:    "error in decoding data",
+			expectedErr:    "buffer too short",
 			// If we cannot decode the message to get a template ID, then the existing template entry will not be removed
 			isTemplateExpected: true,
 		},
@@ -543,6 +545,30 @@ func TestCollectingProcess_DecodeDataRecord(t *testing.T) {
 	dataRecord := []byte{0, 10, 0, 33, 95, 40, 212, 159, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0}
 	_, err = cp.decodePacket(session, bytes.NewBuffer(dataRecord), address.String())
 	assert.Error(t, err, "Error should be logged for malformed data record")
+}
+
+func BenchmarkCollectingProcess_DecodeDataRecord(b *testing.B) {
+	cp := CollectingProcess{}
+	address, err := net.ResolveTCPAddr(tcpTransport, hostPortIPv4)
+	require.NoError(b, err)
+	cp.netAddress = address
+	cp.messageChan = make(chan *entities.Message)
+	go func() { // remove the message from the message channel
+		for range cp.GetMsgChan() {
+		}
+	}()
+	session := newTCPSession(address.String())
+	session.addTemplate(cp.clock, uint32(1), uint16(256), elementsWithValueIPv4, cp.templateTTL)
+	disableLogToStderr()
+	b.ResetTimer()
+
+	for range b.N {
+		b.StopTimer()
+		buf := bytes.NewBuffer(validDataPacket)
+		b.StartTimer()
+		_, err := cp.decodePacket(session, buf, address.String())
+		require.NoError(b, err)
+	}
 }
 
 func TestUDPCollectingProcess_TemplateExpire(t *testing.T) {
@@ -919,4 +945,10 @@ func waitForCollectorReady(t *testing.T, cp *CollectingProcess) {
 	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 500*time.Millisecond, false, checkConn); err != nil {
 		t.Errorf("Cannot establish connection to %s", cp.GetAddress().String())
 	}
+}
+
+func disableLogToStderr() {
+	klogFlagSet := flag.NewFlagSet("klog", flag.ContinueOnError)
+	klog.InitFlags(klogFlagSet)
+	klogFlagSet.Parse([]string{"-logtostderr=false"})
 }
