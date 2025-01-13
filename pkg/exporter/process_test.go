@@ -278,7 +278,7 @@ func TestExportingProcess_SendingDataRecordToLocalTCPServer(t *testing.T) {
 	elements = append(elements, ie)
 
 	dataSet.AddRecord(elements, templateID)
-	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
+	dataRecBuff, _ := dataSet.GetRecords()[0].GetBuffer()
 
 	bytesSent, err := exporter.SendSet(dataSet)
 	assert.NoError(t, err)
@@ -379,7 +379,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 	elements = append(elements, ie)
 
 	dataSet.AddRecord(elements, templateID)
-	dataRecBuff := dataSet.GetRecords()[0].GetBuffer()
+	dataRecBuff, _ := dataSet.GetRecords()[0].GetBuffer()
 
 	bytesSent, err := exporter.SendSet(dataSet)
 	assert.NoError(t, err)
@@ -854,7 +854,7 @@ func TestSendDataRecords(t *testing.T) {
 	getDataRecord := func() entities.Record {
 		elements := []entities.InfoElementWithValue{
 			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("1.2.3.4")),
-			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("5.6.7.8")),
+			entities.NewIPAddressInfoElement(ieDst, net.ParseIP("5.6.7.8")),
 		}
 		return entities.NewDataRecordFromElements(templateID, elements, false)
 	}

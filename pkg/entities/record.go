@@ -17,8 +17,6 @@ package entities
 import (
 	"encoding/binary"
 	"fmt"
-
-	"k8s.io/klog/v2"
 )
 
 //go:generate mockgen -copyright_file ../../license_templates/license_header.raw.txt -destination=testing/mock_record.go -package=testing github.com/vmware/go-ipfix/pkg/entities Record
@@ -35,7 +33,8 @@ type Record interface {
 	PrepareRecord() error
 	AddInfoElement(element InfoElementWithValue) error
 	// TODO: Functions for multiple elements as well.
-	GetBuffer() []byte
+	GetBuffer() ([]byte, error)
+	AppendToBuffer(buffer []byte) ([]byte, error)
 	GetTemplateID() uint16
 	GetFieldCount() uint16
 	GetOrderedElementList() []InfoElementWithValue
@@ -205,20 +204,31 @@ func (d *dataRecord) PrepareRecord() error {
 	return nil
 }
 
-func (d *dataRecord) GetBuffer() []byte {
+func (d *dataRecord) GetBuffer() ([]byte, error) {
 	if len(d.buffer) == d.len || d.isDecoding {
-		return d.buffer
+		return d.buffer, nil
 	}
 	d.buffer = make([]byte, d.len)
 	index := 0
 	for _, element := range d.orderedElementList {
-		err := encodeInfoElementValueToBuff(element, d.buffer, index)
-		if err != nil {
-			klog.Error(err)
+		if err := encodeInfoElementValueToBuff(element, d.buffer, index); err != nil {
+			return nil, err
 		}
 		index += element.GetLength()
 	}
-	return d.buffer
+	return d.buffer, nil
+}
+
+// Callers should ensure that the provided slice has enough capacity (e.g., by calling
+// GetRecordLength), in order to avoid memory allocations.
+func (d *dataRecord) AppendToBuffer(buffer []byte) ([]byte, error) {
+	var err error
+	for _, element := range d.orderedElementList {
+		if buffer, err = appendInfoElementValueToBuffer(element, buffer); err != nil {
+			return nil, err
+		}
+	}
+	return buffer, nil
 }
 
 func (d *dataRecord) GetRecordLength() int {
@@ -283,8 +293,12 @@ func (t *templateRecord) AddInfoElement(element InfoElementWithValue) error {
 	return nil
 }
 
-func (t *templateRecord) GetBuffer() []byte {
-	return t.buffer
+func (t *templateRecord) GetBuffer() ([]byte, error) {
+	return t.buffer, nil
+}
+
+func (t *templateRecord) AppendToBuffer(buffer []byte) ([]byte, error) {
+	return append(buffer, t.buffer...), nil
 }
 
 func (t *templateRecord) GetRecordLength() int {

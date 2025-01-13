@@ -549,7 +549,8 @@ func (ep *ExportingProcess) dataRecSanityCheck(rec entities.Record) error {
 	if rec.GetFieldCount() != uint16(len(ep.templatesMap[templateID].elements)) {
 		return fmt.Errorf("process: field count of data does not match templateID %d", templateID)
 	}
-	if len(rec.GetBuffer()) < int(ep.templatesMap[templateID].minDataRecLen) {
+
+	if rec.GetRecordLength() < int(ep.templatesMap[templateID].minDataRecLen) {
 		return fmt.Errorf("process: Data Record does not pass the min required length (%d) check for template ID %d", ep.templatesMap[templateID].minDataRecLen, templateID)
 	}
 	return nil

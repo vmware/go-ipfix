@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 var uniqueTemplateID uint16 = 256
@@ -139,10 +140,12 @@ func TestAddInfoElements(t *testing.T) {
 			assert.Equal(t, nil, actualErr, "Error returned is not nil")
 		}
 		// go test -v to see data buffer in hex format
+		buf, err := test.record.GetBuffer()
+		require.NoError(t, err)
 		if i == 0 {
-			t.Logf("template record %x", test.record.GetBuffer())
+			t.Logf("template record %x", buf)
 		} else {
-			t.Logf("data record %x", test.record.GetBuffer())
+			t.Logf("data record %x", buf)
 		}
 	}
 }

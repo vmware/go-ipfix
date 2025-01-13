@@ -70,7 +70,10 @@ func testAddRecordIPAddresses(t testing.TB, isIPv6 bool) {
 	expectedBuf := make([]byte, 0, len(ip1)+len(ip2))
 	expectedBuf = append(expectedBuf, ip1...)
 	expectedBuf = append(expectedBuf, ip2...)
-	assert.Equal(t, expectedBuf, newSet.GetRecords()[0].GetBuffer())
+	require.Len(t, newSet.GetRecords(), 1)
+	buf, err := newSet.GetRecords()[0].GetBuffer()
+	require.NoError(t, err)
+	assert.Equal(t, expectedBuf, buf)
 }
 
 func TestAddRecordIPAddresses(t *testing.T) {
