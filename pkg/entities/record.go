@@ -52,7 +52,6 @@ type baseRecord struct {
 	orderedElementList []InfoElementWithValue
 	isDecoding         bool
 	len                int
-	Record
 }
 
 type dataRecord struct {
@@ -246,6 +245,11 @@ func (d *dataRecord) AddInfoElement(element InfoElementWithValue) error {
 	}
 	d.fieldCount++
 	return nil
+}
+
+// This method is only meaningful for template records.
+func (d *dataRecord) GetMinDataRecordLen() uint16 {
+	return 0
 }
 
 func (d *dataRecord) GetRecordType() ContentType {
