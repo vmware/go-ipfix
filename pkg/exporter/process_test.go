@@ -336,6 +336,7 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
+		PathMTU:             1500,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
@@ -730,13 +731,14 @@ func TestExportingProcess_GetMsgSizeLimit(t *testing.T) {
 		CollectorProtocol:   conn.LocalAddr().Network(),
 		ObservationDomainID: 1,
 		TempRefTimeout:      1,
+		MaxMsgSize:          1000,
 	}
 	exporter, err := InitExportingProcess(input)
 	if err != nil {
 		t.Fatalf("Got error when connecting to local server %s: %v", conn.LocalAddr().String(), err)
 	}
 	t.Logf("Created exporter connecting to local server with address: %s", conn.LocalAddr().String())
-	assert.Equal(t, entities.MaxSocketMsgSize, exporter.GetMsgSizeLimit())
+	assert.Equal(t, input.MaxMsgSize, exporter.GetMsgSizeLimit())
 }
 
 func TestExportingProcess_CheckConnToCollector(t *testing.T) {
@@ -883,5 +885,86 @@ func TestSendDataRecords(t *testing.T) {
 		case <-timerCh:
 			require.Fail(t, "Expected message not received")
 		}
+	}
+}
+
+func TestCalculateMaxMsgSize(t *testing.T) {
+	testCases := []struct {
+		proto         string
+		requestedSize int
+		pathMTU       int
+		isIPv6        bool
+		expectedErr   string
+		expectedSize  int
+	}{
+		{
+			proto:         "tcp",
+			requestedSize: entities.MinSupportedMsgSize - 1,
+			expectedErr:   "requested message size should be between",
+		},
+		{
+			proto:         "tcp",
+			requestedSize: entities.MaxSocketMsgSize + 1,
+			expectedErr:   "requested message size should be between",
+		},
+		{
+			proto:         "tcp",
+			requestedSize: 0,
+			expectedSize:  entities.MaxSocketMsgSize,
+		},
+		{
+			proto:         "tcp",
+			requestedSize: 1000,
+			expectedSize:  1000,
+		},
+		{
+			proto:        "udp",
+			expectedSize: entities.MinSupportedMsgSize,
+		},
+		{
+			proto:         "udp",
+			requestedSize: 1000,
+			expectedSize:  1000,
+		},
+		{
+			proto:        "udp",
+			pathMTU:      1500,
+			expectedSize: 1472,
+		},
+		{
+			proto:        "udp",
+			pathMTU:      1500,
+			isIPv6:       true,
+			expectedSize: 1452,
+		},
+		{
+			proto:       "udp",
+			pathMTU:     300,
+			expectedErr: "is not large enough to accommodate min message size",
+		},
+		{
+			proto:         "udp",
+			requestedSize: 2000,
+			pathMTU:       1500,
+			expectedErr:   "exceeds max message size",
+		},
+		{
+			proto:         "udp",
+			requestedSize: 1000,
+			pathMTU:       1500,
+			expectedSize:  1000,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(fmt.Sprintf("%s-req=%d-pmtu=%d-ipv6=%t", tc.proto, tc.requestedSize, tc.pathMTU, tc.isIPv6), func(t *testing.T) {
+			size, err := calculateMaxMsgSize(tc.proto, tc.requestedSize, tc.pathMTU, tc.isIPv6)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				require.NoError(t, err)
+				assert.Equal(t, tc.expectedSize, size)
+			}
+		})
 	}
 }
