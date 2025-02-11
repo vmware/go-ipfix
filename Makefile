@@ -1,7 +1,7 @@
 GO              ?= go
 GOPATH          ?= $$($(GO) env GOPATH)
 BINDIR          ?= $(CURDIR)/bin
-GOMOCK_VERSION         := v0.3.0
+GOMOCK_VERSION         := v0.5.0
 PROTOC_GEN_GO_VERSION  := v1.28.1
 GOLANGCI_LINT_VERSION  := v1.60.3
 GOLANGCI_LINT_BINDIR   := .golangci-bin

@@ -19,6 +19,7 @@
 //
 //	mockgen -copyright_file ../../license_templates/license_header.raw.txt -destination=testing/mock_record.go -package=testing github.com/vmware/go-ipfix/pkg/entities Record
 //
+
 // Package testing is a generated GoMock package.
 package testing
 
@@ -33,6 +34,7 @@ import (
 type MockRecord struct {
 	ctrl     *gomock.Controller
 	recorder *MockRecordMockRecorder
+	isgomock struct{}
 }
 
 // MockRecordMockRecorder is the mock recorder for MockRecord.
@@ -53,32 +55,32 @@ func (m *MockRecord) EXPECT() *MockRecordMockRecorder {
 }
 
 // AddInfoElement mocks base method.
-func (m *MockRecord) AddInfoElement(arg0 entities.InfoElementWithValue) error {
+func (m *MockRecord) AddInfoElement(element entities.InfoElementWithValue) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddInfoElement", arg0)
+	ret := m.ctrl.Call(m, "AddInfoElement", element)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddInfoElement indicates an expected call of AddInfoElement.
-func (mr *MockRecordMockRecorder) AddInfoElement(arg0 any) *gomock.Call {
+func (mr *MockRecordMockRecorder) AddInfoElement(element any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddInfoElement", reflect.TypeOf((*MockRecord)(nil).AddInfoElement), element)
 }
 
 // AppendToBuffer mocks base method.
-func (m *MockRecord) AppendToBuffer(arg0 []byte) ([]byte, error) {
+func (m *MockRecord) AppendToBuffer(buffer []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AppendToBuffer", arg0)
+	ret := m.ctrl.Call(m, "AppendToBuffer", buffer)
 	ret0, _ := ret[0].([]byte)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // AppendToBuffer indicates an expected call of AppendToBuffer.
-func (mr *MockRecordMockRecorder) AppendToBuffer(arg0 any) *gomock.Call {
+func (mr *MockRecordMockRecorder) AppendToBuffer(buffer any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendToBuffer", reflect.TypeOf((*MockRecord)(nil).AppendToBuffer), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AppendToBuffer", reflect.TypeOf((*MockRecord)(nil).AppendToBuffer), buffer)
 }
 
 // GetBuffer mocks base method.
@@ -125,9 +127,9 @@ func (mr *MockRecordMockRecorder) GetFieldCount() *gomock.Call {
 }
 
 // GetInfoElementWithValue mocks base method.
-func (m *MockRecord) GetInfoElementWithValue(arg0 string) (entities.InfoElementWithValue, int, bool) {
+func (m *MockRecord) GetInfoElementWithValue(name string) (entities.InfoElementWithValue, int, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetInfoElementWithValue", arg0)
+	ret := m.ctrl.Call(m, "GetInfoElementWithValue", name)
 	ret0, _ := ret[0].(entities.InfoElementWithValue)
 	ret1, _ := ret[1].(int)
 	ret2, _ := ret[2].(bool)
@@ -135,9 +137,9 @@ func (m *MockRecord) GetInfoElementWithValue(arg0 string) (entities.InfoElementW
 }
 
 // GetInfoElementWithValue indicates an expected call of GetInfoElementWithValue.
-func (mr *MockRecordMockRecorder) GetInfoElementWithValue(arg0 any) *gomock.Call {
+func (mr *MockRecordMockRecorder) GetInfoElementWithValue(name any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElementWithValue", reflect.TypeOf((*MockRecord)(nil).GetInfoElementWithValue), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetInfoElementWithValue", reflect.TypeOf((*MockRecord)(nil).GetInfoElementWithValue), name)
 }
 
 // GetMinDataRecordLen mocks base method.
