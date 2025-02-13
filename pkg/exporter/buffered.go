@@ -86,7 +86,7 @@ func (e *BufferedIPFIXExporter) addDataRecord(record entities.Record) error {
 	return m.addRecord(record)
 }
 
-// AddRecord adds a record to be sent to the destination collector. If it is a template record, the
+// AddRecord adds a record to be sent to the destination collector. If it is a template record, then
 // it will be sent to the collector right away. If it is a data record, it will be added to the
 // buffer. If adding the record to the buffer would cause the buffer length to exceed the max
 // message size, the buffer is flushed first. Note that because data records are serialized to the
