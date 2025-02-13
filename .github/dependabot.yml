@@ -11,6 +11,8 @@ updates:
         - "golang.org/x/*"
     ignore:
     - dependency-name: "k8s.io/*"
+    # Skip in Dependabot because it should stay consistent with GOMOCK_VERSION in the Makefile.
+    - dependency-name: "go.uber.org/mock"
   - package-ecosystem: "github-actions"
     # Workflow files stored in the default location of `.github/workflows`
     directory: "/"

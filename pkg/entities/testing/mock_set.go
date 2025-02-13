@@ -19,6 +19,7 @@
 //
 //	mockgen -copyright_file ../../license_templates/license_header.raw.txt -destination=testing/mock_set.go -package=testing github.com/vmware/go-ipfix/pkg/entities Set
 //
+
 // Package testing is a generated GoMock package.
 package testing
 
@@ -33,6 +34,7 @@ import (
 type MockSet struct {
 	ctrl     *gomock.Controller
 	recorder *MockSetMockRecorder
+	isgomock struct{}
 }
 
 // MockSetMockRecorder is the mock recorder for MockSet.
@@ -53,59 +55,59 @@ func (m *MockSet) EXPECT() *MockSetMockRecorder {
 }
 
 // AddRecord mocks base method.
-func (m *MockSet) AddRecord(arg0 []entities.InfoElementWithValue, arg1 uint16) error {
+func (m *MockSet) AddRecord(elements []entities.InfoElementWithValue, templateID uint16) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRecord", arg0, arg1)
+	ret := m.ctrl.Call(m, "AddRecord", elements, templateID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRecord indicates an expected call of AddRecord.
-func (mr *MockSetMockRecorder) AddRecord(arg0, arg1 any) *gomock.Call {
+func (mr *MockSetMockRecorder) AddRecord(elements, templateID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecord", reflect.TypeOf((*MockSet)(nil).AddRecord), elements, templateID)
 }
 
 // AddRecordV2 mocks base method.
-func (m *MockSet) AddRecordV2(arg0 []entities.InfoElementWithValue, arg1 uint16) error {
+func (m *MockSet) AddRecordV2(elements []entities.InfoElementWithValue, templateID uint16) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRecordV2", arg0, arg1)
+	ret := m.ctrl.Call(m, "AddRecordV2", elements, templateID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRecordV2 indicates an expected call of AddRecordV2.
-func (mr *MockSetMockRecorder) AddRecordV2(arg0, arg1 any) *gomock.Call {
+func (mr *MockSetMockRecorder) AddRecordV2(elements, templateID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordV2", reflect.TypeOf((*MockSet)(nil).AddRecordV2), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordV2", reflect.TypeOf((*MockSet)(nil).AddRecordV2), elements, templateID)
 }
 
 // AddRecordV3 mocks base method.
-func (m *MockSet) AddRecordV3(arg0 entities.Record) error {
+func (m *MockSet) AddRecordV3(record entities.Record) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRecordV3", arg0)
+	ret := m.ctrl.Call(m, "AddRecordV3", record)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRecordV3 indicates an expected call of AddRecordV3.
-func (mr *MockSetMockRecorder) AddRecordV3(arg0 any) *gomock.Call {
+func (mr *MockSetMockRecorder) AddRecordV3(record any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordV3", reflect.TypeOf((*MockSet)(nil).AddRecordV3), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordV3", reflect.TypeOf((*MockSet)(nil).AddRecordV3), record)
 }
 
 // AddRecordWithExtraElements mocks base method.
-func (m *MockSet) AddRecordWithExtraElements(arg0 []entities.InfoElementWithValue, arg1 int, arg2 uint16) error {
+func (m *MockSet) AddRecordWithExtraElements(elements []entities.InfoElementWithValue, numExtraElements int, templateID uint16) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "AddRecordWithExtraElements", arg0, arg1, arg2)
+	ret := m.ctrl.Call(m, "AddRecordWithExtraElements", elements, numExtraElements, templateID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // AddRecordWithExtraElements indicates an expected call of AddRecordWithExtraElements.
-func (mr *MockSetMockRecorder) AddRecordWithExtraElements(arg0, arg1, arg2 any) *gomock.Call {
+func (mr *MockSetMockRecorder) AddRecordWithExtraElements(elements, numExtraElements, templateID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordWithExtraElements", reflect.TypeOf((*MockSet)(nil).AddRecordWithExtraElements), arg0, arg1, arg2)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddRecordWithExtraElements", reflect.TypeOf((*MockSet)(nil).AddRecordWithExtraElements), elements, numExtraElements, templateID)
 }
 
 // GetHeaderBuffer mocks base method.
@@ -179,17 +181,17 @@ func (mr *MockSetMockRecorder) GetSetType() *gomock.Call {
 }
 
 // PrepareSet mocks base method.
-func (m *MockSet) PrepareSet(arg0 entities.ContentType, arg1 uint16) error {
+func (m *MockSet) PrepareSet(setType entities.ContentType, templateID uint16) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PrepareSet", arg0, arg1)
+	ret := m.ctrl.Call(m, "PrepareSet", setType, templateID)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // PrepareSet indicates an expected call of PrepareSet.
-func (mr *MockSetMockRecorder) PrepareSet(arg0, arg1 any) *gomock.Call {
+func (mr *MockSetMockRecorder) PrepareSet(setType, templateID any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareSet", reflect.TypeOf((*MockSet)(nil).PrepareSet), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PrepareSet", reflect.TypeOf((*MockSet)(nil).PrepareSet), setType, templateID)
 }
 
 // ResetSet mocks base method.
