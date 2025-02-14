@@ -52,7 +52,7 @@ var (
 	IPFIXPort      uint16
 	IPFIXTransport string
 	decodingMode   string
-	flowRecords    []string
+	flowRecords    []*flowRecord
 	mutex          sync.Mutex
 
 	flowTextSeparator = bytes.Repeat([]byte("="), 80)
@@ -60,8 +60,21 @@ var (
 	validDecodingModes = []string{string(collector.DecodingModeStrict), string(collector.DecodingModeLenientKeepUnknown), string(collector.DecodingModeLenientDropUnknown)}
 )
 
+type flowRecord struct {
+	// metadata from the message header
+	ExportTime  uint32 `json:"exportTime"`
+	SequenceNum uint32 `json:"sequenceNumber"`
+	ObsDomainID uint32 `json:"obsDomainID"`
+	// template for the data set
+	TemplateID uint16 `json:"templateID"`
+	// idex of the data record in the data set
+	RecordIdx int32 `json:"recordIdx"`
+	// a string representation of the contents of the data record
+	Data string `json:"data"`
+}
+
 type jsonResponse struct {
-	FlowRecords []string `json:"flowRecords"`
+	FlowRecords []*flowRecord `json:"flowRecords"`
 }
 
 func initLoggingToFile(fs *pflag.FlagSet) {
@@ -81,99 +94,100 @@ func addIPFIXFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&decodingMode, "decoding-mode", string(collector.DecodingModeStrict), fmt.Sprintf("Decoding mode, must be one of %v", strings.Join(validDecodingModes, ",")))
 }
 
-func addIPFIXMessage(msg *entities.Message) {
-	var buf bytes.Buffer
-	fmt.Fprint(&buf, "\nIPFIX-HDR:\n")
-	fmt.Fprintf(&buf, "  version: %v,  Message Length: %v\n", msg.GetVersion(), msg.GetMessageLen())
-	fmt.Fprintf(&buf, "  Exported Time: %v (%v)\n", msg.GetExportTime(), time.Unix(int64(msg.GetExportTime()), 0))
-	fmt.Fprintf(&buf, "  Sequence No.: %v,  Observation Domain ID: %v\n", msg.GetSequenceNum(), msg.GetObsDomainID())
-
+func addIPFIXMessage(msg *entities.Message, buf *bytes.Buffer) {
 	set := msg.GetSet()
-	if set.GetSetType() == entities.Template {
-		fmt.Fprint(&buf, "TEMPLATE SET:\n")
-		for i, record := range set.GetRecords() {
-			fmt.Fprintf(&buf, "  TEMPLATE RECORD-%d:\n", i)
-			for _, ie := range record.GetOrderedElementList() {
-				elem := ie.GetInfoElement()
-				fmt.Fprintf(&buf, "    %s: len=%d (enterprise ID = %d) \n", elem.Name, elem.Len, elem.EnterpriseId)
+	if set.GetSetType() != entities.Data {
+		return
+	}
+
+	for i, record := range set.GetRecords() {
+		buf.Reset()
+		for _, ie := range record.GetOrderedElementList() {
+			elem := ie.GetInfoElement()
+			// elem.Name can be empty if the decoding mode is DecodingModeLenientKeepUnknown.
+			if elem.Name == "" {
+				// Log this with default verbosity, since this collector is
+				// primarily meant for development and testing.
+				klog.InfoS("Skipping unknown information element", "enterpriseID", elem.EnterpriseId, "elementID", elem.ElementId)
+				continue
+			}
+			switch elem.DataType {
+			case entities.OctetArray:
+				fmt.Fprintf(buf, "    %s: %s \n", elem.Name, hex.EncodeToString(ie.GetOctetArrayValue()))
+			case entities.Unsigned8:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetUnsigned8Value())
+			case entities.Unsigned16:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetUnsigned16Value())
+			case entities.Unsigned32:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
+			case entities.Unsigned64:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetUnsigned64Value())
+			case entities.Signed8:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetSigned8Value())
+			case entities.Signed16:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetSigned16Value())
+			case entities.Signed32:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetSigned32Value())
+			case entities.Signed64:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetSigned64Value())
+			case entities.Float32:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetFloat32Value())
+			case entities.Float64:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetFloat64Value())
+			case entities.Boolean:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetBooleanValue())
+			case entities.DateTimeSeconds:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
+			case entities.DateTimeMilliseconds:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetUnsigned64Value())
+			case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
+				err := fmt.Errorf("API does not support micro and nano seconds types yet")
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, err)
+			case entities.MacAddress:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetMacAddressValue())
+			case entities.Ipv4Address, entities.Ipv6Address:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetIPAddressValue())
+			case entities.String:
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, ie.GetStringValue())
+			default:
+				err := fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
+				fmt.Fprintf(buf, "    %s: %v \n", elem.Name, err)
 			}
 		}
-	} else {
-		fmt.Fprint(&buf, "DATA SET:\n")
-		for i, record := range set.GetRecords() {
-			fmt.Fprintf(&buf, "  DATA RECORD-%d:\n", i)
-			for _, ie := range record.GetOrderedElementList() {
-				elem := ie.GetInfoElement()
-				// elem.Name can be empty if the decoding mode is DecodingModeLenientKeepUnknown.
-				if elem.Name == "" {
-					// Log this with default verbosity, since this collector is
-					// primarily meant for development and testing.
-					klog.InfoS("Skipping unknown information element", "enterpriseID", elem.EnterpriseId, "elementID", elem.ElementId)
-					continue
-				}
-				switch elem.DataType {
-				case entities.OctetArray:
-					fmt.Fprintf(&buf, "    %s: %s \n", elem.Name, hex.EncodeToString(ie.GetOctetArrayValue()))
-				case entities.Unsigned8:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned8Value())
-				case entities.Unsigned16:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned16Value())
-				case entities.Unsigned32:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
-				case entities.Unsigned64:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned64Value())
-				case entities.Signed8:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned8Value())
-				case entities.Signed16:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned16Value())
-				case entities.Signed32:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned32Value())
-				case entities.Signed64:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetSigned64Value())
-				case entities.Float32:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetFloat32Value())
-				case entities.Float64:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetFloat64Value())
-				case entities.Boolean:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetBooleanValue())
-				case entities.DateTimeSeconds:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned32Value())
-				case entities.DateTimeMilliseconds:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetUnsigned64Value())
-				case entities.DateTimeMicroseconds, entities.DateTimeNanoseconds:
-					err := fmt.Errorf("API does not support micro and nano seconds types yet")
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-				case entities.MacAddress:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetMacAddressValue())
-				case entities.Ipv4Address, entities.Ipv6Address:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetIPAddressValue())
-				case entities.String:
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, ie.GetStringValue())
-				default:
-					err := fmt.Errorf("API supports only valid information elements with datatypes given in RFC7011")
-					fmt.Fprintf(&buf, "    %s: %v \n", elem.Name, err)
-				}
-			}
+
+		flowRecord := &flowRecord{
+			ExportTime:  msg.GetExportTime(),
+			SequenceNum: msg.GetSequenceNum(),
+			ObsDomainID: msg.GetObsDomainID(),
+			TemplateID:  record.GetTemplateID(),
+			RecordIdx:   int32(i),
+			Data:        buf.String(),
 		}
+
+		func() {
+			mutex.Lock()
+			defer mutex.Unlock()
+			if len(flowRecords) >= maxFlowRecords {
+				// Zero and remove first element.
+				flowRecords[0] = nil // Ensure first element can be garbage-collected.
+				flowRecords = flowRecords[1:]
+			}
+			flowRecords = append(flowRecords, flowRecord)
+		}()
 	}
-	mutex.Lock()
-	defer mutex.Unlock()
-	if len(flowRecords) >= maxFlowRecords {
-		// Zero and remove first element.
-		flowRecords[0] = "" // Ensure first element can be garbage-collected.
-		flowRecords = flowRecords[1:]
-	}
-	flowRecords = append(flowRecords, buf.String())
 }
 
 func signalHandler(stopCh chan struct{}, messageReceived chan *entities.Message) {
 	signalCh := make(chan os.Signal, 1)
 	signal.Notify(signalCh, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
+	// A buffer that can be reused for each call to addIPFIXMessage.
+	var buf bytes.Buffer
+
 	for {
 		select {
 		case msg := <-messageReceived:
-			addIPFIXMessage(msg)
+			addIPFIXMessage(msg, &buf)
 		case <-signalCh:
 			close(stopCh)
 			return
@@ -316,7 +330,7 @@ func flowRecordHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			w.Header().Set("Content-Type", "text/plain")
 			for idx := range records {
-				w.Write([]byte(records[idx]))
+				w.Write([]byte(records[idx].Data))
 				// Write a separator
 				w.Write(flowTextSeparator)
 			}
@@ -331,7 +345,7 @@ func resetRecordHandler(w http.ResponseWriter, r *http.Request) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		klog.InfoS("Reset flow records")
-		flowRecords = []string{}
+		flowRecords = []*flowRecord{}
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprint(w, "Flow records successfully reset")
 	} else {
