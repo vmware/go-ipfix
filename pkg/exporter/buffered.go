@@ -68,8 +68,21 @@ func NewBufferedIPFIXExporter(ep *ExportingProcess) *BufferedIPFIXExporter {
 }
 
 func (e *BufferedIPFIXExporter) addTemplateRecord(record entities.Record) error {
+	templateID := record.GetTemplateID()
+	// If the templateID already exists, we should send corresponding buffered data records
+	// immediately, as they may not match the new template definition.
+	if m, ok := e.messages[templateID]; ok {
+		if err := m.flush(); err != nil {
+			return fmt.Errorf("error when flushing buffered records for templateID %d: %w", templateID, err)
+		}
+	}
 	e.templateSet.ResetSet()
-	e.templateSet.PrepareSet(entities.Template, entities.TemplateSetID)
+	if err := e.templateSet.PrepareSet(entities.Template, entities.TemplateSetID); err != nil {
+		return err
+	}
+	if err := e.templateSet.AddRecordV3(record); err != nil {
+		return err
+	}
 	// It's important to use the method from ExporterProcess, for template management purposes.
 	_, err := e.ep.SendSet(e.templateSet)
 	return err
