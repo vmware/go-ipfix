@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.13.0 02-19-2025
+### Added
+- Support configurable decoding mode in reference collector program. (#396, @antoninbas)
+- Add Path MTU to Exporter inputs. (#407, @antoninbas)
+- Add buffered exporter for IPFIX messages. (#409, @antoninbas)
+### Changed
+- Improve received stats in collector. (#394, @antoninbas)
+- Improve IPFIX header decoding in collector. (#395, @antoninbas)
+- Prevent unnecessary memory allocations in WriteIPFIXMsgToBuffer. (#397, @antoninbas)
+- Re-use same buffer when receiving messages in TCP collector. (#399, @antoninbas)
+- Improve collector program for data sets with multiple records. (#410, @antoninbas)
+### Fixed
+- Do not embed Record interface into baseRecord. (#398, @antoninbas)
 ## 0.12.0 01-02-2025
 ### Added
 - Ability to support unknown IEs when decoding template sets. (#380, @antoninbas)
