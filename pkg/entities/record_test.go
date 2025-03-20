@@ -31,8 +31,8 @@ func TestPrepareRecord(t *testing.T) {
 		expectLen uint16
 		expectErr error
 	}{
-		{NewDataRecord(uniqueTemplateID, 1, 0, false), 0, nil},
-		{NewTemplateRecord(uniqueTemplateID, 1, false), 4, nil},
+		{NewDataRecord(uniqueTemplateID, 1, 0), 0, nil},
+		{NewTemplateRecord(uniqueTemplateID, 1), 4, nil},
 	}
 
 	for _, test := range prepareRecordTests {
@@ -95,8 +95,8 @@ func TestAddInfoElements(t *testing.T) {
 		ieList  []*InfoElement
 		valList valData
 	}{
-		{NewTemplateRecord(uniqueTemplateID, 12, false), testIEs, valData{}},
-		{NewDataRecord(uniqueTemplateID, len(testIEs), 0, false), testIEs, values},
+		{NewTemplateRecord(uniqueTemplateID, 12), testIEs, valData{}},
+		{NewDataRecord(uniqueTemplateID, len(testIEs), 0), testIEs, values},
 	}
 
 	for i, test := range addIETests {
@@ -151,7 +151,7 @@ func TestAddInfoElements(t *testing.T) {
 }
 
 func TestGetInfoElementWithValue(t *testing.T) {
-	templateRec := NewTemplateRecord(256, 1, true)
+	templateRec := NewTemplateRecord(256, 1)
 	templateRec.orderedElementList = make([]InfoElementWithValue, 0)
 	ie := NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
 	templateRec.orderedElementList = append(templateRec.orderedElementList, ie)
@@ -159,7 +159,7 @@ func TestGetInfoElementWithValue(t *testing.T) {
 	assert.Equal(t, true, exist)
 	_, _, exist = templateRec.GetInfoElementWithValue("destinationIPv4Address")
 	assert.Equal(t, false, exist)
-	dataRec := NewDataRecord(256, 1, 0, true)
+	dataRec := NewDataRecord(256, 1, 0)
 	dataRec.orderedElementList = make([]InfoElementWithValue, 0)
 	ie = NewIPAddressInfoElement(NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1"))
 	dataRec.orderedElementList = append(dataRec.orderedElementList, ie)
@@ -216,7 +216,7 @@ func TestGetElementMap(t *testing.T) {
 		uint32(time.Now().Unix()),   // dateTimeSeconds
 		uint64(time.Now().Unix()),   // dateTimeMilliseconds
 	}
-	record := NewDataRecord(uniqueTemplateID, len(ieList), 0, false)
+	record := NewDataRecord(uniqueTemplateID, len(ieList), 0)
 
 	for _, testIE := range ieList {
 		var ie InfoElementWithValue

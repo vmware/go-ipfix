@@ -858,7 +858,7 @@ func TestSendDataRecords(t *testing.T) {
 			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("1.2.3.4")),
 			entities.NewIPAddressInfoElement(ieDst, net.ParseIP("5.6.7.8")),
 		}
-		return entities.NewDataRecordFromElements(templateID, elements, false)
+		return entities.NewDataRecordFromElements(templateID, elements)
 	}
 	// Each record will be 8B. The message size has been set to 512B above.
 	// The overheade per message is 16 (message header) + 4 (set header).
