@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.14.0 03-24-2025
+### Fixed
+- Fix Record length computation so that IPFIX UDP messages can be sized
+  correctly by the buffered exporter. (#417, @antoninbas)
+- Fix sequence number incrementing in IPFIX exporter. (#418, @antoninbas)
 ## 0.13.0 02-19-2025
 ### Added
 - Support configurable decoding mode in reference collector program. (#396, @antoninbas)
