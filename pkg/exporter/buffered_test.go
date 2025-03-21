@@ -70,7 +70,7 @@ func TestBufferedExporter(t *testing.T) {
 	ieDst, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	require.NoError(t, err, "Did not find the element with name destinationIPv4Address")
 	elements = append(elements, entities.NewIPAddressInfoElement(ieDst, nil))
-	template := entities.NewTemplateRecordFromElements(templateID, elements, false)
+	template := entities.NewTemplateRecordFromElements(templateID, elements)
 	require.NoError(t, template.PrepareRecord())
 
 	require.NoError(t, bufferedExporter.AddRecord(template))
@@ -86,7 +86,7 @@ func TestBufferedExporter(t *testing.T) {
 			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("1.2.3.4")),
 			entities.NewIPAddressInfoElement(ieDst, net.ParseIP("5.6.7.8")),
 		}
-		return entities.NewDataRecordFromElements(templateID, elements, false)
+		return entities.NewDataRecordFromElements(templateID, elements)
 	}()
 	// Each record will be 8B. The message size has been set to 512B above.
 	// The overhead per message is 16 (message header) + 4 (set header).
@@ -149,7 +149,7 @@ func BenchmarkBufferedExporter(b *testing.B) {
 	ieDst, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	require.NoError(b, err, "Did not find the element with name destinationIPv4Address")
 	elements = append(elements, entities.NewIPAddressInfoElement(ieDst, nil))
-	template := entities.NewTemplateRecordFromElements(templateID, elements, false)
+	template := entities.NewTemplateRecordFromElements(templateID, elements)
 	require.NoError(b, template.PrepareRecord())
 
 	require.NoError(b, bufferedExporter.AddRecord(template))
@@ -159,7 +159,7 @@ func BenchmarkBufferedExporter(b *testing.B) {
 			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("1.2.3.4")),
 			entities.NewIPAddressInfoElement(ieDst, net.ParseIP("5.6.7.8")),
 		}
-		return entities.NewDataRecordFromElements(templateID, elements, false)
+		return entities.NewDataRecordFromElements(templateID, elements)
 	}()
 
 	b.ResetTimer()
@@ -213,7 +213,7 @@ func TestBufferedExporter_UpdateTemplate(t *testing.T) {
 	ieDst, err := registry.GetInfoElement("destinationIPv4Address", registry.IANAEnterpriseID)
 	require.NoError(t, err, "Did not find the element with name destinationIPv4Address")
 	elements = append(elements, entities.NewIPAddressInfoElement(ieDst, nil))
-	template := entities.NewTemplateRecordFromElements(templateID, elements, false)
+	template := entities.NewTemplateRecordFromElements(templateID, elements)
 	require.NoError(t, template.PrepareRecord())
 
 	// msg header (16) + set header (4) + template record header (4) + 2 field specifiers (8)
@@ -259,7 +259,7 @@ func TestBufferedExporter_UpdateTemplate(t *testing.T) {
 			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("1.2.3.4")),
 			entities.NewIPAddressInfoElement(ieDst, net.ParseIP("5.6.7.8")),
 		}
-		return entities.NewDataRecordFromElements(templateID, elements, false)
+		return entities.NewDataRecordFromElements(templateID, elements)
 	}()
 
 	require.NoError(t, bufferedExporter.AddRecord(record))

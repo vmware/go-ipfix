@@ -197,7 +197,6 @@ func BenchmarkSet(b *testing.B) {
 				NewIPAddressInfoElement(sourceIE, net.ParseIP(testIPv4Addr1)),
 				NewIPAddressInfoElement(destinationIE, net.ParseIP(testIPv4Addr2)),
 			},
-			false,
 		)
 	}
 

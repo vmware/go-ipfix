@@ -39,7 +39,7 @@ func BenchmarkWriteIPFIXMsgToBuffer(b *testing.B) {
 			entities.NewIPAddressInfoElement(ieSrc, net.ParseIP("1.2.3.4")),
 			entities.NewIPAddressInfoElement(ieDst, net.ParseIP("5.6.7.8")),
 		}
-		return entities.NewDataRecordFromElements(templateID, elements, false)
+		return entities.NewDataRecordFromElements(templateID, elements)
 	}
 	buf := bytes.NewBuffer(make([]byte, 0, 512))
 	b.ResetTimer()
