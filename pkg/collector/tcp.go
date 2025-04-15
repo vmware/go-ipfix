@@ -138,21 +138,27 @@ func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	tlsMinVersion := cp.tlsMinVersion
+	// This should already be the default value for tls.Config, but we duplicate the earlier
+	// implementation, which was explicitly setting it to 1.2.
+	if tlsMinVersion == 0 {
+		tlsMinVersion = tls.VersionTLS12
+	}
+	// #nosec G402: client is in charge of setting the min TLS version. We use 1.2 as the
+	// default, which is secure.
+	tlsConfig := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tlsMinVersion,
+	}
 	if cp.caCert == nil {
-		return &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
-		}, nil
+		return tlsConfig, nil
 	}
 	roots := x509.NewCertPool()
 	ok := roots.AppendCertsFromPEM(cp.caCert)
 	if !ok {
 		return nil, fmt.Errorf("failed to parse root certificate")
 	}
-	return &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    roots,
-		MinVersion:   tls.VersionTLS12,
-	}, nil
+	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	tlsConfig.ClientCAs = roots
+	return tlsConfig, nil
 }
