@@ -34,6 +34,10 @@ func (cp *CollectingProcess) startUDPServer() {
 		return
 	}
 	if cp.isEncrypted { // use DTLS
+		if cp.tlsMinVersion != 0 && cp.tlsMinVersion != tls.VersionTLS12 {
+			klog.Error("DTLS 1.2 is the only supported version")
+			return
+		}
 		cert, err := tls.X509KeyPair(cp.serverCert, cp.serverKey)
 		if err != nil {
 			klog.Error(err)
@@ -41,10 +45,16 @@ func (cp *CollectingProcess) startUDPServer() {
 		}
 		certPool := x509.NewCertPool()
 		certPool.AppendCertsFromPEM(cp.serverCert)
+		// If tlsConfig.CipherSuites is nil, cipherSuites should also be nil!
+		var cipherSuites []dtls.CipherSuiteID
+		for _, cipherSuite := range cp.tlsCipherSuites {
+			cipherSuites = append(cipherSuites, dtls.CipherSuiteID(cipherSuite))
+		}
 		config := &dtls.Config{
 			Certificates:         []tls.Certificate{cert},
 			ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
 			ClientCAs:            certPool,
+			CipherSuites:         cipherSuites,
 		}
 		listener, err = dtls.Listen("udp", address, config)
 		if err != nil {
