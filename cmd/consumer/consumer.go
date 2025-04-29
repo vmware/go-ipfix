@@ -100,7 +100,6 @@ func run() error {
 		if err != nil {
 			klog.Error(err)
 		}
-		return
 	}()
 
 	stopCh := make(chan struct{})

@@ -165,7 +165,6 @@ func TestExportingProcess_SendingTemplateRecordToLocalUDPServer(t *testing.T) {
 		}
 		// Compare only template record part. Remove message header and set header.
 		buffCh <- bytes
-		return
 	}()
 
 	// Create exporter using local server info
@@ -327,7 +326,6 @@ func TestExportingProcess_SendingDataRecordToLocalUDPServer(t *testing.T) {
 		// Compare only data record part. Remove message header and set header.
 		// TODO: Verify message header and set header through hardcoded byte values
 		buffCh <- buff[20:]
-		return
 	}()
 
 	// Create exporter using local server info
@@ -664,7 +662,6 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 		}
 		// Compare only template record part. Remove message header and set header.
 		buffCh <- buff[20:]
-		return
 	}()
 
 	// Create exporter using local server info

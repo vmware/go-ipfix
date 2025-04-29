@@ -864,7 +864,8 @@ func TestUnknownInformationElement(t *testing.T) {
 				record := records[0]
 				ies := record.GetOrderedElementList()
 
-				if mode == DecodingModeLenientKeepUnknown {
+				switch mode {
+				case DecodingModeLenientKeepUnknown:
 					require.Len(t, ies, 3)
 					// the unknown IE after decoding
 					ieWithValue := ies[1]
@@ -872,7 +873,7 @@ func TestUnknownInformationElement(t *testing.T) {
 					require.Equal(t, entities.NewInfoElement("", unknownID, entities.OctetArray, enterpriseID, 4), ieWithValue.GetInfoElement())
 					value := ieWithValue.GetOctetArrayValue()
 					assert.Equal(t, unknownValue, binary.BigEndian.Uint32(value))
-				} else if mode == DecodingModeLenientDropUnknown {
+				case DecodingModeLenientDropUnknown:
 					require.Len(t, ies, 2)
 				}
 			})

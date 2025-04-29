@@ -1034,7 +1034,7 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 	}
 	assert.Equal(t, int64(1), ap.GetNumFlows())
 	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
-	aggRecord, _ := ap.flowKeyRecordMap[*flowKey1]
+	aggRecord := ap.flowKeyRecordMap[*flowKey1]
 	item = ap.expirePriorityQueue.Peek()
 	assert.Equal(t, *aggRecord, *item.flowRecord)
 	assert.Equal(t, oldActiveExpiryTime, item.activeExpireTime)
@@ -1091,7 +1091,7 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 	}
 	assert.Equal(t, int64(1), ap.GetNumFlows())
 	assert.Equal(t, 1, ap.expirePriorityQueue.Len())
-	aggRecord, _ := ap.flowKeyRecordMap[*flowKey]
+	aggRecord := ap.flowKeyRecordMap[*flowKey]
 	item = ap.expirePriorityQueue.Peek()
 	assert.Equal(t, *aggRecord, *item.flowRecord)
 	assert.Equal(t, oldActiveExpiryTime, item.activeExpireTime)
