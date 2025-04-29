@@ -159,9 +159,10 @@ func InitCollectingProcess(input CollectorInput) (*CollectingProcess, error) {
 
 func (cp *CollectingProcess) Start() {
 	klog.Info("Starting the collecting process")
-	if cp.protocol == "tcp" {
+	switch cp.protocol {
+	case "tcp":
 		cp.startTCPServer()
-	} else if cp.protocol == "udp" {
+	case "udp":
 		cp.startUDPServer()
 	}
 }
@@ -260,8 +261,8 @@ func (cp *CollectingProcess) decodePacket(session *transportSession, packetBuffe
 	// handle IPv6 address which may involve []
 	portIndex := strings.LastIndex(exportAddress, ":")
 	exportAddress = exportAddress[:portIndex]
-	exportAddress = strings.Replace(exportAddress, "[", "", -1)
-	exportAddress = strings.Replace(exportAddress, "]", "", -1)
+	exportAddress = strings.ReplaceAll(exportAddress, "[", "")
+	exportAddress = strings.ReplaceAll(exportAddress, "]", "")
 	message.SetExportAddress(exportAddress)
 
 	// At the moment we assume exactly one set per IPFIX message.

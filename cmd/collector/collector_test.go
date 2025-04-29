@@ -136,20 +136,21 @@ func TestFlowRecordHandler(t *testing.T) {
 			}
 
 			contentType := resp.Header.Get("Content-type")
-			if format == "json" {
+			switch format {
+			case "json":
 				require.Equal(t, "application/json", contentType)
 				var data jsonResponse
 				err := json.Unmarshal(body, &data)
 				require.NoError(t, err, "Invalid JSON response")
 				assert.Equal(t, tc.expectedFlows, data.FlowRecords)
-			} else if format == "text" {
+			case "text":
 				require.Equal(t, "text/plain", contentType)
 				expectedFlows := ""
 				for _, flow := range tc.expectedFlows {
 					expectedFlows += flow.Data + string(flowTextSeparator)
 				}
 				assert.Equal(t, expectedFlows, string(body))
-			} else {
+			default:
 				require.FailNow(t, "Invalid format specified for test case")
 			}
 		})

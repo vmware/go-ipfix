@@ -3,10 +3,11 @@ GOPATH          ?= $$($(GO) env GOPATH)
 BINDIR          ?= $(CURDIR)/bin
 GOMOCK_VERSION         := v0.5.0
 PROTOC_GEN_GO_VERSION  := v1.28.1
-GOLANGCI_LINT_VERSION  := v1.60.3
+GOLANGCI_LINT_VERSION  := v2.1.5
 GOLANGCI_LINT_BINDIR   := .golangci-bin
 GOLANGCI_LINT_BIN      := $(GOLANGCI_LINT_BINDIR)/$(GOLANGCI_LINT_VERSION)/golangci-lint
 GO_FILES               := $(shell find . -type d -name '.cache' -prune -o -type f -name '*.go' -print)
+GO_VERSION             := $(shell head -n 1 build/deps/go-version)
 
 .PHONY: all
 all: collector consumer
@@ -71,12 +72,12 @@ consumer:
 .PHONY: docker-collector
 docker-collector:
 	@echo "===> Building antrea/ipfix-collector Docker image <==="
-	docker build --pull -t antrea/ipfix-collector -f build/images/Dockerfile.build.collector .
+	docker build --pull --build-arg GO_VERSION=$(GO_VERSION) -t antrea/ipfix-collector -f build/images/Dockerfile.build.collector .
 
 .PHONY: docker-consumer
 docker-consumer:
 	@echo "===> Building antrea/kafka-consumer Docker image <==="
-	docker build --pull -t antrea/kafka-consumer -f build/images/Dockerfile.build.consumer .
+	docker build --pull --build-arg GO_VERSION=$(GO_VERSION) -t antrea/kafka-consumer -f build/images/Dockerfile.build.consumer .
 
 .PHONY: manifest
 manifest:

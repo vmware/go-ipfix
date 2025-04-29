@@ -1,4 +1,5 @@
-FROM golang:1.23 as go-ipfix-build
+ARG GO_VERSION=latest
+FROM golang:${GO_VERSION} AS go-ipfix-build
 
 WORKDIR /go-ipfix
 

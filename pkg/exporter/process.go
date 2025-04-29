@@ -159,7 +159,8 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 	var err error
 	if input.TLSClientConfig != nil {
 		tlsConfig := input.TLSClientConfig
-		if input.CollectorProtocol == "tcp" { // use TLS
+		switch input.CollectorProtocol {
+		case "tcp": // use TLS
 			config, configErr := createClientConfig(tlsConfig)
 			if configErr != nil {
 				return nil, configErr
@@ -169,7 +170,7 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 				klog.Errorf("Cannot the create the tls connection to the Collector %s: %v", input.CollectorAddress, err)
 				return nil, err
 			}
-		} else if input.CollectorProtocol == "udp" { // use DTLS
+		case "udp": // use DTLS
 			// TODO: support client authentication
 			if len(tlsConfig.CertData) > 0 || len(tlsConfig.KeyData) > 0 {
 				klog.Error("Client-authentication is not supported yet for DTLS, cert and key data will be ignored")
@@ -559,7 +560,6 @@ func (ep *ExportingProcess) updateTemplate(id uint16, elements []entities.InfoEl
 	for i, elem := range elements {
 		ep.templatesMap[id].elements[i] = elem.GetInfoElement()
 	}
-	return
 }
 
 //nolint:unused // Keeping this function for reference.
