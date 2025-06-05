@@ -16,7 +16,7 @@ import (
 func (cp *CollectingProcess) startTCPServer() {
 	var listener net.Listener
 	if cp.isEncrypted { // use TLS
-		config, err := cp.createServerConfig()
+		config, err := cp.createServerTLSConfig()
 		if err != nil {
 			klog.Error(err)
 			return
@@ -133,7 +133,7 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	}
 }
 
-func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
+func (cp *CollectingProcess) createServerTLSConfig() (*tls.Config, error) {
 	cert, err := tls.X509KeyPair(cp.serverCert, cp.serverKey)
 	if err != nil {
 		return nil, err
@@ -153,12 +153,12 @@ func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
 	if cp.caCert == nil {
 		return tlsConfig, nil
 	}
-	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM(cp.caCert)
+	clientCAs := x509.NewCertPool()
+	ok := clientCAs.AppendCertsFromPEM(cp.caCert)
 	if !ok {
-		return nil, fmt.Errorf("failed to parse root certificate")
+		return nil, fmt.Errorf("failed to parse client CA certificate")
 	}
 	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
-	tlsConfig.ClientCAs = roots
+	tlsConfig.ClientCAs = clientCAs
 	return tlsConfig, nil
 }
