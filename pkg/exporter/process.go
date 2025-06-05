@@ -634,11 +634,6 @@ func (ep *ExportingProcess) dataRecSanityCheck(rec entities.Record) error {
 }
 
 func createClientConfig(config *ExporterTLSClientConfig) (*tls.Config, error) {
-	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM(config.CAData)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse root certificate")
-	}
 	tlsMinVersion := config.MinVersion
 	// This should already be the default value for tls.Config, but we duplicate the earlier
 	// implementation, which was explicitly setting it to 1.2.
@@ -648,18 +643,26 @@ func createClientConfig(config *ExporterTLSClientConfig) (*tls.Config, error) {
 	// #nosec G402: client is in charge of setting the min TLS version. We use 1.2 as the
 	// default, which is secure.
 	tlsConfig := &tls.Config{
-		RootCAs:      roots,
 		ServerName:   config.ServerName,
 		CipherSuites: config.CipherSuites,
 		MinVersion:   tlsMinVersion,
 	}
-	if config.CertData == nil {
-		return tlsConfig, nil
+	// Use system roots if config.CAData == nil.
+	if config.CAData != nil {
+		roots := x509.NewCertPool()
+		ok := roots.AppendCertsFromPEM(config.CAData)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse root certificate")
+		}
+		tlsConfig.RootCAs = roots
 	}
-	cert, err := tls.X509KeyPair(config.CertData, config.KeyData)
-	if err != nil {
-		return nil, err
+	// Don't use a client certificate if config.CertData == nil.
+	if config.CertData != nil {
+		cert, err := tls.X509KeyPair(config.CertData, config.KeyData)
+		if err != nil {
+			return nil, err
+		}
+		tlsConfig.Certificates = []tls.Certificate{cert}
 	}
-	tlsConfig.Certificates = []tls.Certificate{cert}
 	return tlsConfig, nil
 }
