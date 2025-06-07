@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Changed
+- Do not close the UDP connection to the collector if there are errors while sending (#427, @vlet)
 ## 0.15.0 06-11-2025
 ### Added
 - Support for more TLS config options in Collector and Exporter. (#423, @antoninbas)

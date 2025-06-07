@@ -302,11 +302,10 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 					klog.V(2).Info("Sending refreshed templates to the collector")
 					err := expProc.sendRefreshedTemplates()
 					if err != nil {
-						klog.Errorf("Error when sending refreshed templates, closing the connection to the collector: %v", err)
-						expProc.closeConnToCollector()
-						return
+						klog.Errorf("Error when sending refreshed templates: %v", err)
+					} else {
+						klog.V(2).Info("Sent refreshed templates to the collector")
 					}
-					klog.V(2).Info("Sent refreshed templates to the collector")
 				}
 			}
 		}()
