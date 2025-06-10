@@ -82,8 +82,8 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	doneCh := make(chan struct{})
 	cp.wg.Add(1)
 	// We read from the connection in a separate goroutine, so we can stop immediately when
-	// cp.StopChan is closed. An alternative would be to use a read deadline, and check
-	// cp.StopChan at every iteration.
+	// cp.stopChan is closed. An alternative would be to use a read deadline, and check
+	// cp.stopChan at every iteration.
 	go func() {
 		defer cp.wg.Done()
 		defer close(doneCh)
@@ -93,6 +93,13 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 			if errors.Is(err, io.EOF) {
 				klog.V(2).InfoS("Connection was closed by client")
 				return
+			}
+			// If cp.stopChan is closed, server was stopped and any error can be ignored.
+			select {
+			case <-cp.stopChan:
+				return
+			default:
+				break
 			}
 			if err != nil {
 				klog.ErrorS(err, "Error when retrieving message length")
