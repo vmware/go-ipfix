@@ -16,5 +16,12 @@ FROM ubuntu:24.04
 LABEL maintainer="go-ipfix"
 LABEL description="A Docker image based on Ubuntu which contains a IPFIX collector"
 
+# curl and jq are useful troubleshooting tools to access the ipfix-collector API
+# from inside the container.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    jq \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=go-ipfix-build /go-ipfix/bin/collector /usr/local/bin/
 ENTRYPOINT ["collector"]
