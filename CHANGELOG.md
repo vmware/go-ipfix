@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Changed
+- Do not close the UDP connection to the collector if there are errors while sending (@vlet)
 ## 0.14.0 03-24-2025
 ### Fixed
 - Fix Record length computation so that IPFIX UDP messages can be sized
