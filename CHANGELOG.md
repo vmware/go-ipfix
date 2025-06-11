@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.15.0 06-11-2025
+### Added
+- Support for more TLS config options in Collector and Exporter. (#423, @antoninbas)
+- Add curl and jq to ipfix-collector Docker image. (#429, @antoninbas)
+### Changed
+- Bump Go to 1.24. (#425, @antoninbas)
+### Fixed
+- Ignore Read error in TCP collector when server is closed. (#428, @antoninbas)
 ## 0.14.0 03-24-2025
 ### Fixed
 - Fix Record length computation so that IPFIX UDP messages can be sized
