@@ -52,8 +52,12 @@ var (
 	IPFIXPort      uint16
 	IPFIXTransport string
 	decodingMode   string
-	flowRecords    []*flowRecord
-	mutex          sync.Mutex
+	serverCertPath string
+	serverKeyPath  string
+	clientCAPath   string
+
+	flowRecords []*flowRecord
+	mutex       sync.Mutex
 
 	flowTextSeparator = bytes.Repeat([]byte("="), 80)
 
@@ -92,6 +96,9 @@ func addIPFIXFlags(fs *pflag.FlagSet) {
 	fs.Uint16Var(&IPFIXPort, "ipfix.port", 4739, "IPFIX collector port")
 	fs.StringVar(&IPFIXTransport, "ipfix.transport", "tcp", "IPFIX collector transport layer")
 	fs.StringVar(&decodingMode, "decoding-mode", string(collector.DecodingModeStrict), fmt.Sprintf("Decoding mode, must be one of %v", strings.Join(validDecodingModes, ",")))
+	fs.StringVar(&serverCertPath, "server-cert", "", "Path to server cert for the collector server")
+	fs.StringVar(&serverKeyPath, "server-key", "", "Path to private key for the collector server")
+	fs.StringVar(&clientCAPath, "client-ca", "", "Path to CA cert for clients (exporters)")
 }
 
 func addIPFIXMessage(msg *entities.Message, buf *bytes.Buffer) {
@@ -197,21 +204,48 @@ func signalHandler(stopCh chan struct{}, messageReceived chan *entities.Message)
 
 func run() error {
 	klog.Info("Starting IPFIX collector")
+
 	// Load the IPFIX global registry
 	registry.LoadRegistry()
-	// Initialize collecting process
+
+	// Validate flags
 	if !slices.Contains(validDecodingModes, decodingMode) {
 		return fmt.Errorf("not a valid decoding mode: %s", decodingMode)
 	}
+	if (serverCertPath != "" && serverKeyPath == "") || (serverCertPath == "" && serverKeyPath != "") {
+		return fmt.Errorf("--server-cert and --server-key must be provided together")
+	}
+	if clientCAPath != "" && serverCertPath == "" {
+		return fmt.Errorf("--client-ca cannot be provided without --server-cert / --server-key")
+	}
+
+	// Initialize collecting process
 	cpInput := collector.CollectorInput{
 		Address:       IPFIXAddr + ":" + strconv.Itoa(int(IPFIXPort)),
 		Protocol:      IPFIXTransport,
 		MaxBufferSize: 65535,
 		TemplateTTL:   0,
-		IsEncrypted:   false,
-		ServerCert:    nil,
-		ServerKey:     nil,
 		DecodingMode:  collector.DecodingMode(decodingMode),
+	}
+	if serverCertPath != "" {
+		cpInput.IsEncrypted = true
+		serverCert, err := os.ReadFile(serverCertPath)
+		if err != nil {
+			return fmt.Errorf("failed to read server certificate %q: %w", serverCertPath, err)
+		}
+		cpInput.ServerCert = serverCert
+		serverKey, err := os.ReadFile(serverKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to read server private key %q: %w", serverKeyPath, err)
+		}
+		cpInput.ServerKey = serverKey
+	}
+	if clientCAPath != "" {
+		clientCA, err := os.ReadFile(clientCAPath)
+		if err != nil {
+			return fmt.Errorf("failed to read client CA certificate %q: %w", clientCAPath, err)
+		}
+		cpInput.CACert = clientCA
 	}
 	cp, err := collector.InitCollectingProcess(cpInput)
 	if err != nil {

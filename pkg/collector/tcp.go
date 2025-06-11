@@ -16,7 +16,7 @@ import (
 func (cp *CollectingProcess) startTCPServer() {
 	var listener net.Listener
 	if cp.isEncrypted { // use TLS
-		config, err := cp.createServerConfig()
+		config, err := cp.createServerTLSConfig()
 		if err != nil {
 			klog.Error(err)
 			return
@@ -140,26 +140,32 @@ func (cp *CollectingProcess) handleTCPClient(conn net.Conn) {
 	}
 }
 
-func (cp *CollectingProcess) createServerConfig() (*tls.Config, error) {
+func (cp *CollectingProcess) createServerTLSConfig() (*tls.Config, error) {
 	cert, err := tls.X509KeyPair(cp.serverCert, cp.serverKey)
 	if err != nil {
 		return nil, err
 	}
-	if cp.caCert == nil {
-		return &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
-		}, nil
+	tlsMinVersion := cp.tlsMinVersion
+	// This should already be the default value for tls.Config, but we duplicate the earlier
+	// implementation, which was explicitly setting it to 1.2.
+	if tlsMinVersion == 0 {
+		tlsMinVersion = tls.VersionTLS12
 	}
-	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM(cp.caCert)
-	if !ok {
-		return nil, fmt.Errorf("failed to parse root certificate")
-	}
-	return &tls.Config{
+	// #nosec G402: client is in charge of setting the min TLS version. We use 1.2 as the
+	// default, which is secure.
+	tlsConfig := &tls.Config{
 		Certificates: []tls.Certificate{cert},
-		ClientAuth:   tls.RequireAndVerifyClientCert,
-		ClientCAs:    roots,
-		MinVersion:   tls.VersionTLS12,
-	}, nil
+		MinVersion:   tlsMinVersion,
+	}
+	if cp.caCert == nil {
+		return tlsConfig, nil
+	}
+	clientCAs := x509.NewCertPool()
+	ok := clientCAs.AppendCertsFromPEM(cp.caCert)
+	if !ok {
+		return nil, fmt.Errorf("failed to parse client CA certificate")
+	}
+	tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+	tlsConfig.ClientCAs = clientCAs
+	return tlsConfig, nil
 }
