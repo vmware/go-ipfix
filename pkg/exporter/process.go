@@ -176,8 +176,7 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			}
 			conn, err = tls.Dial(input.CollectorProtocol, input.CollectorAddress, config)
 			if err != nil {
-				klog.Errorf("Cannot the create the tls connection to the Collector %s: %v", input.CollectorAddress, err)
-				return nil, err
+				return nil, fmt.Errorf("cannot create the TLS connection to the Collector %q: %w", input.CollectorAddress, err)
 			}
 		case "udp": // use DTLS
 			// TODO: support client authentication
@@ -209,15 +208,13 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 			}
 			conn, err = dtls.Dial(udpAddr.Network(), udpAddr, config)
 			if err != nil {
-				klog.Errorf("Cannot the create the dtls connection to the Collector %s: %v", udpAddr.String(), err)
-				return nil, err
+				return nil, fmt.Errorf("cannot create the DTLS connection to the Collector %q: %w", udpAddr.String(), err)
 			}
 		}
 	} else {
 		conn, err = net.Dial(input.CollectorProtocol, input.CollectorAddress)
 		if err != nil {
-			klog.Errorf("Cannot the create the connection to the Collector %s: %v", input.CollectorAddress, err)
-			return nil, err
+			return nil, fmt.Errorf("cannot create the connection to the Collector %q: %w", input.CollectorAddress, err)
 		}
 	}
 	var isIPv6 bool
