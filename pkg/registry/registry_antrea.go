@@ -80,4 +80,13 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("httpVals", 156, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressNodeName", 157, 13, 56506, 65535), 56506)
 	registerInfoElement(*entities.NewInfoElement("clusterId", 158, 13, 56506, 65535), 56506)
+	registerInfoElement(*entities.NewInfoElement("sourcePodUUID", 159, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("destinationPodUUID", 160, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("sourceNodeUUID", 161, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("destinationNodeUUID", 162, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("destinationServiceUUID", 163, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("ingressNetworkPolicyUUID", 164, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyUUID", 165, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("egressUUID", 166, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("egressNodeUUID", 167, 0, 56506, 16), 56506)
 }
