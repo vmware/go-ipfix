@@ -296,6 +296,15 @@ func InitExportingProcess(input ExporterInput) (*ExportingProcess, error) {
 				case <-expProc.stopCh:
 					return
 				case <-ticker.C:
+					// Dial again (e.g. host name resolving to a different IP)
+					klog.V(2).Info("Refreshing connection")
+					conn, err = net.Dial(input.CollectorProtocol, input.CollectorAddress)
+					if err != nil {
+						klog.Errorf("Cannot connect to the collector %s: %v", input.CollectorAddress, err)
+					} else {
+						expProc.connToCollector = conn
+					}
+
 					klog.V(2).Info("Sending refreshed templates to the collector")
 					err := expProc.sendRefreshedTemplates()
 					if err != nil {
