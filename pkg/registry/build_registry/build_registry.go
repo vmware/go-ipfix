@@ -75,7 +75,7 @@ func loadIANARegistry() {
 		}
 
 		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
-		parameters := generateIEString(row[1], row[0], row[2], "0")
+		parameters := generateIEString(row[1], row[0], row[2], "0", "")
 		fmt.Fprintf(writer, parameters)
 		writer.WriteString("), ")
 		fmt.Fprintf(writer, fmt.Sprint(registry.IANAEnterpriseID))
@@ -126,7 +126,7 @@ func loadAntreaRegistry() {
 		}
 
 		writer.WriteString("	registerInfoElement(*entities.NewInfoElement(")
-		parameters := generateIEString(row[1], row[0], row[2], row[12])
+		parameters := generateIEString(row[1], row[0], row[2], row[12], row[13])
 		fmt.Fprintf(writer, parameters)
 		writer.WriteString("), ")
 		fmt.Fprintf(writer, fmt.Sprint(registry.AntreaEnterpriseID))
@@ -164,11 +164,17 @@ func readCSVFromFile(name string) ([][]string, error) {
 	return data, nil
 }
 
-func generateIEString(name string, elementid string, datatype string, enterpriseid string) string {
+func generateIEString(name string, elementid string, datatype string, enterpriseid string, lengthStr string) string {
 	elementID, _ := strconv.ParseUint(elementid, 10, 16)
 	enterpriseID, _ := strconv.ParseUint(enterpriseid, 10, 16)
 	dataType := entities.IENameToType(datatype)
-	length := entities.InfoElementLength[dataType]
+	var length uint16
+	if lengthStr == "" || lengthStr == "0" {
+		length = entities.InfoElementLength[dataType]
+	} else {
+		l, _ := strconv.ParseUint(lengthStr, 10, 16)
+		length = uint16(l)
+	}
 	return fmt.Sprintf("\"%s\", %d, %v, %d, %d", name, uint16(elementID), dataType, uint16(enterpriseID), length)
 }
 
