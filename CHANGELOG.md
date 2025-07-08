@@ -4,8 +4,13 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.16.0 07-08-2025
+### Added
+- Add new IEs for K8s object UUIDs to Antrea registry. (#433, @antoninbas)
 ### Changed
-- Do not close the UDP connection to the collector if there are errors while sending (#427, @vlet)
+- Do not close the UDP connection to the collector if there are errors while sending. (#427, @vlet)
+### Fixed
+- Remove some unnecessary error logs with typo. (#432, @antoninbas)
 ## 0.15.0 06-11-2025
 ### Added
 - Support for more TLS config options in Collector and Exporter. (#423, @antoninbas)
