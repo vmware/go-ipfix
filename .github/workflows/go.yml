@@ -14,7 +14,7 @@ jobs:
     name: Get Go version for use by other jobs
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
       with:
         show-progress: false
     - name: Read build/deps/go-version
@@ -30,7 +30,7 @@ jobs:
     steps:
 
     - name: Check-out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -56,7 +56,7 @@ jobs:
     steps:
 
     - name: Check-out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -82,7 +82,7 @@ jobs:
     steps:
 
     - name: Check-out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -105,7 +105,7 @@ jobs:
     steps:
 
     - name: Check-out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -123,7 +123,7 @@ jobs:
     steps:
 
       - name: Check-out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Go
         uses: actions/setup-go@v5
