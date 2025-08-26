@@ -190,7 +190,9 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 	}
 
+	doneCh := make(chan struct{})
 	go func() {
+		defer close(doneCh)
 		// template packate
 		<-cp.GetMsgChan()
 		// data packet
@@ -202,7 +204,14 @@ func TestTCPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 
 	// Check if connection has closed properly or not by trying to write to it.
 	assert.EventuallyWithT(t, func(t *assert.CollectT) {
-		_, err = conn.Write(validDataPacket)
+		select {
+		case <-doneCh:
+			break
+		default:
+			assert.Fail(t, "Collector process not stopped yet")
+			return
+		}
+		_, err := conn.Write(validDataPacket)
 		assert.Error(t, err)
 	}, 100*time.Millisecond, 10*time.Millisecond)
 	conn.Close()
@@ -294,7 +303,9 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 		t.Errorf("UDP Collecting Process does not start correctly.")
 	}
 
+	doneCh := make(chan struct{})
 	go func() {
+		defer close(doneCh)
 		// template packate
 		<-cp.GetMsgChan()
 		// data packet
@@ -307,7 +318,14 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 	// after the 2 packets are processed, the goroutine started above will stop the collector,
 	// which should close the UDP socket. Eventually, calling Write should fail.
 	assert.EventuallyWithT(t, func(t *assert.CollectT) {
-		_, err = conn.Write(validDataPacket)
+		select {
+		case <-doneCh:
+			break
+		default:
+			assert.Fail(t, "Collector process not stopped yet")
+			return
+		}
+		_, err := conn.Write(validDataPacket)
 		assert.Error(t, err)
 	}, 100*time.Millisecond, 10*time.Millisecond)
 	conn.Close()
