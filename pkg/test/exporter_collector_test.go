@@ -116,12 +116,12 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	}
 	if isEncrypted {
 		if address.Network() == "tcp" {
-			cpInput.CACert = []byte(testcerts.FakeCACert)
-			cpInput.ServerCert = []byte(testcerts.FakeCert)
-			cpInput.ServerKey = []byte(testcerts.FakeKey)
+			cpInput.CACert = testcerts.FakeCACert
+			cpInput.ServerCert = testcerts.FakeCert
+			cpInput.ServerKey = testcerts.FakeKey
 		} else if address.Network() == "udp" {
-			cpInput.ServerCert = []byte(testcerts.FakeCert2)
-			cpInput.ServerKey = []byte(testcerts.FakeKey2)
+			cpInput.ServerCert = testcerts.FakeCert2
+			cpInput.ServerKey = testcerts.FakeKey2
 		}
 	}
 	cp, _ := collector.InitCollectingProcess(cpInput)
@@ -139,11 +139,11 @@ func testExporterToCollector(address net.Addr, isSrcNode, isIPv6 bool, isMultipl
 	if isEncrypted {
 		tlsClientConfig := &exporter.ExporterTLSClientConfig{}
 		if address.Network() == "tcp" { // use TLS
-			tlsClientConfig.CAData = []byte(testcerts.FakeCACert)
-			tlsClientConfig.CertData = []byte(testcerts.FakeClientCert)
-			tlsClientConfig.KeyData = []byte(testcerts.FakeClientKey)
+			tlsClientConfig.CAData = testcerts.FakeCACert
+			tlsClientConfig.CertData = testcerts.FakeClientCert
+			tlsClientConfig.KeyData = testcerts.FakeClientKey
 		} else if address.Network() == "udp" { // use DTLS
-			tlsClientConfig.CAData = []byte(testcerts.FakeCert2)
+			tlsClientConfig.CAData = testcerts.FakeCert2
 		}
 		epInput.TLSClientConfig = tlsClientConfig
 	}
