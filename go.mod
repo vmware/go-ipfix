@@ -6,7 +6,7 @@ require (
 	github.com/IBM/sarama v1.45.1
 	github.com/pion/dtls/v2 v2.2.12
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.7
+	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.0
 	go.uber.org/mock v0.5.0
 	google.golang.org/protobuf v1.36.8
