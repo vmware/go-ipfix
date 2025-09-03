@@ -39,7 +39,7 @@ func TestInitKafkaProducerWithTLS(t *testing.T) {
 	doListenerTLSTest(t, serverTLSConfig, testcerts.FakeCACert, testcerts.FakeClientCert, testcerts.FakeClientKey)
 }
 
-func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, clientCert, clientKey string) {
+func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, clientCert, clientKey []byte) {
 	seedListener, err := tls.Listen("tcp", "127.0.0.1:0", serverTLSConfig)
 	if err != nil {
 		t.Fatal("cannot open listener", err)
@@ -79,15 +79,13 @@ func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, client
 	kafkaProducer.Close()
 }
 
-func createTmpFileAndWrite(t *testing.T, content, pattern string) *os.File {
+func createTmpFileAndWrite(t *testing.T, content []byte, pattern string) *os.File {
 	tmpFile, err := os.CreateTemp("", pattern)
 	if err != nil {
 		t.Fatal("Cannot create temporary file", err)
 	}
 
-	// Example writing to the file
-	text := []byte(content)
-	if _, err = tmpFile.Write(text); err != nil {
+	if _, err = tmpFile.Write(content); err != nil {
 		t.Fatal("Failed to write to temporary file", err)
 	}
 

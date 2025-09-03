@@ -711,11 +711,11 @@ func TestTLSCollectingProcess(t *testing.T) {
 
 	collectorAddr := cp.GetAddress()
 	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCACert))
+	ok := roots.AppendCertsFromPEM(testcerts.FakeCACert)
 	if !ok {
 		t.Error("Failed to parse root certificate")
 	}
-	cert, err := tls.X509KeyPair([]byte(testcerts.FakeClientCert), []byte(testcerts.FakeClientKey))
+	cert, err := tls.X509KeyPair(testcerts.FakeClientCert, testcerts.FakeClientKey)
 	if err != nil {
 		t.Error(err)
 	}
@@ -756,7 +756,7 @@ func TestDTLSCollectingProcess(t *testing.T) {
 
 	collectorAddr, _ := net.ResolveUDPAddr("udp", cp.GetAddress().String())
 	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM([]byte(testcerts.FakeCert2))
+	ok := roots.AppendCertsFromPEM(testcerts.FakeCert2)
 	if !ok {
 		t.Error("Failed to parse root certificate")
 	}
@@ -914,9 +914,9 @@ func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorI
 				MaxBufferSize: 1024,
 				TemplateTTL:   0,
 				IsEncrypted:   true,
-				CACert:        []byte(testcerts.FakeCACert),
-				ServerCert:    []byte(testcerts.FakeCert),
-				ServerKey:     []byte(testcerts.FakeKey),
+				CACert:        testcerts.FakeCACert,
+				ServerCert:    testcerts.FakeCert,
+				ServerKey:     testcerts.FakeKey,
 			}
 		} else {
 			return CollectorInput{
@@ -939,8 +939,8 @@ func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorI
 				MaxBufferSize: 1024,
 				TemplateTTL:   0,
 				IsEncrypted:   true,
-				ServerCert:    []byte(testcerts.FakeCert2),
-				ServerKey:     []byte(testcerts.FakeKey2),
+				ServerCert:    testcerts.FakeCert2,
+				ServerKey:     testcerts.FakeKey2,
 			}
 		} else {
 			return CollectorInput{

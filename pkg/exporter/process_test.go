@@ -495,7 +495,7 @@ func TestInitExportingProcessWithTLS(t *testing.T) {
 			// Create local server for testing
 			address, err := net.ResolveTCPAddr("tcp", "127.0.0.1:0")
 			require.NoError(t, err)
-			serverCertData, serverKeyData, err := testcerts.GenerateServerCert(caCert, caKey, tc.serverCertOptions...)
+			serverCertData, serverKeyData, err := testcerts.GenerateServerCert(caCert, caKey, false /* RSA */, tc.serverCertOptions...)
 			require.NoError(t, err, "Error when generating server cert")
 			serverCert, err := tls.X509KeyPair(serverCertData, serverKeyData)
 			require.NoError(t, err)
@@ -558,7 +558,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error when resolving tcp address: %v", err)
 	}
-	cer, err := tls.X509KeyPair([]byte(testcerts.FakeCert), []byte(testcerts.FakeKey))
+	cer, err := tls.X509KeyPair(testcerts.FakeCert, testcerts.FakeKey)
 	if err != nil {
 		t.Error(err)
 		return
@@ -585,7 +585,7 @@ func TestExportingProcessWithTLS(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		TLSClientConfig: &ExporterTLSClientConfig{
-			CAData:     []byte(testcerts.FakeCACert),
+			CAData:     testcerts.FakeCACert,
 			ServerName: "127.0.0.1",
 		},
 	}
@@ -631,7 +631,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Got error when resolving udp address: %v", err)
 	}
-	cert, err := tls.X509KeyPair([]byte(testcerts.FakeCert2), []byte(testcerts.FakeKey2))
+	cert, err := tls.X509KeyPair(testcerts.FakeCert2, testcerts.FakeKey2)
 	if err != nil {
 		t.Error(err)
 		return
@@ -671,7 +671,7 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 		ObservationDomainID: 1,
 		TempRefTimeout:      0,
 		TLSClientConfig: &ExporterTLSClientConfig{
-			CAData: []byte(testcerts.FakeCert2),
+			CAData: testcerts.FakeCert2,
 		},
 	}
 	exporter, err := InitExportingProcess(input)
