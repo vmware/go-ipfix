@@ -9,7 +9,7 @@ jobs:
   build-ipfix-collector:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Build go-ipfix Docker images and push to Antrea Docker registry
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -23,7 +23,7 @@ jobs:
   build-kafka-collector:
     runs-on: [ubuntu-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Build kafka-consumer Docker images and push to Antrea Docker registry
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
