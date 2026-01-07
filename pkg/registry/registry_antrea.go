@@ -89,4 +89,9 @@ func loadAntreaRegistry() {
 	registerInfoElement(*entities.NewInfoElement("egressNetworkPolicyUUID", 165, 0, 56506, 16), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressUUID", 166, 0, 56506, 16), 56506)
 	registerInfoElement(*entities.NewInfoElement("egressNodeUUID", 167, 0, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("destinationServiceIPv4", 168, 18, 56506, 4), 56506)
+	registerInfoElement(*entities.NewInfoElement("destinationServiceIPv6", 169, 19, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("proxySnatIPv4", 170, 18, 56506, 4), 56506)
+	registerInfoElement(*entities.NewInfoElement("proxySnatIPv6", 171, 19, 56506, 16), 56506)
+	registerInfoElement(*entities.NewInfoElement("proxySnatPort", 172, 2, 56506, 2), 56506)
 }

@@ -67,3 +67,8 @@ ElementID,Name,Abstract Data Type,Data Type Semantics,Status,Description,Units,R
 165,egressNetworkPolicyUUID,octetArray,,current,,,,,,,,56506,16,
 166,egressUUID,octetArray,,current,,,,,,,,56506,16,
 167,egressNodeUUID,octetArray,,current,,,,,,,,56506,16,
+168,destinationServiceIPv4,ipv4Address,,current,,,,,,,,56506,,
+169,destinationServiceIPv6,ipv6Address,,current,,,,,,,,56506,,
+170,proxySnatIPv4,ipv4Address,,current,,,,,,,,56506,,
+171,proxySnatIPv6,ipv6Address,,current,,,,,,,,56506,,
+172,proxySnatPort,unsigned16,,current,,,,,,,,56506,,
