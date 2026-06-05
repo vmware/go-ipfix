@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.17.0 06-16-2026
+### Added
+- Add new IEs for External-to-Pod flow support to Antrea registry. (#458, @petertran-avgo)
 ## 0.16.0 07-08-2025
 ### Added
 - Add new IEs for K8s object UUIDs to Antrea registry. (#433, @antoninbas)
