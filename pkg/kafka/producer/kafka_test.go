@@ -47,9 +47,11 @@ func doListenerTLSTest(t *testing.T, serverTLSConfig *tls.Config, caCert, client
 	seedBroker := sarama.NewMockBrokerListener(t, 1, seedListener)
 	defer seedBroker.Close()
 
-	metadataResponse := new(sarama.MetadataResponse)
-	metadataResponse.AddBroker(seedBroker.Addr(), seedBroker.BrokerID())
-	seedBroker.Returns(metadataResponse)
+	seedBroker.SetHandlerByMap(map[string]sarama.MockResponse{
+		"ApiVersionsRequest": sarama.NewMockApiVersionsResponse(t),
+		"MetadataRequest": sarama.NewMockMetadataResponse(t).
+			SetBroker(seedBroker.Addr(), seedBroker.BrokerID()),
+	})
 
 	caCertFile := createTmpFileAndWrite(t, testcerts.FakeCACert, "ca-")
 	certFile := createTmpFileAndWrite(t, testcerts.FakeClientCert, "clientCert-")
