@@ -1,9 +1,9 @@
 GO              ?= go
 GOPATH          ?= $$($(GO) env GOPATH)
 BINDIR          ?= $(CURDIR)/bin
-GOMOCK_VERSION         := v0.5.0
+GOMOCK_VERSION         := v0.6.0
 PROTOC_GEN_GO_VERSION  := v1.28.1
-GOLANGCI_LINT_VERSION  := v2.1.5
+GOLANGCI_LINT_VERSION  := v2.12.2
 GOLANGCI_LINT_BINDIR   := .golangci-bin
 GOLANGCI_LINT_BIN      := $(GOLANGCI_LINT_BINDIR)/$(GOLANGCI_LINT_VERSION)/golangci-lint
 GO_FILES               := $(shell find . -type d -name '.cache' -prune -o -type f -name '*.go' -print)
@@ -45,7 +45,7 @@ test-integration: .coverage
 $(GOLANGCI_LINT_BIN):
 	@echo "===> Installing Golangci-lint <==="
 	@rm -rf $(GOLANGCI_LINT_BINDIR)/* # delete old versions
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOLANGCI_LINT_BINDIR)/$(GOLANGCI_LINT_VERSION) $(GOLANGCI_LINT_VERSION)
+	@curl -sSfL https://golangci-lint.run/install.sh | sh -s -- -b $(GOLANGCI_LINT_BINDIR)/$(GOLANGCI_LINT_VERSION) $(GOLANGCI_LINT_VERSION)
 
 .PHONY: golangci
 golangci: $(GOLANGCI_LINT_BIN)
