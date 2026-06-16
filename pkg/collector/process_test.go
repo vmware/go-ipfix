@@ -355,8 +355,11 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 		if err != nil {
 			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
 		}
-		time.Sleep(time.Millisecond)
-		assert.GreaterOrEqual(t, cp.GetNumConnToCollector(), int64(2), "There should be at least two tcp clients.")
+		// Poll until both connections are registered by the collector's accept loop,
+		// rather than relying on a fixed sleep that can be too short on slow CI runners.
+		assert.Eventually(t, func() bool {
+			return cp.GetNumConnToCollector() >= 2
+		}, 500*time.Millisecond, 10*time.Millisecond, "There should be at least two tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
