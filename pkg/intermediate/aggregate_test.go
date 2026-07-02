@@ -38,6 +38,8 @@ var (
 		"destinationNodeName",
 		"destinationClusterIPv4",
 		"destinationClusterIPv6",
+		"destinationServiceIPv4",
+		"destinationServiceIPv6",
 		"destinationServicePort",
 		"ingressNetworkPolicyRuleAction",
 		"egressNetworkPolicyRuleAction",
@@ -114,15 +116,17 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	ie6 := entities.NewStringInfoElement(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), "")
 	ie7 := entities.NewStringInfoElement(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), "")
 	ie9 := entities.NewUnsigned16InfoElement(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), 0)
-	var ie1, ie2, ie8 entities.InfoElementWithValue
+	var ie1, ie2, ie8, ie19 entities.InfoElementWithValue
 	if !isIPv6 {
 		ie1 = entities.NewIPAddressInfoElement(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), nil)
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), nil)
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), nil)
+		ie19 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationServiceIPv4", 168, 18, registry.AntreaEnterpriseID, 4), nil)
 	} else {
 		ie1 = entities.NewIPAddressInfoElement(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), nil)
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), nil)
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), nil)
+		ie19 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationServiceIPv6", 169, 19, registry.AntreaEnterpriseID, 16), nil)
 	}
 	ie10 := entities.NewDateTimeSecondsInfoElement(entities.NewInfoElement("flowEndSeconds", 151, 14, 0, 4), 0)
 	ie11 := entities.NewUnsigned8InfoElement(entities.NewInfoElement("flowType", 137, 1, registry.AntreaEnterpriseID, 1), 0)
@@ -130,7 +134,7 @@ func createMsgwithTemplateSet(isIPv6 bool) *entities.Message {
 	ie13 := entities.NewUnsigned8InfoElement(entities.NewInfoElement("egressNetworkPolicyRuleAction", 140, 1, registry.AntreaEnterpriseID, 1), 0)
 	ie14 := entities.NewSigned32InfoElement(entities.NewInfoElement("ingressNetworkPolicyRulePriority", 116, 7, registry.AntreaEnterpriseID, 4), 0)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie19)
 	set.AddRecord(elements, 256)
 
 	message := entities.NewMessage(true)
@@ -166,15 +170,17 @@ func createDataMsgForSrc(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie6 := entities.NewStringInfoElement(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), srcPod)
 	ie7 := entities.NewStringInfoElement(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), dstPod)
 	ie9 := entities.NewUnsigned16InfoElement(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), uint16(4739))
-	var ie1, ie2, ie8, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17, ie18 entities.InfoElementWithValue
+	var ie1, ie2, ie8, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17, ie18, ie19 entities.InfoElementWithValue
 	if !isIPv6 {
 		ie1 = entities.NewIPAddressInfoElement(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), net.ParseIP("10.0.0.1").To4())
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), net.ParseIP("10.0.0.2").To4())
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), net.ParseIP("192.168.0.1").To4())
+		ie19 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationServiceIPv4", 168, 18, registry.AntreaEnterpriseID, 4), net.ParseIP("192.168.0.1").To4())
 	} else {
 		ie1 = entities.NewIPAddressInfoElement(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFB"))
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), net.ParseIP("2001:0:3238:DFE1:63::FEFC"))
 		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
+		ie19 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationServiceIPv6", 169, 19, registry.AntreaEnterpriseID, 16), net.ParseIP("2001:0:3238:BBBB:63::AAAA"))
 	}
 	tmpFlowStartSecs, _ := registry.GetInfoElement("flowStartSeconds", registry.IANAEnterpriseID)
 	tmpFlowEndSecs, _ := registry.GetInfoElement("flowEndSeconds", registry.IANAEnterpriseID)
@@ -213,7 +219,7 @@ func createDataMsgForSrc(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedR
 	}
 	ie17 = entities.NewDateTimeSecondsInfoElement(tmpFlowStartSecs, uint32(0))
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17, ie18)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17, ie18, ie19)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -270,7 +276,7 @@ func createDataMsgForDst(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedR
 	set := entities.NewSet(true)
 	set.PrepareSet(entities.Data, testTemplateID)
 	elements := make([]entities.InfoElementWithValue, 0)
-	var srcAddr, dstAddr, svcAddr []byte
+	var srcAddr, dstAddr, dstServiceIP []byte
 	var flowStartTime, flowEndTime uint32
 	var flowEndReason, ingressNetworkPolicyRuleAction, antreaFlowType uint8
 	var srcPod, dstPod, tcpState, httpVals string
@@ -302,25 +308,27 @@ func createDataMsgForDst(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedR
 	ie6 := entities.NewStringInfoElement(entities.NewInfoElement("sourcePodName", 101, 13, registry.AntreaEnterpriseID, 65535), srcPod)
 	ie7 := entities.NewStringInfoElement(entities.NewInfoElement("destinationPodName", 103, 13, registry.AntreaEnterpriseID, 65535), dstPod)
 	ie9 := entities.NewUnsigned16InfoElement(entities.NewInfoElement("destinationServicePort", 107, 2, registry.AntreaEnterpriseID, 2), svcPort)
-	var ie1, ie2, ie8, ie11 entities.InfoElementWithValue
+	var ie1, ie2, ie8, ie11, ie19 entities.InfoElementWithValue
 	if !isIPv6 {
 		srcAddr = net.ParseIP("10.0.0.1").To4()
 		dstAddr = net.ParseIP("10.0.0.2").To4()
-		svcAddr = net.ParseIP("0.0.0.0").To4()
+		dstServiceIP = net.ParseIP("0.0.0.0").To4()
 		ie1 = entities.NewIPAddressInfoElement(entities.NewInfoElement("sourceIPv4Address", 8, 18, 0, 4), srcAddr)
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv4Address", 12, 18, 0, 4), dstAddr)
-		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), svcAddr)
+		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv4", 106, 18, registry.AntreaEnterpriseID, 4), dstServiceIP)
+		ie19 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationServiceIPv4", 168, 18, registry.AntreaEnterpriseID, 4), dstServiceIP)
 	} else {
 		srcAddr = net.ParseIP("2001:0:3238:DFE1:63::FEFB")
 		dstAddr = net.ParseIP("2001:0:3238:DFE1:63::FEFC")
 		if !isIntraNode {
-			svcAddr = net.ParseIP("::0")
+			dstServiceIP = net.ParseIP("::0")
 		} else {
-			svcAddr = net.ParseIP("2001:0:3238:BBBB:63::AAAA")
+			dstServiceIP = net.ParseIP("2001:0:3238:BBBB:63::AAAA")
 		}
 		ie1 = entities.NewIPAddressInfoElement(entities.NewInfoElement("sourceIPv6Address", 8, 19, 0, 16), srcAddr)
 		ie2 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationIPv6Address", 12, 19, 0, 16), dstAddr)
-		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), svcAddr)
+		ie8 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationClusterIPv6", 106, 19, registry.AntreaEnterpriseID, 16), dstServiceIP)
+		ie19 = entities.NewIPAddressInfoElement(entities.NewInfoElement("destinationServiceIPv6", 169, 19, registry.AntreaEnterpriseID, 16), dstServiceIP)
 	}
 	flowStartTime = uint32(0)
 	if !isUpdatedRecord {
@@ -354,7 +362,7 @@ func createDataMsgForDst(t testing.TB, isIPv6 bool, isIntraNode bool, isUpdatedR
 	tmpElement, _ = registry.GetInfoElement("httpVals", registry.AntreaEnterpriseID)
 	ie18 := entities.NewStringInfoElement(tmpElement, httpVals)
 
-	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17, ie18)
+	elements = append(elements, ie1, ie2, ie3, ie4, ie5, ie6, ie7, ie8, ie9, ie10, ie11, ie12, ie13, ie14, ie15, ie16, ie17, ie18, ie19)
 	// Add all elements in statsElements.
 	for _, element := range statsElementList {
 		var e *entities.InfoElement
@@ -797,10 +805,12 @@ func assertElementMap(t *testing.T, record map[string]interface{}, ipv6 bool) {
 		assert.Equal(t, net.ParseIP("2001:0:3238:dfe1:63::fefb"), record["sourceIPv6Address"])
 		assert.Equal(t, net.ParseIP("2001:0:3238:dfe1:63::fefc"), record["destinationIPv6Address"])
 		assert.Equal(t, net.ParseIP("2001:0:3238:bbbb:63::aaaa"), record["destinationClusterIPv6"])
+		assert.Equal(t, net.ParseIP("2001:0:3238:bbbb:63::aaaa"), record["destinationServiceIPv6"])
 	} else {
 		assert.Equal(t, net.ParseIP("10.0.0.1").To4(), record["sourceIPv4Address"])
 		assert.Equal(t, net.ParseIP("10.0.0.2").To4(), record["destinationIPv4Address"])
 		assert.Equal(t, net.ParseIP("192.168.0.1").To4(), record["destinationClusterIPv4"])
+		assert.Equal(t, net.ParseIP("192.168.0.1").To4(), record["destinationServiceIPv4"])
 	}
 	assert.Equal(t, uint16(1234), record["sourceTransportPort"])
 	assert.Equal(t, uint16(5678), record["destinationTransportPort"])
@@ -1059,8 +1069,12 @@ func runCorrelationAndCheckResult(t *testing.T, ap *AggregationProcess, record1,
 		if !isIPv6 {
 			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
 			assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.GetIPAddressValue())
+			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServiceIPv4")
+			assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.GetIPAddressValue())
 		} else {
 			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv6")
+			assert.Equal(t, net.ParseIP("2001:0:3238:BBBB:63::AAAA"), ieWithValue.GetIPAddressValue())
+			ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServiceIPv6")
 			assert.Equal(t, net.ParseIP("2001:0:3238:BBBB:63::AAAA"), ieWithValue.GetIPAddressValue())
 		}
 		ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
@@ -1103,6 +1117,8 @@ func runAggregationAndCheckResult(t *testing.T, ap *AggregationProcess, srcRecor
 	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationPodName")
 	assert.Equal(t, "pod2", ieWithValue.GetStringValue())
 	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationClusterIPv4")
+	assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.GetIPAddressValue())
+	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServiceIPv4")
 	assert.Equal(t, net.ParseIP("192.168.0.1").To4(), ieWithValue.GetIPAddressValue())
 	ieWithValue, _, _ = aggRecord.Record.GetInfoElementWithValue("destinationServicePort")
 	assert.Equal(t, uint16(4739), ieWithValue.GetUnsigned16Value())

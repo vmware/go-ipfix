@@ -47,6 +47,8 @@ var (
 		"destinationNodeName",
 		"destinationClusterIPv4",
 		"destinationClusterIPv6",
+		"destinationServiceIPv4",
+		"destinationServiceIPv6",
 		"destinationServicePort",
 	}
 	nonStatsElementList = []string{
@@ -179,7 +181,7 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 		assert.NotNil(t, flowKeyRecordMap[flowKey1])
 		record = flowKeyRecordMap[flowKey1].Record
 	}
-	assert.Equal(t, 40, len(record.GetOrderedElementList()))
+	assert.Equal(t, 41, len(record.GetOrderedElementList()))
 	for _, element := range record.GetOrderedElementList() {
 		infoElem := element.GetInfoElement()
 		switch infoElem.Name {
@@ -201,9 +203,9 @@ func testCollectorToIntermediate(t *testing.T, address net.Addr, isIPv6 bool) {
 			assert.Equal(t, uint64(500), element.GetUnsigned64Value())
 		case "packetTotalCount":
 			assert.Equal(t, uint64(1000), element.GetUnsigned64Value())
-		case "destinationClusterIPv4":
+		case "destinationClusterIPv4", "destinationServiceIPv4":
 			assert.Equal(t, net.IP{10, 0, 0, 3}, element.GetIPAddressValue())
-		case "destinationClusterIPv6":
+		case "destinationClusterIPv6", "destinationServiceIPv6":
 			assert.Equal(t, net.IP{0x20, 0x1, 0x0, 0x0, 0x32, 0x38, 0xbb, 0xbb, 0x0, 0x63, 0x0, 0x0, 0x0, 0x0, 0xaa, 0xaa}, element.GetIPAddressValue())
 		case "destinationServicePort":
 			assert.Equal(t, uint16(4739), element.GetUnsigned16Value())

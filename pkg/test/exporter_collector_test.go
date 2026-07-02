@@ -261,8 +261,8 @@ func matchDataRecordElements(t *testing.T, record entities.Record, isSrcNode, is
 		element, _, exist := record.GetInfoElementWithValue(name)
 		assert.True(t, exist)
 		switch name {
-		case "destinationClusterIPv4", "destinationClusterIPv6":
-			assert.Equal(t, testRec.dstClusterIP, element.GetIPAddressValue())
+		case "destinationClusterIPv4", "destinationClusterIPv6", "destinationServiceIPv4", "destinationServiceIPv6":
+			assert.Equal(t, testRec.dstServiceIP, element.GetIPAddressValue())
 		case "sourcePodName":
 			assert.Equal(t, testRec.srcPod, element.GetStringValue())
 		case "destinationPodName":
