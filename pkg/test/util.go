@@ -58,9 +58,11 @@ var (
 	}
 	antreaIPv4 = []string{
 		"destinationClusterIPv4",
+		"destinationServiceIPv4",
 	}
 	antreaIPv6 = []string{
 		"destinationClusterIPv6",
+		"destinationServiceIPv6",
 	}
 	reverseFields = []string{
 		"reversePacketTotalCount",
@@ -87,7 +89,7 @@ type testRecord struct {
 	pktDelta      uint64
 	srcPod        string
 	dstPod        string
-	dstClusterIP  net.IP
+	dstServiceIP  net.IP
 	dstSvcPort    uint16
 	revPktCount   uint64
 	revPktDelta   uint64
@@ -134,9 +136,9 @@ func getTestRecord(isSrcNode, isIPv6 bool, options ...testRecordOptions) *testRe
 		record.revPktCount = uint64(400)
 		record.revPktDelta = uint64(200)
 		if !isIPv6 {
-			record.dstClusterIP = net.ParseIP("0.0.0.0")
+			record.dstServiceIP = net.ParseIP("0.0.0.0")
 		} else {
-			record.dstClusterIP = net.ParseIP("::")
+			record.dstServiceIP = net.ParseIP("::")
 		}
 	} else {
 		record.flowEnd = uint32(1257894000)
@@ -150,9 +152,9 @@ func getTestRecord(isSrcNode, isIPv6 bool, options ...testRecordOptions) *testRe
 		record.revPktCount = uint64(300)
 		record.revPktDelta = uint64(150)
 		if !isIPv6 {
-			record.dstClusterIP = net.ParseIP("10.0.0.3")
+			record.dstServiceIP = net.ParseIP("10.0.0.3")
 		} else {
-			record.dstClusterIP = net.ParseIP("2001:0:3238:BBBB:63::AAAA")
+			record.dstServiceIP = net.ParseIP("2001:0:3238:BBBB:63::AAAA")
 		}
 	}
 	return &record
@@ -253,8 +255,8 @@ func getDataRecordElements(testRec *testRecord) []entities.InfoElementWithValue 
 		element, _ := registry.GetInfoElement(name, registry.AntreaEnterpriseID)
 		var ie entities.InfoElementWithValue
 		switch name {
-		case "destinationClusterIPv4", "destinationClusterIPv6":
-			ie = entities.NewIPAddressInfoElement(element, testRec.dstClusterIP)
+		case "destinationClusterIPv4", "destinationClusterIPv6", "destinationServiceIPv4", "destinationServiceIPv6":
+			ie = entities.NewIPAddressInfoElement(element, testRec.dstServiceIP)
 		case "sourcePodName":
 			ie = entities.NewStringInfoElement(element, testRec.srcPod)
 		case "destinationPodName":
