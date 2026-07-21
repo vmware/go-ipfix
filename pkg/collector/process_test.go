@@ -25,6 +25,7 @@ import (
 	"io"
 	"net"
 	"runtime"
+	"sync"
 	"testing"
 	"time"
 
@@ -338,7 +339,10 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, false)
 	cp, _ := InitCollectingProcess(input)
+	var wg sync.WaitGroup
+	wg.Add(2)
 	go func() {
+		defer wg.Done()
 		// wait until collector is ready
 		waitForCollectorReady(t, cp)
 		collectorAddr := cp.GetAddress()
@@ -348,6 +352,7 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 		}
 	}()
 	go func() {
+		defer wg.Done()
 		// wait until collector is ready
 		waitForCollectorReady(t, cp)
 		collectorAddr := cp.GetAddress()
@@ -359,10 +364,14 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 		// rather than relying on a fixed sleep that can be too short on slow CI runners.
 		assert.Eventually(t, func() bool {
 			return cp.GetNumConnToCollector() >= 2
-		}, 500*time.Millisecond, 10*time.Millisecond, "There should be at least two tcp clients.")
+		}, 5*time.Second, 10*time.Millisecond, "There should be at least two tcp clients.")
 		cp.Stop()
 	}()
 	cp.Start()
+	// Ensure both goroutines (and their calls into t) have finished before the
+	// test returns, otherwise a slow goroutine can call t.Errorf after the
+	// test has already completed, causing a panic.
+	wg.Wait()
 }
 
 func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
