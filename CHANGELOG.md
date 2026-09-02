@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.  The format
 Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+## 0.18.0 09-02-2026
+### Added
+- Add PolicyTypeK8sClusterNetworkPolicy in policy type enum. (#476, @Dyanngg)
+### Changed
+- Upgrade github.com/pion/dtls from v2.2.12 to v3.1.8, which addresses
+  CVE-2026-26014. (#482, @antoninbas)
+- Mark DestinationClusterIP as deprecated. (#472, @Dyanngg)
+## 0.17.0 06-16-2026
+### Added
+- Add new IEs for External-to-Pod flow support to Antrea registry. (#458, @petertran-avgo)
 ## 0.16.0 07-08-2025
 ### Added
 - Add new IEs for K8s object UUIDs to Antrea registry. (#433, @antoninbas)
