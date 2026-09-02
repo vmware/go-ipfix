@@ -29,7 +29,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v3"
+	dtlsnet "github.com/pion/dtls/v3/pkg/net"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -757,6 +758,41 @@ func TestTLSCollectingProcess(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// dialDTLS connects to the DTLS collector listening at addr, trusting rootCertPEM, and
+// completes the handshake. Failing to create the connection fails the test; a failed
+// handshake does not, it is returned as an error, so that callers can assert on it.
+// The connection is closed via t.Cleanup, which runs after the test function's own
+// defers: do not rely on it being closed before, say, a deferred cp.Stop().
+func dialDTLS(t *testing.T, addr *net.UDPAddr, rootCertPEM []byte) (*dtls.Conn, error) {
+	t.Helper()
+	roots := x509.NewCertPool()
+	require.True(t, roots.AppendCertsFromPEM(rootCertPEM), "Failed to parse root certificate")
+	// We dial the socket ourselves and hand it to pion as a net.PacketConn, instead of
+	// using dtls.Dial which would leave the socket unconnected. This is what the exporter
+	// does: see InitExportingProcess. It matters here because the collector keys sessions
+	// by the source address of the datagrams it receives, and only a connected socket has
+	// a local address that is guaranteed to match that source address.
+	udpConn, err := net.DialUDP(addr.Network(), nil, addr)
+	require.NoError(t, err)
+	conn, err := dtls.ClientWithOptions(
+		dtlsnet.PacketConnFromConn(udpConn), addr,
+		dtls.WithRootCAs(roots),
+		dtls.WithExtendedMasterSecret(dtls.RequireExtendedMasterSecret),
+	)
+	if err != nil {
+		udpConn.Close()
+	}
+	require.NoError(t, err)
+	t.Cleanup(func() { conn.Close() })
+	// As of pion/dtls v3, the handshake is not performed when the connection is created,
+	// but lazily on the first Read / Write. We trigger it explicitly so that handshake
+	// errors are reported here. We bound it, so that a collector which stalls mid-handshake
+	// fails this test instead of hanging until the package-level test timeout.
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return conn, conn.HandshakeContext(ctx)
+}
+
 func TestDTLSCollectingProcess(t *testing.T) {
 	input := getCollectorInput(udpTransport, true, false)
 	cp, err := InitCollectingProcess(input)
@@ -767,16 +803,40 @@ func TestDTLSCollectingProcess(t *testing.T) {
 	defer cp.Stop()
 
 	collectorAddr, _ := net.ResolveUDPAddr("udp", cp.GetAddress().String())
-	roots := x509.NewCertPool()
-	ok := roots.AppendCertsFromPEM(testcerts.FakeCert2)
-	if !ok {
-		t.Error("Failed to parse root certificate")
-	}
-	config := &dtls.Config{RootCAs: roots,
-		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret}
-	conn, err := dtls.Dial("udp", collectorAddr, config)
+	conn, err := dialDTLS(t, collectorAddr, testcerts.FakeCert2)
 	require.NoError(t, err)
-	defer conn.Close()
+	_, err = conn.Write(validTemplatePacket)
+	require.NoError(t, err)
+	<-cp.GetMsgChan()
+	template, _ := cp.getTemplateIEs(localConnSessionID(conn), 1, 256)
+	assert.NotNil(t, template, "DTLS Collecting Process should receive and store the received template")
+}
+
+// TestDTLSCollectingProcessFailedHandshake checks that a client which fails the DTLS
+// handshake does not prevent subsequent clients from connecting: otherwise any peer could
+// take the collector down by starting a handshake it cannot complete.
+func TestDTLSCollectingProcessFailedHandshake(t *testing.T) {
+	input := getCollectorInput(udpTransport, true, false)
+	cp, err := InitCollectingProcess(input)
+	require.NoError(t, err)
+	go cp.Start()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	defer cp.Stop()
+
+	collectorAddr, _ := net.ResolveUDPAddr("udp", cp.GetAddress().String())
+	// This client does not trust the collector's certificate, so it aborts the handshake.
+	_, _, unrelatedCACertPEM, err := testcerts.GenerateCACert()
+	require.NoError(t, err)
+	_, err = dialDTLS(t, collectorAddr, unrelatedCACertPEM)
+	require.Error(t, err, "Handshake should fail when the collector certificate is not trusted")
+	// The collector must have rejected us, not just gone silent: a timeout here would mean
+	// the accept path stalled, which is what the second dial below is meant to detect.
+	require.NotErrorIs(t, err, context.DeadlineExceeded)
+
+	// The collector must still be accepting connections.
+	conn, err := dialDTLS(t, collectorAddr, testcerts.FakeCert2)
+	require.NoError(t, err)
 	_, err = conn.Write(validTemplatePacket)
 	require.NoError(t, err)
 	<-cp.GetMsgChan()

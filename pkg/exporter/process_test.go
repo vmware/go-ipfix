@@ -25,7 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -636,11 +636,11 @@ func TestExportingProcessWithDTLS(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	config := &dtls.Config{
-		Certificates:         []tls.Certificate{cert},
-		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
-	}
-	listener, err := dtls.Listen("udp", address, config)
+	listener, err := dtls.ListenWithOptions(
+		"udp", address,
+		dtls.WithCertificates(cert),
+		dtls.WithExtendedMasterSecret(dtls.RequireExtendedMasterSecret),
+	)
 	if err != nil {
 		t.Errorf("Cannot start dtls collecting process on %s: %v", listener.Addr().String(), err)
 		return
