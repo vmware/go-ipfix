@@ -340,39 +340,47 @@ func TestUDPCollectingProcess_ReceiveDataRecord(t *testing.T) {
 func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 	input := getCollectorInput(tcpTransport, false, false)
 	cp, _ := InitCollectingProcess(input)
+	go cp.Start()
+	// Stop the collector when the test returns, and never before: stopping it from one
+	// of the client goroutines below used to race with the other clients, which could
+	// then fail to connect.
+	defer cp.Stop()
+	// wait until collector is ready
+	waitForCollectorReady(t, cp)
+	collectorAddr := cp.GetAddress()
+
+	const numClients = 2
+	// The connections are kept open until the end of the test, so that all the clients
+	// are connected to the collector simultaneously. They also need to be referenced
+	// until then, as the garbage collector closes unreachable connections.
+	conns := make([]net.Conn, numClients)
 	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		// wait until collector is ready
-		waitForCollectorReady(t, cp)
-		collectorAddr := cp.GetAddress()
-		_, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
-		}
-	}()
-	go func() {
-		defer wg.Done()
-		// wait until collector is ready
-		waitForCollectorReady(t, cp)
-		collectorAddr := cp.GetAddress()
-		_, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
-		if err != nil {
-			t.Errorf("Cannot establish connection to %s", collectorAddr.String())
-		}
-		// Poll until both connections are registered by the collector's accept loop,
-		// rather than relying on a fixed sleep that can be too short on slow CI runners.
-		assert.Eventually(t, func() bool {
-			return cp.GetNumConnToCollector() >= 2
-		}, 5*time.Second, 10*time.Millisecond, "There should be at least two tcp clients.")
-		cp.Stop()
-	}()
-	cp.Start()
-	// Ensure both goroutines (and their calls into t) have finished before the
-	// test returns, otherwise a slow goroutine can call t.Errorf after the
-	// test has already completed, causing a panic.
+	for i := range numClients {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			conn, err := net.Dial(collectorAddr.Network(), collectorAddr.String())
+			// Use assert and not require, which must not be called from a goroutine
+			// other than the one running the test.
+			if !assert.NoErrorf(t, err, "Cannot establish connection to %s", collectorAddr.String()) {
+				return
+			}
+			conns[i] = conn
+		}()
+	}
+	// All the clients connect concurrently, but we wait for all of them to be connected
+	// before asserting anything about the collector's sessions.
 	wg.Wait()
+	for _, conn := range conns {
+		if conn != nil {
+			defer conn.Close()
+		}
+	}
+
+	// Sessions are registered asynchronously by the accept loop, hence Eventually.
+	assert.Eventually(t, func() bool {
+		return cp.GetNumConnToCollector() >= numClients
+	}, 5*time.Second, 10*time.Millisecond, "There should be at least two tcp clients.")
 }
 
 func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
