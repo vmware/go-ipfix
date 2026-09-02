@@ -354,6 +354,7 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 	// are connected to the collector simultaneously. They also need to be referenced
 	// until then, as the garbage collector closes unreachable connections.
 	conns := make([]net.Conn, numClients)
+	sessionIDs := make([]string, numClients)
 	var wg sync.WaitGroup
 	for i := range numClients {
 		wg.Add(1)
@@ -366,10 +367,9 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 				return
 			}
 			conns[i] = conn
+			sessionIDs[i] = localConnSessionID(conn)
 		}()
 	}
-	// All the clients connect concurrently, but we wait for all of them to be connected
-	// before asserting anything about the collector's sessions.
 	wg.Wait()
 	for _, conn := range conns {
 		if conn != nil {
@@ -377,10 +377,22 @@ func TestTCPCollectingProcess_ConcurrentClient(t *testing.T) {
 		}
 	}
 
-	// Sessions are registered asynchronously by the accept loop, hence Eventually.
+	// Check for these specific sessions, and not just the session count, so that the
+	// assertion cannot be satisfied by an unrelated session. Sessions are registered
+	// asynchronously by the accept loop, hence Eventually.
 	assert.Eventually(t, func() bool {
-		return cp.GetNumConnToCollector() >= numClients
-	}, 5*time.Second, 10*time.Millisecond, "There should be at least two tcp clients.")
+		cp.mutex.RLock()
+		defer cp.mutex.RUnlock()
+		if len(cp.sessions) != numClients {
+			return false
+		}
+		for _, id := range sessionIDs {
+			if _, ok := cp.sessions[id]; !ok {
+				return false
+			}
+		}
+		return true
+	}, 5*time.Second, 10*time.Millisecond, "The collector should have a session for each tcp client.")
 }
 
 func TestUDPCollectingProcess_ConcurrentClient(t *testing.T) {
@@ -1032,18 +1044,22 @@ func getCollectorInput(network string, isEncrypted bool, isIPv6 bool) CollectorI
 	}
 }
 
+// waitForCollectorReady waits until the collector's socket is bound and its listening
+// address is available. Both the TCP and the UDP code paths bind the socket before
+// calling updateAddress, so a non-nil address means that the kernel is already queuing
+// incoming connections / datagrams for the collector, even if its accept or read loop
+// has not been scheduled yet.
+//
+// It deliberately does not dial the collector to probe for readiness: such a connection
+// is registered as a session by the TCP accept loop, and is only unregistered
+// asynchronously after it is closed, which contaminates session assertions in tests.
 func waitForCollectorReady(t *testing.T, cp *CollectingProcess) {
-	checkConn := func(ctx context.Context) (bool, error) {
-		if conn, err := net.Dial(cp.GetAddress().Network(), cp.GetAddress().String()); err != nil {
-			return false, err
-		} else {
-			defer conn.Close()
-			return true, nil
-		}
+	t.Helper()
+	checkAddr := func(ctx context.Context) (bool, error) {
+		return cp.GetAddress() != nil, nil
 	}
-	if err := wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 500*time.Millisecond, false, checkConn); err != nil {
-		t.Errorf("Cannot establish connection to %s", cp.GetAddress().String())
-	}
+	err := wait.PollUntilContextTimeout(context.Background(), 10*time.Millisecond, 5*time.Second, true, checkAddr)
+	require.NoError(t, err, "Collecting process is not ready")
 }
 
 func disableLogToStderr() {
